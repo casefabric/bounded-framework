@@ -13,11 +13,11 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-package bounded.test
+package io.cafienne.bounded.test
 
 import akka.actor.{ActorContext, ActorRef}
 import akka.persistence.PersistentActor
-import bounded.commands.AggregateRootEvent
+import io.cafienne.bounded.commands.AggregateRootEvent
 
 class CreateEventsInStoreActor extends PersistentActor {
   override def persistenceId: String = "bounded.test-events-actor"

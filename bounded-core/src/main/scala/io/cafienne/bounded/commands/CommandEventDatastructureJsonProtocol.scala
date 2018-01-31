@@ -13,14 +13,14 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-package bounded.commands
+package io.cafienne.bounded.commands
 
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 import java.util.UUID
 
-import bounded.akka.persistence.eventmaterializers.EventNumber
+import io.cafienne.bounded.akka.persistence.eventmaterializers.EventNumber
 import spray.json._
 
 object CommandEventDatastructureJsonProtocol extends DefaultJsonProtocol {

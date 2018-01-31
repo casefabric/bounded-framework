@@ -13,7 +13,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-package bounded.akka.persistence
+package io.cafienne.bounded.akka.persistence
 
 import akka.actor.Props
 import akka.persistence.cassandra.query.scaladsl.CassandraReadJournal
@@ -24,8 +24,8 @@ import akka.persistence.journal.leveldb.{
 import akka.persistence.query.PersistenceQuery
 import akka.persistence.query.journal.leveldb.scaladsl.LeveldbReadJournal
 import akka.persistence.query.scaladsl._
-import bounded.akka.ActorSystemProvider
-import bounded.akka.persistence.leveldb.SharedJournal
+import io.cafienne.bounded.akka.ActorSystemProvider
+import io.cafienne.bounded.akka.persistence.leveldb.SharedJournal
 
 /**
   * Provides a readJournal that has the eventsByTag available that's used for

@@ -13,13 +13,13 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-package bounded.akka.http
+package io.cafienne.bounded.akka.http
 
 import java.util.UUID
 
 import akka.http.scaladsl.unmarshalling._
 import akka.persistence.query.{Offset, Sequence}
-import bounded.config.Configured
+import io.cafienne.bounded.config.Configured
 
 /**
   * Actually Deserializers that allow you to get a query parameter (with the parameters directive)

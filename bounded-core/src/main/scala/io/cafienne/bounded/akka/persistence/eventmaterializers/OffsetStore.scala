@@ -13,13 +13,13 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-package bounded.akka.persistence.eventmaterializers
+package io.cafienne.bounded.akka.persistence.eventmaterializers
 
 import java.util.UUID
 
 import akka.persistence.cassandra.query.scaladsl.CassandraReadJournal
 import akka.persistence.query.{Offset, Sequence, TimeBasedUUID}
-import bounded.akka.persistence.ReadJournalProvider
+import io.cafienne.bounded.akka.persistence.ReadJournalProvider
 
 import scala.collection.mutable.Map
 import scala.concurrent.duration._

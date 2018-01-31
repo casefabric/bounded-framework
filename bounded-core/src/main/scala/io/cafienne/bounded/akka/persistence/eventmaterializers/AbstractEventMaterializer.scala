@@ -13,16 +13,16 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-package bounded.akka.persistence.eventmaterializers
+package io.cafienne.bounded.akka.persistence.eventmaterializers
 
 import akka.{Done, NotUsed}
 import akka.actor.ActorSystem
 import akka.persistence.query.{EventEnvelope, Offset}
 import akka.stream.{ActorMaterializer, KillSwitches, UniqueKillSwitch}
 import akka.stream.scaladsl.{Keep, Sink, Source}
-import bounded.akka.ActorSystemProvider
-import bounded.akka.persistence.ReadJournalProvider
-import bounded.config.Configured
+import io.cafienne.bounded.akka.ActorSystemProvider
+import io.cafienne.bounded.akka.persistence.ReadJournalProvider
+import io.cafienne.bounded.config.Configured
 import com.typesafe.scalalogging.Logger
 
 import scala.concurrent.{Await, Future}

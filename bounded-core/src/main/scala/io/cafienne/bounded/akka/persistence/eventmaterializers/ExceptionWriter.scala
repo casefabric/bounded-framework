@@ -1,4 +1,4 @@
-package bounded.akka.persistence.eventmaterializers
+package io.cafienne.bounded.akka.persistence.eventmaterializers
 
 import java.io.{PrintWriter, StringWriter}
 

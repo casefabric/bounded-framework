@@ -1,4 +1,4 @@
-package bounded.test
+package io.cafienne.bounded.test
 
 import akka.testkit.TestKit
 import org.scalatest.{BeforeAndAfterAll, Suite}

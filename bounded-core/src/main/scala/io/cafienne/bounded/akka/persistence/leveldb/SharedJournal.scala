@@ -13,7 +13,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-package bounded.akka.persistence.leveldb
+package io.cafienne.bounded.akka.persistence.leveldb
 
 import akka.actor.{ActorPath, RootActorPath, Address}
 import akka.persistence.query.journal.leveldb.scaladsl.LeveldbReadJournal

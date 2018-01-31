@@ -1,6 +1,6 @@
-package bounded.akka.persistence.persisters
+package io.cafienne.bounded.akka.persistence.persisters
 
-import bounded.commands._
+import io.cafienne.bounded.commands._
 import com.typesafe.scalalogging.LazyLogging
 import spray.json.{DefaultJsonProtocol, RootJsonFormat}
 import stamina._

@@ -1,4 +1,4 @@
-package bounded.test
+package io.cafienne.bounded.test
 
 import akka.persistence.query.PersistenceQuery
 import akka.persistence.query.scaladsl._
