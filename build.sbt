@@ -41,35 +41,10 @@ lazy val moduleSettings = basicSettings ++ Seq(
     else
       Opts.resolver.sonatypeStaging
   ),
-
   publishMavenStyle := true,
-//    publishTo := {
-//        val nexus = "https://oss.sonatype.org/"
-//        if (isSnapshot.value)
-//            Some("snapshots" at nexus + "content/repositories/snapshots")
-//        else
-//            Some("releases"  at nexus + "service/local/staging/deploy/maven2")
-//    },
-    publishArtifact in Test := false,
-    pomIncludeRepository := { _ => false },
-//    pomExtra :=
-//      <url>https://github.com/bounded-ddd/bounded-framework</url>
-//      <issueManagement>
-//          <system>Github</system>
-//          <url>https://github.com/bounded-ddd/bounded-framework/issues</url>
-//      </issueManagement>
-//      <scm>
-//          <url>git@github.com:bounded-ddd/bounded-framework.git</url>
-//          <connection>scm:git:git@github.com:bounded-ddd/bounded-framework.git</connection>
-//      </scm>
-//      <developers>
-//        <developer>
-//          <id>olger</id>
-//          <name>Olger Warnier</name>
-//            <email>olger.warnier@spronq.com</email>
-//        </developer>
-//      </developers>
-) 
+  publishArtifact in Test := false,
+  pomIncludeRepository := { _ => false },
+)
 
 lazy val boundedRoot = (project in file("."))
   .settings(basicSettings: _*)
