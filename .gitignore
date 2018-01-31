@@ -1,2 +1,26 @@
 *.class
 *.log
+.idea/
+*.iml
+target/
+*.ipr
+*.iws
+rebel.xml
+*-dev.*
+target
+project/boot
+project/target
+project/plugins/target
+db.properties
+*.sh
+.DS_Store
+local.conf
+*.sc
+# Emacs-specific
+.ensime*
+.projectile
+*/src/main/resources/git.properties
+*/src/main/resources/git.props
+tags
+journal
+journal/*
