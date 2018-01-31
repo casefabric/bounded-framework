@@ -6,7 +6,6 @@ lazy val basicSettings = {
   Seq(
     organization := "io.cafienne.bounded",
     description := "Scala and Akka based Domain Driven Design Framework",
-    licenses +=("Apache-2.0", url("http://www.apache.org/licenses/LICENSE-2.0")),
     scalaVersion := currentScalaVersion,
     crossScalaVersions := Seq(currentScalaVersion, scala211Version),
     scalacOptions := Seq(
@@ -30,7 +29,7 @@ lazy val moduleSettings = basicSettings ++ Seq(
   homepage := Some(url("https://github.com/cafienne/bounded-framework")),
   scmInfo := Some(ScmInfo(url("https://github.com/cafienne/bounded-framework"), "git@github.com:cafienne/bounded-framework.git")),
   developers := List(Developer("olger",
-    "Olwer Warnier",
+    "Olger Warnier",
     "olger.warnier@spronq.com",
     url("https://github.com/olger"))),
   licenses += ("Apache-2.0", url("http://www.apache.org/licenses/LICENSE-2.0")),
@@ -53,36 +52,37 @@ lazy val moduleSettings = basicSettings ++ Seq(
 //    },
     publishArtifact in Test := false,
     pomIncludeRepository := { _ => false },
-    pomExtra :=
-      <url>https://github.com/bounded-ddd/bounded-framework</url>
-      <issueManagement>
-          <system>Github</system>
-          <url>https://github.com/bounded-ddd/bounded-framework/issues</url>
-      </issueManagement>
-      <scm>
-          <url>git@github.com:bounded-ddd/bounded-framework.git</url>
-          <connection>scm:git:git@github.com:bounded-ddd/bounded-framework.git</connection>
-      </scm>
-      <developers>
-        <developer>
-          <id>olger</id>
-          <name>Olger Warnier</name>
-            <email>olger.warnier@spronq.com</email>
-        </developer>
-      </developers>
+//    pomExtra :=
+//      <url>https://github.com/bounded-ddd/bounded-framework</url>
+//      <issueManagement>
+//          <system>Github</system>
+//          <url>https://github.com/bounded-ddd/bounded-framework/issues</url>
+//      </issueManagement>
+//      <scm>
+//          <url>git@github.com:bounded-ddd/bounded-framework.git</url>
+//          <connection>scm:git:git@github.com:bounded-ddd/bounded-framework.git</connection>
+//      </scm>
+//      <developers>
+//        <developer>
+//          <id>olger</id>
+//          <name>Olger Warnier</name>
+//            <email>olger.warnier@spronq.com</email>
+//        </developer>
+//      </developers>
 ) 
 
 lazy val boundedRoot = (project in file("."))
   .settings(basicSettings: _*)
-  .enablePlugins(ReleasePlugin)
   //.settings(releaseSettings)
   .aggregate(boundedCore, boundedTest)
 
 val boundedCore = (project in file("bounded-core"))
+  .enablePlugins(ReleasePlugin)
   .settings(moduleSettings: _*)
   .settings(libraryDependencies ++= Dependencies.baseDeps)
 
 val boundedTest = (project in file("bounded-test"))
   .dependsOn(boundedCore)
+  .enablePlugins(ReleasePlugin)
   .settings(moduleSettings: _*)
   .settings(libraryDependencies ++= Dependencies.baseDeps)
