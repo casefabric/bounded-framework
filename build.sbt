@@ -4,7 +4,7 @@ lazy val basicSettings = {
   val scala211Version     = "2.11.11"
 
   Seq(
-    organization := "org.boundedframework",
+    organization := "io.cafienne.bounded",
     description := "Scala and Akka based Domain Driven Design Framework",
     licenses +=("Apache-2.0", url("http://www.apache.org/licenses/LICENSE-2.0")),
     scalaVersion := currentScalaVersion,
@@ -21,19 +21,36 @@ lazy val basicSettings = {
       "-Ywarn-value-discard", // Warn when non-Unit expression results are unused
       "-Ywarn-inaccessible",
       "-Ywarn-dead-code"
-    )
+    ),
+    scalastyleConfig := baseDirectory.value / "project/scalastyle-config.xml"
   )
 }
 
 lazy val moduleSettings = basicSettings ++ Seq(
-    publishMavenStyle := true,
-    publishTo := {
-        val nexus = "https://oss.sonatype.org/"
-        if (isSnapshot.value)
-            Some("snapshots" at nexus + "content/repositories/snapshots")
-        else
-            Some("releases"  at nexus + "service/local/staging/deploy/maven2")
-    },
+  homepage := Some(url("https://github.com/cafienne/bounded-framework")),
+  scmInfo := Some(ScmInfo(url("https://github.com/cafienne/bounded-framework"), "git@github.com:cafienne/bounded-framework.git")),
+  developers := List(Developer("olger",
+    "Olwer Warnier",
+    "olger.warnier@spronq.com",
+    url("https://github.com/olger"))),
+  licenses += ("Apache-2.0", url("http://www.apache.org/licenses/LICENSE-2.0")),
+
+// Add sonatype repository settings
+  publishTo := Some(
+    if (isSnapshot.value)
+      Opts.resolver.sonatypeSnapshots
+    else
+      Opts.resolver.sonatypeStaging
+  ),
+
+  publishMavenStyle := true,
+//    publishTo := {
+//        val nexus = "https://oss.sonatype.org/"
+//        if (isSnapshot.value)
+//            Some("snapshots" at nexus + "content/repositories/snapshots")
+//        else
+//            Some("releases"  at nexus + "service/local/staging/deploy/maven2")
+//    },
     publishArtifact in Test := false,
     pomIncludeRepository := { _ => false },
     pomExtra :=
@@ -50,7 +67,7 @@ lazy val moduleSettings = basicSettings ++ Seq(
         <developer>
           <id>olger</id>
           <name>Olger Warnier</name>
-            <email>olger@spectare.nl</email>
+            <email>olger.warnier@spronq.com</email>
         </developer>
       </developers>
 ) 
