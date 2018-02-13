@@ -42,7 +42,8 @@ object CommandEventDatastructureJsonProtocol extends DefaultJsonProtocol {
 
     def write(dt: ZonedDateTime): JsValue =
       JsString(
-        dt.truncatedTo(ChronoUnit.MINUTES)
+        dt.truncatedTo(ChronoUnit.SECONDS)
+          .toOffsetDateTime
           .format(DateTimeFormatter.ISO_DATE_TIME))
 
     def read(value: JsValue): ZonedDateTime = value match {
