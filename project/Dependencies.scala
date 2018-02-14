@@ -2,8 +2,12 @@ import sbt._
 
 object Dependencies {
 
+  val akkaVersion = "2.5.9"
+  val staminaVersion = "0.1.4"
+  val persistenceInMemVersion = "2.5.1.1"
+
   val baseDeps = {
-    def akkaModule(name: String, version: String = "2.5.9") =
+    def akkaModule(name: String, version: String = akkaVersion) =
       "com.typesafe.akka" %% s"akka-$name" % version
     Seq(
       akkaModule("slf4j"),
@@ -13,12 +17,11 @@ object Dependencies {
       akkaModule("persistence-query"),
       akkaModule("stream-testkit") % Test,
       akkaModule("testkit") % Test,
-      "com.scalapenos"                  %% "stamina-json"                           % "0.1.3",
-      "io.spray"                        %% "spray-json"                             % "1.3.3",
-//      "org.iq80.leveldb"                %  "leveldb"                                % "0.8",
-//      "org.fusesource.leveldbjni"       %  "leveldbjni-all"                         % "1.8",
-      "com.typesafe.akka"               %% "akka-persistence-cassandra"             % "0.54",
-      "com.typesafe.scala-logging"      %% "scala-logging"                          % "3.5.0"
+      "com.scalapenos"              %% "stamina-json"                           % staminaVersion,
+      "io.spray"                    %% "spray-json"                             % "1.3.4",
+      "com.typesafe.akka"           %% "akka-persistence-cassandra"             % "0.81",
+      "com.github.dnvriend"         %% "akka-persistence-inmemory"              % persistenceInMemVersion,
+      "com.typesafe.scala-logging"  %% "scala-logging"                          % "3.5.0"
     )
   }
 
@@ -36,8 +39,7 @@ object Dependencies {
   val testDeps = {
     baseDeps ++ Seq(
       "org.scalatest"          %% "scalatest"                   % "3.0.1",
-      "com.github.dnvriend"    %% "akka-persistence-inmemory"   % "2.5.0.0",
-      "com.typesafe.akka"      %% "akka-testkit"                % "2.5.9"
+      "com.typesafe.akka"      %% "akka-testkit"                % akkaVersion
     )
   }
 
@@ -51,8 +53,7 @@ object Dependencies {
   val  test = {
     log ++ Seq(
       "org.scalatest"       %% "scalatest"                   % "3.0.1" % Test,
-      "com.github.dnvriend" %% "akka-persistence-inmemory"   % "2.5.0.0" % Test,
-      "com.scalapenos"      %% "stamina-testkit"             % "0.1.3" % Test,
+      "com.scalapenos"      %% "stamina-testkit"             % "0.1.4" % Test,
       "org.scalamock"       %% "scalamock-scalatest-support" % "3.6.0" % Test,
       "com.danielasfregola" %% "random-data-generator"       % "2.3" % Test
     )

@@ -17,11 +17,8 @@ package io.cafienne.bounded.test
 
 import akka.NotUsed
 import akka.actor.ActorSystem
-import akka.persistence.inmemory.extension.{
-  InMemoryJournalStorage,
-  InMemorySnapshotStorage,
-  StorageExtension
-}
+import akka.persistence.inmemory.extension.{InMemoryJournalStorage, InMemorySnapshotStorage, StorageExtension}
+import akka.persistence.inmemory.query.scaladsl.InMemoryReadJournal
 import akka.persistence.query.scaladsl._
 import akka.persistence.query.{EventEnvelope, PersistenceQuery}
 import akka.stream.ActorMaterializer
@@ -37,7 +34,7 @@ trait TestJournalProvider {
   implicit val materializer: ActorMaterializer = ActorMaterializer()
 
   private lazy val readJournal = PersistenceQuery(journalActorSystem)
-    .readJournalFor("inmemory-read-journal")
+    .readJournalFor[InMemoryReadJournal](InMemoryReadJournal.Identifier)
     .asInstanceOf[ReadJournal with CurrentPersistenceIdsQuery with CurrentEventsByPersistenceIdQuery with CurrentEventsByTagQuery with EventsByPersistenceIdQuery with EventsByTagQuery]
 
   protected def resetJournal(): Unit = {
