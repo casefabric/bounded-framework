@@ -50,7 +50,7 @@ lazy val moduleSettings = basicSettings ++ Seq(
 lazy val boundedRoot = (project in file("."))
   .settings(basicSettings: _*)
   //.settings(releaseSettings)
-  .aggregate(boundedCore, boundedTest)
+  .aggregate(boundedCore, boundedAkkaHttp, boundedTest)
 
 val boundedCore = (project in file("bounded-core"))
   .enablePlugins(ReleasePlugin)
@@ -59,10 +59,18 @@ val boundedCore = (project in file("bounded-core"))
     name := "bounded-core",
     libraryDependencies ++= Dependencies.baseDeps)
 
+val boundedAkkaHttp = (project in file("bounded-akka-http"))
+  .dependsOn(boundedCore)
+  .enablePlugins(ReleasePlugin)
+  .settings(moduleSettings: _*)
+  .settings(
+    name := "bounded-akka-http",
+    libraryDependencies ++= Dependencies.akkaHttpDeps)
+
 val boundedTest = (project in file("bounded-test"))
   .dependsOn(boundedCore)
   .enablePlugins(ReleasePlugin)
   .settings(moduleSettings: _*)
   .settings(
     name := "bounded-test",
-    libraryDependencies ++= Dependencies.baseDeps)
+    libraryDependencies ++= Dependencies.testDeps)
