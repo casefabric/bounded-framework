@@ -8,6 +8,7 @@ lazy val basicSettings = {
     description := "Scala and Akka based Domain Driven Design Framework",
     scalaVersion := currentScalaVersion,
     crossScalaVersions := Seq(currentScalaVersion, scala211Version),
+    releaseCrossBuild := true,
     scalacOptions := Seq(
       "-encoding", "UTF-8",
       "-target:jvm-1.8",
@@ -54,10 +55,14 @@ lazy val boundedRoot = (project in file("."))
 val boundedCore = (project in file("bounded-core"))
   .enablePlugins(ReleasePlugin)
   .settings(moduleSettings: _*)
-  .settings(libraryDependencies ++= Dependencies.baseDeps)
+  .settings(
+    name := "bounded-core",
+    libraryDependencies ++= Dependencies.baseDeps)
 
 val boundedTest = (project in file("bounded-test"))
   .dependsOn(boundedCore)
   .enablePlugins(ReleasePlugin)
   .settings(moduleSettings: _*)
-  .settings(libraryDependencies ++= Dependencies.baseDeps)
+  .settings(
+    name := "bounded-test",
+    libraryDependencies ++= Dependencies.baseDeps)
