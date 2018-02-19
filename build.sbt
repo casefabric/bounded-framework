@@ -50,7 +50,7 @@ lazy val boundedRoot = (project in file("."))
   .settings(basicSettings: _*)
   .settings(publishArtifact := false) 
   //.settings(releaseSettings)
-  .aggregate(boundedCore, boundedAkkaHttp, boundedTest)
+  .aggregate(boundedCore, boundedAkkaHttp, boundedTest, cargoSample)
 
 val boundedCore = (project in file("bounded-core"))
   .enablePlugins(ReleasePlugin)
