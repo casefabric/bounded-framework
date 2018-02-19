@@ -136,20 +136,20 @@ class CassandraOffsetStore(readJournal: CassandraReadJournal,
 
 }
 
-trait OffsetType {
+protected trait OffsetType {
   def offsetType: OffsetTypes = ???
 }
 
-trait OffsetTypeUuid extends OffsetType {
-  override def offsetType = UuidType
+sealed trait OffsetTypeUuid extends OffsetType {
+  override def offsetType: OffsetTypes = UuidType
 }
 
-trait OffsetTypeSequence extends OffsetType {
-  override def offsetType = SequenceType
+sealed trait OffsetTypeSequence extends OffsetType {
+  override def offsetType: OffsetTypes = SequenceType
 }
 
-trait OffsetTypeEventNumber extends OffsetType {
-  override def offsetType = EventNumberType
+sealed trait OffsetTypeEventNumber extends OffsetType {
+  override def offsetType: OffsetTypes = EventNumberType
 }
 
 trait ReadJournalOffsetStore extends OffsetStore with OffsetType {

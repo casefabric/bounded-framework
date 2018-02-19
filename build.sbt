@@ -8,7 +8,7 @@ lazy val basicSettings = {
     description := "Scala and Akka based Domain Driven Design Framework",
     scalaVersion := currentScalaVersion,
     crossScalaVersions := Seq(currentScalaVersion, scala211Version),
-    releaseCrossBuild := true,
+    //releaseCrossBuild := true,
     scalacOptions := Seq(
       "-encoding", "UTF-8",
       "-target:jvm-1.8",
@@ -16,7 +16,6 @@ lazy val basicSettings = {
       "-feature", // warning and location for usages of features that should be imported explicitly
       "-unchecked", // additional warnings where generated code depends on assumptions
       "-Xlint", // recommended additional warnings
-      "-Xcheckinit", // runtime error when a val is not initialized due to trait hierarchies (instead of NPE somewhere else)
       "-Ywarn-adapted-args", // Warn if an argument list is modified to match the receiver
       "-Ywarn-value-discard", // Warn when non-Unit expression results are unused
       "-Ywarn-inaccessible",
@@ -49,6 +48,7 @@ lazy val moduleSettings = basicSettings ++ Seq(
 
 lazy val boundedRoot = (project in file("."))
   .settings(basicSettings: _*)
+  .settings(publishArtifact := false) 
   //.settings(releaseSettings)
   .aggregate(boundedCore, boundedAkkaHttp, boundedTest)
 
@@ -73,4 +73,12 @@ val boundedTest = (project in file("bounded-test"))
   .settings(moduleSettings: _*)
   .settings(
     name := "bounded-test",
+    libraryDependencies ++= Dependencies.testDeps)
+
+val cargoSample = (project in file("cargo-sample"))
+  .dependsOn(boundedCore, boundedAkkaHttp, boundedTest)
+  .enablePlugins(ReleasePlugin)
+  .settings(moduleSettings: _*)
+  .settings(
+    name := "cargo-sample",
     libraryDependencies ++= Dependencies.testDeps)

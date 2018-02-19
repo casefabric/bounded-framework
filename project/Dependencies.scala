@@ -25,6 +25,20 @@ object Dependencies {
     )
   }
 
+  val log = Seq(
+      "ch.qos.logback" % "logback-classic" % "1.2.3",
+      "net.logstash.logback" % "logstash-logback-encoder" % "4.10"
+    )
+
+
+  val  test = log ++ Seq(
+      "org.scalatest"       %% "scalatest"                   % "3.0.1" % Test,
+      "com.scalapenos"      %% "stamina-testkit"             % "0.1.4" % Test,
+      "org.scalamock"       %% "scalamock-scalatest-support" % "3.6.0" % Test,
+      "com.danielasfregola" %% "random-data-generator"       % "2.3" % Test
+    )
+
+
   val akkaHttpDeps = {
     def akkaHttpModule(name: String, version: String = "10.0.11") =
       "com.typesafe.akka" %% s"akka-$name" % version
@@ -33,30 +47,14 @@ object Dependencies {
       akkaHttpModule("http"),
       akkaHttpModule("http-spray-json"),
       akkaHttpModule("http-testkit") % Test
-    )
+    ) ++ test
   }
 
   val testDeps = {
     baseDeps ++ Seq(
       "org.scalatest"          %% "scalatest"                   % "3.0.1",
       "com.typesafe.akka"      %% "akka-testkit"                % akkaVersion
-    )
-  }
-
-  val log = {
-    Seq(
-      "ch.qos.logback" % "logback-classic" % "1.2.3",
-      "net.logstash.logback" % "logstash-logback-encoder" % "4.10"
-    )
-  }
-
-  val  test = {
-    log ++ Seq(
-      "org.scalatest"       %% "scalatest"                   % "3.0.1" % Test,
-      "com.scalapenos"      %% "stamina-testkit"             % "0.1.4" % Test,
-      "org.scalamock"       %% "scalamock-scalatest-support" % "3.6.0" % Test,
-      "com.danielasfregola" %% "random-data-generator"       % "2.3" % Test
-    )
+    ) ++ test
   }
 
 }
