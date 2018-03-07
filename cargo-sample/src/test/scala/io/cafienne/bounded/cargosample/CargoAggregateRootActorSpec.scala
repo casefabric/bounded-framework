@@ -50,7 +50,7 @@ class CargoAggregateRootActorSpec extends TestKit(ActorSystem("CargoTestSystem",
       val routeSpecification = RouteSpecification(Location("home"), Location("destination"), ZonedDateTime.parse("2018-03-03T10:15:30+01:00[Europe/Amsterdam]"))
       val planCargoCommand = PlanCargo(metaData, cargoId1, trackingId, routeSpecification)
 
-      val aggregateRootActor = system.actorOf(Cargo.create(cargoId1), "test-aggregate")
+      val aggregateRootActor = system.actorOf(Cargo.props(cargoId1), "test-aggregate")
 
       within(10.seconds) {
         aggregateRootActor ! planCargoCommand
