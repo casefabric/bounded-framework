@@ -15,7 +15,7 @@
 // limitations under the License.
 package io.cafienne.bounded.akka.persistence.persisters
 
-import io.cafienne.bounded.commands._
+import io.cafienne.bounded.aggregate._
 import com.typesafe.scalalogging.LazyLogging
 import spray.json.{DefaultJsonProtocol, RootJsonFormat}
 import stamina._
@@ -26,9 +26,7 @@ object UnsupportedEventProtocol extends DefaultJsonProtocol {
   case class UnsupportedEventAggregateId(id: String) extends AggregateRootId {
     override def idAsString: String = id
   }
-  case class UnsupportedEvent(metaData: MetaData,
-                              id: UnsupportedEventAggregateId)
-      extends AggregateRootEvent
+  case class UnsupportedEvent(metaData: MetaData, id: UnsupportedEventAggregateId) extends AggregateRootEvent
 
   implicit val unsupportedAggregateIdFmt
     : RootJsonFormat[UnsupportedEventAggregateId] = jsonFormat1(

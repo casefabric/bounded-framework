@@ -13,22 +13,16 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-package io.cafienne.bounded.commands
+package io.cafienne.bounded.aggregate
 
-class CommandValidationException(msg: String) extends Exception(msg) {
-  def this(msg: String, cause: Throwable) = {
-    this(msg)
-    initCause(cause)
-  }
+import scala.concurrent.Future
+
+trait ValidateableCommand[T <: AggregateRootCommand] {
+  def validate(cmd: T): Future[T]
 }
 
-object CommandValidationException {
-  def apply(reason: String): CommandValidationException =
-    new CommandValidationException(reason)
-  def apply(reason: String, cause: Throwable): CommandValidationException =
-    new CommandValidationException(reason, cause)
-
-  def unapply(
-      e: CommandValidationException): Option[(String, Option[Throwable])] =
-    Some((e.getMessage, Option(e.getCause)))
+object CommandValidator {
+  def validate[T <: AggregateRootCommand](v: T)(
+      implicit validator: ValidateableCommand[T]): Future[T] =
+    validator.validate(v)
 }

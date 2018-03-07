@@ -17,10 +17,11 @@ package io.cafienne.bounded.test
 
 import akka.actor.{ActorContext, ActorRef}
 import akka.persistence.PersistentActor
-import io.cafienne.bounded.commands.AggregateRootEvent
+import io.cafienne.bounded.aggregate.{AggregateRootEvent, AggregateRootId}
 
-class CreateEventsInStoreActor extends PersistentActor {
-  override def persistenceId: String = "bounded.test-events-actor"
+class CreateEventsInStoreActor(aggregateId: AggregateRootId) extends PersistentActor {
+  override def persistenceId: String = aggregateId.idAsString
+
 
   override def receiveRecover: Receive = {
     case other =>

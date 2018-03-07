@@ -17,7 +17,7 @@ package io.cafienne.bounded.cargosample.aggregate
 
 import akka.actor.{ Actor, ActorLogging, ActorRef, ActorSystem, Props }
 import akka.util.Timeout
-import io.cafienne.bounded.commands.{ AggregateRootId, CommandValidationException, CommandValidator }
+import io.cafienne.bounded.aggregate.{ AggregateRootId, CommandValidationException, CommandValidator }
 import io.cafienne.bounded.cargosample.aggregate.CargoDomainProtocol._
 import io.cafienne.bounded.cargosample.aggregate.{ CargoCommandValidators, CargoCommandValidatorsImpl }
 import scala.util.{ Failure, Success }

@@ -19,7 +19,7 @@ import io.cafienne.bounded.cargosample.aggregate.CargoDomainProtocol.{CargoPlann
 import spray.json._
 
 object CargoDomainEventJsonProtocol extends DefaultJsonProtocol {
-  import io.cafienne.bounded.commands.CommandEventDatastructureJsonProtocol._
+  import io.cafienne.bounded.aggregate.CommandEventDatastructureJsonProtocol._
   import io.cafienne.bounded.cargosample.aggregate.CargoDomainJsonProtocol._
 
   implicit val smartDriverEnrolledFmt = jsonFormat4(CargoPlanned)

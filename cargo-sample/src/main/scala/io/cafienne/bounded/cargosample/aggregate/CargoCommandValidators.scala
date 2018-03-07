@@ -19,7 +19,7 @@ import akka.actor.ActorSystem
 import akka.stream.ActorMaterializer
 import io.cafienne.bounded.akka.ActorSystemProvider
 import io.cafienne.bounded.akka.persistence.ReadJournalProvider
-import io.cafienne.bounded.commands.ValidateableCommand
+import io.cafienne.bounded.aggregate.ValidateableCommand
 import io.cafienne.bounded.cargosample.aggregate.CargoDomainProtocol.{CargoDomainCommand, CargoNotFound, PlanCargo, SpecifyNewRoute}
 
 import scala.concurrent.Future

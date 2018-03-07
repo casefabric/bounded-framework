@@ -18,7 +18,7 @@ package io.cafienne.bounded.cargosample.aggregate
 import java.time.ZonedDateTime
 import java.util.UUID
 
-import io.cafienne.bounded.commands._
+import io.cafienne.bounded.aggregate._
 
 import scala.annotation.meta.field
 

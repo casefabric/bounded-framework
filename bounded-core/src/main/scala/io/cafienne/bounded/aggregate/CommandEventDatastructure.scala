@@ -13,7 +13,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-package io.cafienne.bounded.commands
+package io.cafienne.bounded.aggregate
 
 import java.time.ZonedDateTime
 import java.util.UUID
@@ -23,6 +23,8 @@ import stamina.Persistable
 trait Id {
   def idAsString: String
 }
+
+trait AggregateRootState
 
 trait AggregateRootId extends Id
 
@@ -67,6 +69,7 @@ trait AggregateRootCommand {
 }
 
 trait AggregateRootEvent extends Persistable {
+
   def id: AggregateRootId
 
   def metaData: MetaData

@@ -16,27 +16,31 @@
 package io.cafienne.bounded.cargosample.aggregate
 
 import akka.actor._
-import akka.persistence.{PersistentActor, RecoveryCompleted}
-import io.cafienne.bounded.commands.{AggregateRootId, CommandNotProcessedException}
+import akka.persistence.RecoveryCompleted
+import io.cafienne.bounded.aggregate._
 import io.cafienne.bounded.cargosample.aggregate.Cargo.CargoAggregateRootState
 import io.cafienne.bounded.cargosample.aggregate.CargoDomainProtocol._
 
 import scala.collection.immutable.Seq
+import scala.reflect.ClassTag
 
 /**
  * Aggregate root that keeps the logic of the cargo.
- * @param CargoId unique identifier for cargo.
+ * @param cargoId unique identifier for cargo.
  */
-class Cargo(CargoId: CargoId) extends PersistentActor with ActorLogging {
+class Cargo(cargoId: AggregateRootId) extends AggregateRootActor with ActorLogging {
 
-  override def persistenceId: String = CargoId.id.toString
+  override def persistenceId: String = cargoId.idAsString
 
-  var state: Option[CargoAggregateRootState] = None
+  private var internalState: Option[CargoAggregateRootState] = None
+
+  def state: Option[CargoAggregateRootState] = { internalState }
 
   private def updateState(evt: CargoDomainEvent) {
+    log.debug("Updating State for aggregate {} with event {}", cargoId, evt)
     evt match {
-      case CargoPlanned(meta, cargoId, trackingId, routeSpecification) => state = Some(CargoAggregateRootState(trackingId, routeSpecification))
-      case NewRouteSpecified(meta, cargoId, routeSpecification) => state = state.map(s => s.copy(routeSpecification = routeSpecification))
+      case CargoPlanned(meta, cargoId, trackingId, routeSpecification) => internalState = Some(CargoAggregateRootState(trackingId, routeSpecification))
+      case NewRouteSpecified(meta, cargoId, routeSpecification) => internalState = internalState.map(s => s.copy(routeSpecification = routeSpecification))
     }
   }
 
@@ -46,7 +50,7 @@ class Cargo(CargoId: CargoId) extends PersistentActor with ActorLogging {
     case other => log.error("received unknown event to recover:" + other)
   }
 
-  override def receiveCommand: Receive = {
+  commandHandler {
     case cmd: CargoDomainCommand =>
       val originalSender = sender()
       handleCommand(cmd) match {
@@ -58,8 +62,6 @@ class Cargo(CargoId: CargoId) extends PersistentActor with ActorLogging {
           originalSender ! Right(evt)
         case Left(exc) => sender() ! Left(CommandNotProcessedException("Could not handle command.", exc))
       }
-
-    case other => sender() ! Left(CommandNotProcessedException("unknown message " + other))
   }
 
   private def handleCommand(command: CargoDomainCommand): Either[Exception, Seq[CargoDomainEvent]] = {
@@ -72,12 +74,15 @@ class Cargo(CargoId: CargoId) extends PersistentActor with ActorLogging {
 
 }
 
-object Cargo {
+object Cargo extends AggregateRootCreator {
 
-  case class CargoAggregateRootState(trackingId: TrackingId, routeSpecification: RouteSpecification)
+  case class CargoAggregateRootState(trackingId: TrackingId, routeSpecification: RouteSpecification) extends AggregateRootState
 
-  def props(CargoId: AggregateRootId): Props = Props(classOf[Cargo], CargoId)
+  def props(cargoId: AggregateRootId): Props = Props(classOf[Cargo], cargoId)
 
   final val aggregateRootTag = "ar-cargo" // used to tag the events and read them
+
+  override def create[A <: AggregateRootActor :ClassTag](id: AggregateRootId): A = new Cargo(id).asInstanceOf[A]
+
 }
 

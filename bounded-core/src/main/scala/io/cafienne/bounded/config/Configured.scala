@@ -36,8 +36,4 @@ trait Configured {
                        defaultState: Boolean = true): Boolean =
     (config.hasPath(featurePath) && config.getBoolean(featurePath)) || (!config
       .hasPath(featurePath) && defaultState)
-
-  def isNuvveConnectionEnabled(): Boolean =
-    isFeatureEnabled("application.features.nuvve", false)
-
 }
