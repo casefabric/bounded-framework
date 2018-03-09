@@ -24,7 +24,9 @@ trait Id {
   def idAsString: String
 }
 
-trait AggregateRootState
+trait AggregateRootState {
+  def update(evt: AggregateRootEvent): AggregateRootState
+}
 
 trait AggregateRootId extends Id
 
