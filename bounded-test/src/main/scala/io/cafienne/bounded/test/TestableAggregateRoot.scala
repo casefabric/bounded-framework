@@ -27,7 +27,7 @@ import io.cafienne.bounded.aggregate._
 import scala.concurrent.Future
 import scala.concurrent.duration.Duration
 
-class TestableAggregateRoot[A <: AggregateRootActor](id: AggregateRootId, evt: AggregateRootEvent)
+class TestableAggregateRoot[A <: AggregateRootActor](id: AggregateRootId, evt: Seq[AggregateRootEvent])
                                                     (implicit system: ActorSystem, timeout: Timeout, ctag: reflect.ClassTag[A]) {
 
   import TestableAggregateRoot.testId
@@ -41,9 +41,10 @@ class TestableAggregateRoot[A <: AggregateRootActor](id: AggregateRootId, evt: A
   private val testProbe = TestProbe()
   testProbe watch storeEventsActor
 
-  testProbe.send(storeEventsActor, evt)
-  testProbe.expectMsgAllConformingOf(classOf[AggregateRootEvent])
-
+  evt foreach { event =>
+    testProbe.send(storeEventsActor, event)
+    testProbe.expectMsgAllConformingOf(classOf[AggregateRootEvent])
+  }
   storeEventsActor ! PoisonPill
   testProbe.expectTerminated(storeEventsActor)
 
@@ -62,7 +63,7 @@ class TestableAggregateRoot[A <: AggregateRootActor](id: AggregateRootId, evt: A
 
     aggregateRootProbe.send(aggregateRootActor.get, command)
     aggregateRootProbe.expectMsgPF(duration) {
-      case Right(msgList: List[AggregateRootEvent]) if msgList.isInstanceOf[List[AggregateRootEvent]] =>
+      case Right(msgList: Seq[AggregateRootEvent]) if msgList.isInstanceOf[Seq[AggregateRootEvent]] =>
         handledEvents = handledEvents ++ msgList
       case other => throw new IllegalStateException("Actor should receive events not " + other)
     }
@@ -86,7 +87,7 @@ class TestableAggregateRoot[A <: AggregateRootActor](id: AggregateRootId, evt: A
 
 object TestableAggregateRoot {
 
-  def given[A <: AggregateRootActor](id: AggregateRootId, evt: AggregateRootEvent)
+  def given[A <: AggregateRootActor](id: AggregateRootId, evt: AggregateRootEvent*)
                                     (implicit system: ActorSystem, timeout: Timeout, ctag: reflect.ClassTag[A]): TestableAggregateRoot[A] = {
     new TestableAggregateRoot[A](id, evt)
   }

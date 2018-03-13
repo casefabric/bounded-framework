@@ -18,7 +18,7 @@ package io.cafienne.bounded.cargosample.aggregate
 import java.util.UUID
 
 import io.cafienne.bounded.cargosample.aggregate.CargoDomainProtocol._
-import spray.json._
+import spray.json.{RootJsonFormat, _}
 
 object CargoDomainJsonProtocol extends DefaultJsonProtocol {
   import io.cafienne.bounded.aggregate.CommandEventDatastructureJsonProtocol._
@@ -43,12 +43,18 @@ object CargoDomainJsonProtocol extends DefaultJsonProtocol {
 
   implicit val locationFmt = jsonFormat1(Location)
   implicit val routeSpecificationFmt = jsonFormat3(RouteSpecification)
-  implicit val CargoNotFoundFmt = jsonFormat1(CargoNotFound)
+
+  implicit object CargoNotFoundFmt extends RootJsonFormat[CargoNotFound] {
+    override def read(json: JsValue): CargoNotFound = json.asJsObject.getFields("message", "cause") match {
+      case Seq(JsString(message), JsString(cause)) => CargoNotFound(message, new Throwable(cause))
+      case Seq(JsString(message), JsNull) => CargoNotFound(message)
+    }
+
+    override def write(obj: CargoNotFound): JsValue = JsObject(Map("message" -> JsString(obj.msg)).++:(Option(obj.getCause)
+      .fold(Map.empty[String,JsValue])(cause => Map("cause" -> JsString(cause.getMessage)))))
+  }
 
   implicit val planCargoFmt = jsonFormat4(PlanCargo)
   implicit val specifyNewRouteFmt = jsonFormat3(SpecifyNewRoute)
-
-//  implicit val cargoPlannedFmt = jsonFormat4(CargoPlanned)
-//  implicit val newRouteSpecifiedFmt = jsonFormat3(NewRouteSpecified)
 
 }

@@ -33,6 +33,5 @@ object CargoPersisters {
   )
 }
 
-// TODO: can't get the EnervalisPersisters to work; added it here to get it to work
 class CargoPersistersSerializer extends ForwardsCompatibleSerializer(CargoPersisters.persisters) {}
 

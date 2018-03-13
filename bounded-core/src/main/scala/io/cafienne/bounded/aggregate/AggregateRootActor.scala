@@ -34,7 +34,7 @@ trait AggregateRootStateCreator {
 /**
   * The AggregateRootActor ensures focus on the transformation of domain commands towards domain event.
   */
-trait AggregateRootActor extends PersistentActor with AggregateRootStateCreator {
+trait AggregateRootActor extends PersistentActor with AggregateRootStateCreator with ActorLogging {
 
   /**
     * When extending the AggregateRootActor you must return the unique id of the aggregate root.
@@ -48,15 +48,8 @@ trait AggregateRootActor extends PersistentActor with AggregateRootStateCreator 
     * @param command is the commands your aggregate root expects
     * @param currentState of the Aggregate Root
     * @return a seqency of events when everything is Right, or an Exception (Left)
-    */
+    */                                                                                //TODO replace Either (no EXCEPTION)
   def handleCommand(command: AggregateRootCommand, currentState: AggregateRootState): Either[Exception, Seq[AggregateRootEvent]]
-
-  /**
-    * In your implementation you can handle your own commands by writing a commandHanlder {} function.
-    * @param next is the partial Actor.Receive function of messages you like to handle next to the Aggregate Root default messages
-    */
-  final def commandHandler(next: Actor.Receive): Unit = { commandReceivers = commandReceivers orElse next }
-
 
   // Below this line is the internal implementation of the Aggregate Root Actor.
   private var internalState: Option[AggregateRootState] = None
@@ -67,16 +60,16 @@ trait AggregateRootActor extends PersistentActor with AggregateRootStateCreator 
     internalState = Some(internalState.fold(newState(evt))(state => state.update(evt)))
   }
 
-  var commandReceivers: Actor.Receive = {
+  override def persistenceId: String = aggregateId.idAsString
+
+  final def receiveCommand: Actor.Receive = {
     case cmd: AggregateRootCommand =>
-      //although it is not required to store the sender of the message in a persistent actor, it is common practice in normal actors.
       val originalSender = sender()
       handleCommand(cmd, internalState.fold(NoState: AggregateRootState)(state => state)) match {
         case Right(evt) =>
           persistAll[AggregateRootEvent](evt) { e =>
             updateState(e)
           }
-          //log.debug("Command handled for {} gives events {}", persistenceId, evt)
           originalSender ! Right(evt)
         case Left(exc) => originalSender ! Left(CommandNotProcessedException("Could not handle command.", exc))
       }
@@ -85,14 +78,10 @@ trait AggregateRootActor extends PersistentActor with AggregateRootStateCreator 
       state.fold(sender() ! NoState)(state => sender() ! state)
   }
 
-  override def persistenceId: String = aggregateId.idAsString
-
-  final def receiveCommand: Actor.Receive = commandReceivers // Actor.receive definition
-
   override def receiveRecover: Receive = {
     case _: RecoveryCompleted => // initialize further processing when required
     case evt: AggregateRootEvent => updateState(evt)
-    case other =>  //log.error("received unknown event to recover:" + other)
+    case other => log.warning("Received unknown event {} during recovery", other)
   }
 
 }

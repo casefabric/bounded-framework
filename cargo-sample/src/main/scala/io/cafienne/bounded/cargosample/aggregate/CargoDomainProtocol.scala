@@ -72,11 +72,25 @@ object CargoDomainProtocol {
     override def id: CargoId = CargoId
   }
 
-  //TODO change exception structure
   trait CargoDomainException {
     val msg: String
   }
 
-  case class CargoNotFound(msg: String) extends Exception(msg) with CargoDomainException
+  class CargoNotFound(override val msg: String) extends Exception(msg) with CargoDomainException {
+    def this(msg: String, cause: Throwable) {
+      this(msg)
+      initCause(cause)
+    }
+  }
+
+  object CargoNotFound {
+    def apply(msg: String): CargoNotFound =
+      new CargoNotFound(msg)
+    def apply(msg: String, cause: Throwable): CargoNotFound =
+      new CargoNotFound(msg, cause)
+
+    def unapply(e: CargoNotFound): Option[(String, Option[Throwable])] =
+      Some((e.getMessage, Option(e.getCause)))
+  }
 
 }
