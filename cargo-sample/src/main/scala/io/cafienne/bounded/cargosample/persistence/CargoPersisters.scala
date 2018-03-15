@@ -16,12 +16,12 @@
 package io.cafienne.bounded.cargosample.persistence
 
 import io.cafienne.bounded.akka.persistence.persisters.ForwardsCompatibleSerializer
-import io.cafienne.bounded.cargosample.aggregate.CargoDomainProtocol.{CargoPlanned, NewRouteSpecified}
+import io.cafienne.bounded.cargosample.domain.CargoDomainProtocol.{CargoPlanned, NewRouteSpecified}
 import stamina.json.{JsonPersister, persister}
 
 object CargoPersisters {
 
-  import io.cafienne.bounded.cargosample.aggregate.CargoDomainJsonProtocol._
+  import io.cafienne.bounded.cargosample.domain.CargoDomainJsonProtocol._
   import io.cafienne.bounded.cargosample.persistence.CargoDomainEventJsonProtocol._
 
   val v1CargoPlanned = persister[CargoPlanned]("cargoplanned")

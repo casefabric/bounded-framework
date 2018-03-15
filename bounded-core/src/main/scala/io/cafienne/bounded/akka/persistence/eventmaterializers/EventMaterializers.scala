@@ -15,64 +15,48 @@
 // limitations under the License.
 package io.cafienne.bounded.akka.persistence.eventmaterializers
 
-import akka.persistence.query.Offset
-import com.typesafe.scalalogging.{Logger}
+import akka.persistence.query.{NoOffset, Offset}
+import com.typesafe.scalalogging.Logger
 import org.slf4j.LoggerFactory
 
 import scala.concurrent.Future
 import scala.util.{Failure, Success}
 
-class EventMaterializers(replayables: List[ResumableReplayable],
-                         nonReplayables: List[Resumable]) {
+class EventMaterializers(replayables: List[Resumable]) {
 
   import EventMaterializerExecutionContext._
 
   lazy val logger: Logger = Logger(
     LoggerFactory.getLogger("bounded.eventmaterializers"))
 
-  case class ReplayResult(resumableReplayable: ResumableReplayable,
+  case class ReplayResult(viewMaterializer: Resumable,
                           offset: Offset)
 
   /**
     * Start event listeners in given order: First do a replay and *after* all replays have
     * finished start listening for new events (register listener)
     *
-    * @param callbackFunction function that is called when replaying has finished.
+    * @param keepListenersRunning gives the option to only replay (false) or continue after replay (true)
+    * @return The list of Offsets for the replayed (and possibly started) event materializers
+    *         When the event materializer is *NOT* replayable, the offset will be NoOffset
     */
-  def startUp(callbackFunction: () => Unit): Unit = {
-
-    val fSerialized = replayables.foldLeft(
-      Future.successful[List[ReplayResult]](Nil)) { (f, replayable) =>
-      f.flatMap { x =>
-        replayable.replayEvents().map(ReplayResult(replayable, _) :: x)
-      }
-    } map (_.reverse)
-
-    fSerialized onComplete {
-      case Success(result) =>
-        logger.info("Replays finished, Register listeners")
-        result.foreach(
-          r =>
-            handleListenerResult(
-              r.resumableReplayable.registerListener(Some(r.offset))))
-        nonReplayables.foreach(nr =>
-          handleListenerResult(nr.registerListener(Option.empty)))
-        logger.info("Done registering listeners")
-        callbackFunction()
-      case Failure(t) =>
-        logger.error("Error during replay", t)
-        throw new IllegalStateException("Replay failed", t)
-    }
-
+  def startUp(keepListenersRunning: Boolean): Future[List[ReplayResult]] = {
+    Future.sequence(replayables map {
+      case replayable: ResumableReplayable =>
+        replayable.replayEvents().map(replayOffset =>
+          startListing(ReplayResult(replayable, replayOffset), keepListenersRunning))
+      case nonReplayable: Resumable =>
+        Future(startListing(ReplayResult(nonReplayable, NoOffset), keepListenersRunning))
+    })
   }
 
-  private def handleListenerResult(listener: Future[Any]): Unit = {
-    listener onComplete {
-      case Success(result) =>
-        logger.info("Listener stopped")
-      case Failure(t) =>
-        logger.error("Error during replay", t)
-        throw new IllegalStateException("Listener aborted with error", t)
+  private def startListing(replayed: ReplayResult, keepRunning: Boolean): ReplayResult = {
+    if (keepRunning) {
+      replayed.viewMaterializer.registerListener(Some(replayed.offset)).onComplete({
+        case Success(msg) => logger.info("Listener {} is done msg: {}", replayed.viewMaterializer, msg)
+        case Failure(msg) => logger.error("Listener {} stopped with a failure: {}", replayed.viewMaterializer, msg)
+      })
     }
+    replayed
   }
 }

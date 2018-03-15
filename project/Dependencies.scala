@@ -46,7 +46,8 @@ object Dependencies {
     baseDeps ++ Seq(
       akkaHttpModule("http"),
       akkaHttpModule("http-spray-json"),
-      akkaHttpModule("http-testkit") % Test
+      akkaHttpModule("http-testkit") % Test,
+      "com.github.swagger-akka-http" %% "swagger-akka-http" % "0.14.0"
     ) ++ test
   }
 

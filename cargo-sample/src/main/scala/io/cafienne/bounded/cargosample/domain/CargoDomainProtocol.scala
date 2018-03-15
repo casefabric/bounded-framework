@@ -13,7 +13,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-package io.cafienne.bounded.cargosample.aggregate
+package io.cafienne.bounded.cargosample.domain
 
 import java.time.ZonedDateTime
 import java.util.UUID
@@ -21,6 +21,7 @@ import java.util.UUID
 import io.cafienne.bounded.aggregate._
 
 import scala.annotation.meta.field
+import scala.util.control.NoStackTrace
 
 object CargoDomainProtocol {
 
@@ -72,7 +73,7 @@ object CargoDomainProtocol {
     override def id: CargoId = CargoId
   }
 
-  trait CargoDomainException {
+  trait CargoDomainException extends NoStackTrace {
     val msg: String
   }
 

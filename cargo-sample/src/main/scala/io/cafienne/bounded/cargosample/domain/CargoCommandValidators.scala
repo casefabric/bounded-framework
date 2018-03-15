@@ -13,14 +13,14 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-package io.cafienne.bounded.cargosample.aggregate
+package io.cafienne.bounded.cargosample.domain
 
 import akka.actor.ActorSystem
 import akka.stream.ActorMaterializer
 import io.cafienne.bounded.akka.ActorSystemProvider
 import io.cafienne.bounded.akka.persistence.ReadJournalProvider
 import io.cafienne.bounded.aggregate.ValidateableCommand
-import io.cafienne.bounded.cargosample.aggregate.CargoDomainProtocol.{CargoDomainCommand, CargoNotFound, PlanCargo, SpecifyNewRoute}
+import io.cafienne.bounded.cargosample.domain.CargoDomainProtocol.{CargoDomainCommand, CargoNotFound, PlanCargo, SpecifyNewRoute}
 
 import scala.concurrent.Future
 

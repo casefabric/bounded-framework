@@ -140,15 +140,15 @@ protected trait OffsetType {
   def offsetType: OffsetTypes = ???
 }
 
-sealed trait OffsetTypeUuid extends OffsetType {
+trait OffsetTypeUuid extends OffsetType {
   override def offsetType: OffsetTypes = UuidType
 }
 
-sealed trait OffsetTypeSequence extends OffsetType {
+trait OffsetTypeSequence extends OffsetType {
   override def offsetType: OffsetTypes = SequenceType
 }
 
-sealed trait OffsetTypeEventNumber extends OffsetType {
+trait OffsetTypeEventNumber extends OffsetType {
   override def offsetType: OffsetTypes = EventNumberType
 }
 

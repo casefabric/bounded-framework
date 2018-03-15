@@ -81,4 +81,4 @@ val cargoSample = (project in file("cargo-sample"))
   .settings(moduleSettings: _*)
   .settings(
     name := "cargo-sample",
-    libraryDependencies ++= Dependencies.testDeps)
+    libraryDependencies ++= Dependencies.akkaHttpDeps ++ Dependencies.testDeps)

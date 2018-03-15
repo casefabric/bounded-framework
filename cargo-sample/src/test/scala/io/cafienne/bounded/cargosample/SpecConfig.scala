@@ -71,7 +71,7 @@ object SpecConfig {
       |        cargoTagging = "io.cafienne.bounded.cargosample.persistence.CargoTaggingEventAdapter"
       |      }
       |      event-adapter-bindings {
-      |        "io.cafienne.bounded.cargosample.aggregate.CargoDomainProtocol$CargoDomainEvent" = cargoTagging
+      |        "io.cafienne.bounded.cargosample.domain.CargoDomainProtocol$CargoDomainEvent" = cargoTagging
       |      }
       |    }
       |    inmemory-read-journal {
