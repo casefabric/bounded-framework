@@ -34,8 +34,7 @@ object Dependencies {
   val  test = log ++ Seq(
       "org.scalatest"       %% "scalatest"                   % "3.0.1" % Test,
       "com.scalapenos"      %% "stamina-testkit"             % "0.1.4" % Test,
-      "org.scalamock"       %% "scalamock-scalatest-support" % "3.6.0" % Test,
-      "com.danielasfregola" %% "random-data-generator"       % "2.3" % Test
+      "org.scalamock"       %% "scalamock-scalatest-support" % "3.6.0" % Test
     )
 
 
