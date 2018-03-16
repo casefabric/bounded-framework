@@ -94,6 +94,11 @@ object TestableAggregateRoot {
     new TestableAggregateRoot[A](id, evt)
   }
 
+  def given[A <: AggregateRootActor](id: AggregateRootId)
+                                    (implicit system: ActorSystem, timeout: Timeout, ctag: reflect.ClassTag[A]): TestableAggregateRoot[A] = {
+    new TestableAggregateRoot[A](id, Seq.empty[DomainEvent])
+  }
+
   //The tested aggregate root makes use of an additional counter in the id in order to prevent collision of parallel running tests.
   private val atomicCounter: AtomicInteger = new AtomicInteger()
   private def testId(id: AggregateRootId): AggregateRootId = TestId(id.idAsString + "-" + atomicCounter.getAndIncrement().toString)
