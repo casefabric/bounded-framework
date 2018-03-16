@@ -40,7 +40,7 @@ object Dependencies {
 
 
   val akkaHttpDeps = {
-    def akkaHttpModule(name: String, version: String = "10.0.11") =
+    def akkaHttpModule(name: String, version: String = "10.1.0") =
       "com.typesafe.akka" %% s"akka-$name" % version
 
     baseDeps ++ Seq(

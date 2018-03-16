@@ -21,10 +21,10 @@ import java.util.UUID
 import akka.actor.ActorSystem
 import akka.testkit.TestKit
 import akka.util.Timeout
+import io.cafienne.bounded.cargosample.domain.Cargo.CargoAggregateState
+import io.cafienne.bounded.cargosample.domain.CargoDomainProtocol._
 import io.cafienne.bounded.aggregate._
 import io.cafienne.bounded.cargosample.SpecConfig
-import io.cafienne.bounded.cargosample.domain.Cargo.CargoAggregateRootState
-import io.cafienne.bounded.cargosample.domain.CargoDomainProtocol._
 import io.cafienne.bounded.test.TestableAggregateRoot
 import org.scalatest._
 
@@ -55,12 +55,14 @@ class CargoAggregateRootActorNewSpec extends AsyncWordSpec with Matchers with Be
         ZonedDateTime.parse("2018-03-04T10:45:45+01:00[Europe/Amsterdam]"))
       val specifyNewRouteCommand = SpecifyNewRoute(metaData, cargoId3, newRouteSpecification)
 
-      val ar = TestableAggregateRoot.given[Cargo](cargoId3, cargoPlannedEvent).when(specifyNewRouteCommand)
+      val ar = TestableAggregateRoot
+        .given[Cargo](cargoId3, cargoPlannedEvent)
+        .when(specifyNewRouteCommand)
 
       // You see that this only shows the events that are 'published' via when
       ar.events should contain (NewRouteSpecified(metaData, cargoId3, newRouteSpecification))
 
-      val targetState = CargoAggregateRootState(trackingId, newRouteSpecification)
+      val targetState = CargoAggregateState(trackingId, newRouteSpecification)
       ar.currentState map { state => assert(state == targetState) }
     }
 

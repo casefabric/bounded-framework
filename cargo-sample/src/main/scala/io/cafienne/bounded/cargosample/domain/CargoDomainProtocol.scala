@@ -15,12 +15,9 @@
 // limitations under the License.
 package io.cafienne.bounded.cargosample.domain
 
+import io.cafienne.bounded.aggregate._
 import java.time.ZonedDateTime
 import java.util.UUID
-
-import io.cafienne.bounded.aggregate._
-
-import scala.annotation.meta.field
 import scala.util.control.NoStackTrace
 
 object CargoDomainProtocol {
@@ -36,23 +33,23 @@ object CargoDomainProtocol {
   case class RouteSpecification(origin: Location, destination: Location, arrivalDeadline: ZonedDateTime)
 
   /**
-   * All commands for the Cargo are extended via AggregateRootCommand.
+   * All commands for the Cargo are extended via DomainCommand.
    * This command expects id,  user context and a timestamp as standard input next to to command specific payload.
    *
-   * @see AggregateRootCommand for details.
+   * @see DomainCommand for details.
    */
-  trait CargoDomainCommand extends AggregateRootCommand {
+  trait CargoDomainCommand extends DomainCommand {
     override def id: CargoId
 
     val metaData: MetaData
   }
 
   /**
-   * All events for the Cargo are extended via AggregateRootEvent
+   * All events for the Cargo are extended via DomainEvent
    * This event expects id, tenant(id), user context and a timestamp as standard input next to the event specific payload.
    *
    */
-  trait CargoDomainEvent extends AggregateRootEvent
+  trait CargoDomainEvent extends DomainEvent
 
   // Commands
   case class PlanCargo(metaData: MetaData, cargoId: CargoId, trackingId: TrackingId, routeSpecification: RouteSpecification) extends CargoDomainCommand {

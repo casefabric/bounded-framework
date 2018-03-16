@@ -22,7 +22,7 @@ object SpecConfig {
   /*
   PLEASE NOTE:
   Currently the https://github.com/dnvriend/akka-persistence-inmemory is NOT working for Aggregate Root tests
-  because it is not possible to use a seperate instance writing the events that should be in the event store
+  because it is not possible to use a separate instance writing the events that should be in the event store
   before you actually create the aggregate root (should replay those stored events) to check execution of a new
   command.
   A new configuration that uses the akka bundled inmem storage is added to create a working situation.

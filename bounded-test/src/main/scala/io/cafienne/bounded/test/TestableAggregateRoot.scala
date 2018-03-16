@@ -27,14 +27,14 @@ import io.cafienne.bounded.aggregate._
 import scala.concurrent.Future
 import scala.concurrent.duration.Duration
 
-class TestableAggregateRoot[A <: AggregateRootActor](id: AggregateRootId, evt: Seq[AggregateRootEvent])
+class TestableAggregateRoot[A <: AggregateRootActor](id: AggregateRootId, evt: Seq[DomainEvent])
                                                     (implicit system: ActorSystem, timeout: Timeout, ctag: reflect.ClassTag[A]) {
 
   import TestableAggregateRoot.testId
   final val arTestId = testId(id)
 
   private val storeEventsActor = system.actorOf(Props(classOf[CreateEventsInStoreActor], arTestId), "create-events-actor")
-  private var handledEvents: List[AggregateRootEvent] = List.empty
+  private var handledEvents: List[DomainEvent] = List.empty
 
   implicit val duration: Duration = timeout.duration
 
@@ -43,7 +43,7 @@ class TestableAggregateRoot[A <: AggregateRootActor](id: AggregateRootId, evt: S
 
   evt foreach { event =>
     testProbe.send(storeEventsActor, event)
-    testProbe.expectMsgAllConformingOf(classOf[AggregateRootEvent])
+    testProbe.expectMsgAllConformingOf(classOf[DomainEvent])
   }
   storeEventsActor ! PoisonPill
   testProbe.expectTerminated(storeEventsActor)
@@ -55,26 +55,28 @@ class TestableAggregateRoot[A <: AggregateRootActor](id: AggregateRootId, evt: S
     system.actorOf(Props(ctag.runtimeClass, arTestId), s"test-aggregate-$arTestId")
   }
 
-  def when(command: AggregateRootCommand): TestableAggregateRoot[A] = {
+  def when(command: DomainCommand): TestableAggregateRoot[A] = {
     if (command.id != id) throw new IllegalArgumentException(s"Command for Aggregate Root ${command.id} cannot be handled by this aggregate root with id $id")
     aggregateRootActor = aggregateRootActor.fold(Some(createActor[A](arTestId)))(r => Some(r))
     val aggregateRootProbe = TestProbe()
     aggregateRootProbe watch aggregateRootActor.get
 
     aggregateRootProbe.send(aggregateRootActor.get, command)
-    aggregateRootProbe.expectMsgPF(duration) {
-      case Right(msgList: Seq[AggregateRootEvent]) if msgList.isInstanceOf[Seq[AggregateRootEvent]] =>
-        handledEvents = handledEvents ++ msgList
-      case other => throw new IllegalStateException("Actor should receive events not " + other)
-    }
+
+    val events =
+      aggregateRootProbe.expectMsgPF[Seq[DomainEvent]](duration, "reply with events") {
+        case Ok(events) => events
+      }
+
+    handledEvents ++= events
     this
   }
 
-  def currentState: Future[AggregateRootState] = {
-    aggregateRootActor.fold(Future.failed[AggregateRootState](new IllegalStateException("")))(actor => (actor ? GetState).mapTo[AggregateRootState])
+  def currentState: Future[AggregateState] = {
+    aggregateRootActor.fold(Future.failed[AggregateState](new IllegalStateException("")))(actor => (actor ? GetState).mapTo[AggregateState])
   }
 
-  def events: List[AggregateRootEvent] = {
+  def events: List[DomainEvent] = {
     handledEvents
   }
 
@@ -87,7 +89,7 @@ class TestableAggregateRoot[A <: AggregateRootActor](id: AggregateRootId, evt: S
 
 object TestableAggregateRoot {
 
-  def given[A <: AggregateRootActor](id: AggregateRootId, evt: AggregateRootEvent*)
+  def given[A <: AggregateRootActor](id: AggregateRootId, evt: DomainEvent*)
                                     (implicit system: ActorSystem, timeout: Timeout, ctag: reflect.ClassTag[A]): TestableAggregateRoot[A] = {
     new TestableAggregateRoot[A](id, evt)
   }

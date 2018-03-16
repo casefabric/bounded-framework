@@ -22,9 +22,8 @@ import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.server._
 import akka.stream.ActorMaterializer
-import io.cafienne.bounded.aggregate.{CommandGateway, DefaultCommandGateway}
-import io.cafienne.bounded.cargosample.domain.Cargo
-import io.cafienne.bounded.cargosample.projections.{CargoQueries, CargoQueriesImpl}
+import io.cafienne.bounded.aggregate.CommandGateway
+import io.cafienne.bounded.cargosample.projections.CargoQueries
 import io.cafienne.bounded.config.Configured
 import spray.json._
 

@@ -19,7 +19,6 @@ import akka.actor.{ Actor, ActorLogging, ActorRef, ActorSystem, Props }
 import akka.util.Timeout
 import io.cafienne.bounded.aggregate.{ AggregateRootId, CommandValidationException, CommandValidator }
 import io.cafienne.bounded.cargosample.domain.CargoDomainProtocol._
-import io.cafienne.bounded.cargosample.domain.{ CargoCommandValidators, CargoCommandValidatorsImpl }
 import scala.util.{ Failure, Success }
 
 trait CargoAggregateRootRouterProvider {
@@ -48,7 +47,7 @@ class InMemCargoAggregateRootRouter(validators: CargoCommandValidators) extends 
   import validators._
 
   implicit val system = context.system
-  implicit val timeout = Timeout(3 seconds)
+  implicit val timeout = Timeout(3.seconds)
 
   //TODO normal Routee functionality + sleep of actors that were not used for a while
   val aggregateRootInstanceActors = collection.mutable.Map[AggregateRootId, ActorRef]()

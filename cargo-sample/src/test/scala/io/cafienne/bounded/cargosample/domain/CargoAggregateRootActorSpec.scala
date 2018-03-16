@@ -52,12 +52,10 @@ class CargoAggregateRootActorSpec extends TestKit(ActorSystem("CargoTestSystem",
 
       val aggregateRootActor = system.actorOf(Cargo.props(cargoId1), "test-aggregate")
 
-      within(10.seconds) {
-        aggregateRootActor ! planCargoCommand
-        expectMsgPF() {
-          case Right(List(msg)) if msg.isInstanceOf[CargoPlanned] => // expected
-          case other => fail(s"did not receive CargoPlanned but $other")
-        }
+      aggregateRootActor ! planCargoCommand
+
+      fishForMessage(10.seconds, hint = "CargoPlanned") {
+        case Ok(events) => events.headOption.exists(_.isInstanceOf[CargoPlanned])
       }
     }
 
@@ -68,21 +66,18 @@ class CargoAggregateRootActorSpec extends TestKit(ActorSystem("CargoTestSystem",
       val cargoPlannedEvent = CargoPlanned(metaData, cargoId2, trackingId, routeSpecification)
       val storeEventsActor = system.actorOf(Props(classOf[CreateEventsInStoreActor], cargoId2), "create-events-actor")
 
-      within(10.seconds) {
-        storeEventsActor ! cargoPlannedEvent
-        expectMsgPF() {
-          case m: CargoPlanned => system.log.debug("Stored CargoPlanned Event for AR actor {}", storeEventsActor)
-          case other => fail(s"did not receive CargoPlanned to initialize but $other")
-        }
+      storeEventsActor ! cargoPlannedEvent
+      fishForMessage(10.seconds, "CargoPlanned") {
+        case m: CargoPlanned =>
+          system.log.debug("Stored CargoPlanned Event for AR actor {}", storeEventsActor)
+          true
       }
 
       val testProbe = TestProbe()
       testProbe watch storeEventsActor
 
-      within(10.seconds) {
-        storeEventsActor ! PoisonPill
-        testProbe.expectTerminated(storeEventsActor)
-      }
+      storeEventsActor ! PoisonPill
+      testProbe.expectTerminated(storeEventsActor)
 
       val aggregateRootActorBackToLife = system.actorOf(Props(classOf[Cargo], cargoId2), "test-aggregate2")
 
@@ -91,12 +86,9 @@ class CargoAggregateRootActorSpec extends TestKit(ActorSystem("CargoTestSystem",
       val specifyNewRouteCommand = SpecifyNewRoute(metaData, cargoId2, newRouteSpecification)
 
       // expect this one to have the Planned State
-      within(10.seconds) {
-        aggregateRootActorBackToLife ! specifyNewRouteCommand
-        expectMsgPF() {
-          case Right(List(msg)) if msg.isInstanceOf[NewRouteSpecified] => // expected
-          case other => fail(s"did not receive NewRouteSpecified but $other")
-        }
+      aggregateRootActorBackToLife ! specifyNewRouteCommand
+      fishForMessage(10.seconds, "New Route Specified") {
+        case Ok(events) => events.headOption.exists(_.isInstanceOf[NewRouteSpecified])
       }
     }
 

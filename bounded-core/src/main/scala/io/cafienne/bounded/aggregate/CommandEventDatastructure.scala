@@ -15,17 +15,15 @@
 // limitations under the License.
 package io.cafienne.bounded.aggregate
 
-import java.time.ZonedDateTime
 import java.util.UUID
-import io.cafienne.bounded.akka.persistence.eventmaterializers.EventNumber
-import stamina.Persistable
+
 
 trait Id {
   def idAsString: String
 }
 
-trait AggregateRootState {
-  def update(evt: AggregateRootEvent): AggregateRootState
+trait AggregateState {
+  def update(event: DomainEvent): AggregateState
 }
 
 trait AggregateRootId extends Id
@@ -58,21 +56,4 @@ trait UserContext {
 
     result
   }
-}
-
-case class MetaData(timestamp: ZonedDateTime,
-                    userContext: Option[UserContext],
-                    eventId: Option[EventNumber])
-
-trait AggregateRootCommand {
-  def id: AggregateRootId
-
-  def metaData: MetaData
-}
-
-trait AggregateRootEvent extends Persistable {
-
-  def id: AggregateRootId
-
-  def metaData: MetaData
 }

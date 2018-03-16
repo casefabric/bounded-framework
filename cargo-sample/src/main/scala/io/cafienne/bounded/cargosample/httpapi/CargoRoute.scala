@@ -28,13 +28,11 @@ import io.cafienne.bounded.cargosample.domain.CargoDomainProtocol.{CargoId, Carg
 import io.cafienne.bounded.cargosample.projections.CargoQueries
 import io.cafienne.bounded.cargosample.projections.QueriesJsonProtocol.CargoViewItem
 import io.swagger.annotations._
-
-import scala.concurrent.ExecutionContext
 import scala.util.{Failure, Success}
 
 @Path("/")
 @Api(value = "cargo", produces = "application/json", consumes = "application/json")
-class CargoRoute(commandGateway: CommandGateway, cargoQueries: CargoQueries)(implicit actorSystem: ActorSystem, ec: ExecutionContext) extends SprayJsonSupport {
+class CargoRoute(commandGateway: CommandGateway, cargoQueries: CargoQueries)(implicit actorSystem: ActorSystem) extends SprayJsonSupport {
 
   import akka.http.scaladsl.server.Directives._
   import HttpJsonProtocol._
@@ -60,7 +58,7 @@ class CargoRoute(commandGateway: CommandGateway, cargoQueries: CargoQueries)(imp
       path("cargo" / PathMatchers.JavaUUID) { id =>
           val cargoId = CargoId(id)
           onComplete(cargoQueries.getCargo(cargoId)) {
-            case Success(cargoResponse) => complete(StatusCodes.OK, cargoResponse)
+            case Success(cargoResponse) => complete(StatusCodes.OK -> cargoResponse)
             case Failure(err) => {
               err match {
                 case notFound: CargoNotFound => complete(StatusCodes.NotFound -> ErrorResponse(notFound.msg))

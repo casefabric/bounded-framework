@@ -17,7 +17,7 @@ package io.cafienne.bounded.cargosample.domain
 
 import akka.actor._
 import io.cafienne.bounded.aggregate._
-import io.cafienne.bounded.cargosample.domain.Cargo.CargoAggregateRootState
+import io.cafienne.bounded.cargosample.domain.Cargo.CargoAggregateState
 import io.cafienne.bounded.cargosample.domain.CargoDomainProtocol._
 
 import scala.collection.immutable.Seq
@@ -27,22 +27,22 @@ import scala.reflect.ClassTag
  * Aggregate root that keeps the logic of the cargo.
  * @param cargoId unique identifier for cargo.
  */
-class Cargo(cargoId: AggregateRootId) extends AggregateRootActor with AggregateRootStateCreator with ActorLogging {
+class Cargo(cargoId: AggregateRootId) extends AggregateRootActor with AggregateStateCreator with ActorLogging {
 
   override def aggregateId: AggregateRootId = cargoId
 
-  override def handleCommand(command: AggregateRootCommand, currentState: AggregateRootState): Either[Exception, Seq[AggregateRootEvent]] = {
+  override def handleCommand(command: DomainCommand, currentState: AggregateState): Reply = {
     command match {
-      case cmd: PlanCargo => Right(Seq(CargoPlanned(cmd.metaData, cmd.cargoId, cmd.trackingId, cmd.routeSpecification)))
-      case cmd: SpecifyNewRoute => Right(Seq(NewRouteSpecified(cmd.metaData, cmd.cargoId, cmd.routeSpecification)))
-      case other => Left(CommandNotProcessedException("unknown command: " + other))
+      case cmd: PlanCargo => Ok(Seq(CargoPlanned(cmd.metaData, cmd.cargoId, cmd.trackingId, cmd.routeSpecification)))
+      case cmd: SpecifyNewRoute => Ok(Seq(NewRouteSpecified(cmd.metaData, cmd.cargoId, cmd.routeSpecification)))
+      case other => Ko(new UnexpectedCommand(other))
     }
   }
 
-  override def newState(evt: AggregateRootEvent): AggregateRootState = {
+  override def newState(evt: DomainEvent): AggregateState = {
     evt match {
-      case evt: CargoPlanned => new CargoAggregateRootState(evt.trackingId, evt.routeSpecification)
-      case _ => throw new IllegalArgumentException(s"Event $evt is not valid to create a new CargoAggregateRootState")
+      case evt: CargoPlanned => new CargoAggregateState(evt.trackingId, evt.routeSpecification)
+      case _ => throw new IllegalArgumentException(s"Event $evt is not valid to create a new CargoAggregateState")
     }
   }
 
@@ -50,10 +50,10 @@ class Cargo(cargoId: AggregateRootId) extends AggregateRootActor with AggregateR
 
 object Cargo extends AggregateRootCreator {
 
-  case class CargoAggregateRootState(trackingId: TrackingId, routeSpecification: RouteSpecification) extends AggregateRootState {
-    override def update(evt: AggregateRootEvent): AggregateRootState = {
+  case class CargoAggregateState(trackingId: TrackingId, routeSpecification: RouteSpecification) extends AggregateState {
+    override def update(evt: DomainEvent): AggregateState = {
       evt match {
-        case CargoPlanned(meta, cargoId, trackingId, routeSpecification) => CargoAggregateRootState(trackingId, routeSpecification)
+        case CargoPlanned(meta, cargoId, trackingId, routeSpecification) => CargoAggregateState(trackingId, routeSpecification)
         case NewRouteSpecified(meta, cargoId, routeSpecification) => this.copy(routeSpecification = routeSpecification)
         case other => this
       }

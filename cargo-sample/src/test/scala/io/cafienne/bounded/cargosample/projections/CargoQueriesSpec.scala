@@ -15,9 +15,8 @@
 // limitations under the License.
 package io.cafienne.bounded.cargosample.projections
 
-import java.time.{ZoneOffset, ZonedDateTime}
+import java.time.ZonedDateTime
 import java.util.UUID
-
 import akka.actor.{ActorSystem, Props}
 import akka.event.{Logging, LoggingAdapter}
 import akka.testkit.{TestKit, _}
@@ -67,6 +66,7 @@ class CargoQueriesSpec extends TestKit(ActorSystem("testsystem", SpecConfig.test
   val cargoWriter = new CargoViewProjectionWriter(system) with ReadJournalOffsetStore with OffsetTypeSequence
   val eventMaterializers = new EventMaterializers(List(cargoWriter))
 
+  //Note that the startup replays the events and needs an extended timeout for that !
   Await.result(eventMaterializers.startUp(true), 10.seconds)
 
   "Cargo Query" must {

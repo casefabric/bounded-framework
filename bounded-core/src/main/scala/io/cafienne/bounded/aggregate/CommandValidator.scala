@@ -17,12 +17,12 @@ package io.cafienne.bounded.aggregate
 
 import scala.concurrent.Future
 
-trait ValidateableCommand[T <: AggregateRootCommand] {
+trait ValidateableCommand[T <: DomainCommand] {
   def validate(cmd: T): Future[T]
 }
 
 object CommandValidator {
-  def validate[T <: AggregateRootCommand](v: T)(
+  def validate[T <: DomainCommand](v: T)(
       implicit validator: ValidateableCommand[T]): Future[T] =
     validator.validate(v)
 }

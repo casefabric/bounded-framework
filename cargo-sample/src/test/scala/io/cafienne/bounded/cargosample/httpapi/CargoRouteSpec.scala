@@ -22,7 +22,7 @@ import akka.event.Logging
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.testkit.ScalatestRouteTest
-import io.cafienne.bounded.aggregate.{AggregateRootCommand, CommandGateway, ValidateableCommand}
+import io.cafienne.bounded.aggregate.{DomainCommand, CommandGateway, ValidateableCommand}
 import io.cafienne.bounded.cargosample.domain.CargoDomainProtocol
 import io.cafienne.bounded.cargosample.domain.CargoDomainProtocol.{CargoId, CargoNotFound}
 import io.cafienne.bounded.cargosample.httpapi.HttpJsonProtocol.ErrorResponse
@@ -53,9 +53,9 @@ class CargoRouteSpec extends FlatSpec with MustMatchers with ScalatestRouteTest 
 
   //TODO make use of testing command gateway ?
   val commandGateway = new CommandGateway {
-    override def send[T <: AggregateRootCommand](command: T)(implicit validator: ValidateableCommand[T]): Future[Unit] = ???
+    override def send[T <: DomainCommand](command: T)(implicit validator: ValidateableCommand[T]): Future[Unit] = ???
 
-    override def sendAndAsk[T <: AggregateRootCommand](command: T)(implicit validator: ValidateableCommand[T]): Future[_] = ???
+    override def sendAndAsk[T <: DomainCommand](command: T)(implicit validator: ValidateableCommand[T]): Future[_] = ???
   }
 
   val cargoRoute = new CargoRoute(commandGateway, cargoQueries)
