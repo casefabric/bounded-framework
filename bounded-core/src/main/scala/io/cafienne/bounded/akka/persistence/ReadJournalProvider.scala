@@ -7,7 +7,10 @@ package io.cafienne.bounded.akka.persistence
 import akka.actor.Props
 import akka.persistence.cassandra.query.scaladsl.CassandraReadJournal
 import akka.persistence.inmemory.query.scaladsl.InMemoryReadJournal
-import akka.persistence.journal.leveldb.{SharedLeveldbJournal, SharedLeveldbStore}
+import akka.persistence.journal.leveldb.{
+  SharedLeveldbJournal,
+  SharedLeveldbStore
+}
 import akka.persistence.query.PersistenceQuery
 import akka.persistence.query.journal.leveldb.scaladsl.LeveldbReadJournal
 import akka.persistence.query.scaladsl._

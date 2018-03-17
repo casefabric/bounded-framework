@@ -12,7 +12,8 @@ class CargoTaggingEventAdapter extends WriteEventAdapter {
   override def manifest(event: Any): String = ""
 
   override def toJournal(event: Any): Any = event match {
-    case prEvent: CargoDomainEvent => Tagged(prEvent, Set(Cargo.aggregateRootTag))
+    case prEvent: CargoDomainEvent =>
+      Tagged(prEvent, Set(Cargo.aggregateRootTag))
     case other => other
   }
 }

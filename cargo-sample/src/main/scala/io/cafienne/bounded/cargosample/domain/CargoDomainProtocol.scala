@@ -19,14 +19,16 @@ object CargoDomainProtocol {
 
   case class TrackingId(id: UUID)
   case class Location(name: String)
-  case class RouteSpecification(origin: Location, destination: Location, arrivalDeadline: ZonedDateTime)
+  case class RouteSpecification(origin: Location,
+                                destination: Location,
+                                arrivalDeadline: ZonedDateTime)
 
   /**
-   * All commands for the Cargo are extended via DomainCommand.
-   * This command expects id,  user context and a timestamp as standard input next to to command specific payload.
-   *
-   * @see DomainCommand for details.
-   */
+    * All commands for the Cargo are extended via DomainCommand.
+    * This command expects id,  user context and a timestamp as standard input next to to command specific payload.
+    *
+    * @see DomainCommand for details.
+    */
   trait CargoDomainCommand extends DomainCommand {
     override def id: CargoId
 
@@ -34,28 +36,41 @@ object CargoDomainProtocol {
   }
 
   /**
-   * All events for the Cargo are extended via DomainEvent
-   * This event expects id, tenant(id), user context and a timestamp as standard input next to the event specific payload.
-   *
-   */
+    * All events for the Cargo are extended via DomainEvent
+    * This event expects id, tenant(id), user context and a timestamp as standard input next to the event specific payload.
+    *
+    */
   trait CargoDomainEvent extends DomainEvent
 
   // Commands
-  case class PlanCargo(metaData: MetaData, cargoId: CargoId, trackingId: TrackingId, routeSpecification: RouteSpecification) extends CargoDomainCommand {
+  case class PlanCargo(metaData: MetaData,
+                       cargoId: CargoId,
+                       trackingId: TrackingId,
+                       routeSpecification: RouteSpecification)
+      extends CargoDomainCommand {
     override def id: CargoId = cargoId
   }
 
-  case class SpecifyNewRoute(metaData: MetaData, cargoId: CargoId, routeSpecification: RouteSpecification) extends CargoDomainCommand {
+  case class SpecifyNewRoute(metaData: MetaData,
+                             cargoId: CargoId,
+                             routeSpecification: RouteSpecification)
+      extends CargoDomainCommand {
     override def id: CargoId = cargoId
   }
-
 
   // Events
-  case class CargoPlanned(metaData: MetaData, cargoId: CargoId, trackingId: TrackingId, routeSpecification: RouteSpecification) extends CargoDomainEvent {
+  case class CargoPlanned(metaData: MetaData,
+                          cargoId: CargoId,
+                          trackingId: TrackingId,
+                          routeSpecification: RouteSpecification)
+      extends CargoDomainEvent {
     override def id: CargoId = cargoId
   }
 
-  case class NewRouteSpecified(metaData: MetaData, CargoId: CargoId, routeSpecification: RouteSpecification) extends CargoDomainEvent {
+  case class NewRouteSpecified(metaData: MetaData,
+                               CargoId: CargoId,
+                               routeSpecification: RouteSpecification)
+      extends CargoDomainEvent {
     override def id: CargoId = CargoId
   }
 
@@ -63,7 +78,9 @@ object CargoDomainProtocol {
     val msg: String
   }
 
-  class CargoNotFound(override val msg: String) extends Exception(msg) with CargoDomainException {
+  class CargoNotFound(override val msg: String)
+      extends Exception(msg)
+      with CargoDomainException {
     def this(msg: String, cause: Throwable) {
       this(msg)
       initCause(cause)

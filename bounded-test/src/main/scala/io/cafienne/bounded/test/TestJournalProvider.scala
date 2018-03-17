@@ -6,7 +6,11 @@ package io.cafienne.bounded.test
 
 import akka.NotUsed
 import akka.actor.ActorSystem
-import akka.persistence.inmemory.extension.{InMemoryJournalStorage, InMemorySnapshotStorage, StorageExtension}
+import akka.persistence.inmemory.extension.{
+  InMemoryJournalStorage,
+  InMemorySnapshotStorage,
+  StorageExtension
+}
 import akka.persistence.inmemory.query.scaladsl.InMemoryReadJournal
 import akka.persistence.query.scaladsl._
 import akka.persistence.query.{EventEnvelope, PersistenceQuery}

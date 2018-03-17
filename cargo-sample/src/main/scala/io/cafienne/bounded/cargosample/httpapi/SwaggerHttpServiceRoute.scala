@@ -9,7 +9,9 @@ import akka.stream.ActorMaterializer
 import com.github.swagger.akka._
 import com.github.swagger.akka.model.Info
 
-class SwaggerHttpServiceRoute(val system: ActorSystem, val mat: ActorMaterializer) extends SwaggerHttpService {
+class SwaggerHttpServiceRoute(val system: ActorSystem,
+                              val mat: ActorMaterializer)
+    extends SwaggerHttpService {
   implicit val actorSystem: ActorSystem = system
   implicit val materializer: ActorMaterializer = mat
 
@@ -18,12 +20,12 @@ class SwaggerHttpServiceRoute(val system: ActorSystem, val mat: ActorMaterialize
   override val basePath = "/" //the basePath for the API you are exposing
   override val apiDocsPath = "api-docs" //where you want the swagger-json endpoint exposed
 
-  override val info = Info(description =
-    """Cargo sample services.
+  override val info = Info(description = """Cargo sample services.
       |
       |Allows..
       |
-      """.stripMargin, version = "1.0.0")
+      """.stripMargin,
+                           version = "1.0.0")
 
   def swaggerUIRoute = get {
     routes ~

@@ -15,7 +15,9 @@ object UnsupportedEventProtocol extends DefaultJsonProtocol {
   case class UnsupportedEventAggregateId(id: String) extends AggregateRootId {
     override def idAsString: String = id
   }
-  case class UnsupportedEvent(metaData: MetaData, id: UnsupportedEventAggregateId) extends DomainEvent
+  case class UnsupportedEvent(metaData: MetaData,
+                              id: UnsupportedEventAggregateId)
+      extends DomainEvent
 
   implicit val unsupportedAggregateIdFmt
     : RootJsonFormat[UnsupportedEventAggregateId] = jsonFormat1(
@@ -49,7 +51,8 @@ class ForwardsCompatibleSerializer(
         val persisted = codec.readPersisted(bytes)
         if (persisted.key == "UnsupportedEvent") throw ude
 
-        logger.warn("Unsupported event, converting to UnsupportedEvent event", ude)
+        logger.warn("Unsupported event, converting to UnsupportedEvent event",
+                    ude)
         // This will stop the persister (reader/writer) completely in case of failure.
         // In case of failure we either have rubbish, or an event which does not originate from DomainEvent
         ApPersisters.unsupportedEventPersister.unpersist(

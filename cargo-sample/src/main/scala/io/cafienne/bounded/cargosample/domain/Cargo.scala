@@ -13,25 +13,40 @@ import scala.collection.immutable.Seq
 import scala.reflect.ClassTag
 
 /**
- * Aggregate root that keeps the logic of the cargo.
- * @param cargoId unique identifier for cargo.
- */
-class Cargo(cargoId: AggregateRootId) extends AggregateRootActor with AggregateStateCreator with ActorLogging {
+  * Aggregate root that keeps the logic of the cargo.
+  * @param cargoId unique identifier for cargo.
+  */
+class Cargo(cargoId: AggregateRootId)
+    extends AggregateRootActor
+    with AggregateStateCreator
+    with ActorLogging {
 
   override def aggregateId: AggregateRootId = cargoId
 
-  override def handleCommand(command: DomainCommand, currentState: AggregateState): Reply = {
+  override def handleCommand(command: DomainCommand,
+                             currentState: AggregateState): Reply = {
     command match {
-      case cmd: PlanCargo => Ok(Seq(CargoPlanned(cmd.metaData, cmd.cargoId, cmd.trackingId, cmd.routeSpecification)))
-      case cmd: SpecifyNewRoute => Ok(Seq(NewRouteSpecified(cmd.metaData, cmd.cargoId, cmd.routeSpecification)))
+      case cmd: PlanCargo =>
+        Ok(
+          Seq(
+            CargoPlanned(cmd.metaData,
+                         cmd.cargoId,
+                         cmd.trackingId,
+                         cmd.routeSpecification)))
+      case cmd: SpecifyNewRoute =>
+        Ok(Seq(
+          NewRouteSpecified(cmd.metaData, cmd.cargoId, cmd.routeSpecification)))
       case other => Ko(new UnexpectedCommand(other))
     }
   }
 
   override def newState(evt: DomainEvent): AggregateState = {
     evt match {
-      case evt: CargoPlanned => new CargoAggregateState(evt.trackingId, evt.routeSpecification)
-      case _ => throw new IllegalArgumentException(s"Event $evt is not valid to create a new CargoAggregateState")
+      case evt: CargoPlanned =>
+        new CargoAggregateState(evt.trackingId, evt.routeSpecification)
+      case _ =>
+        throw new IllegalArgumentException(
+          s"Event $evt is not valid to create a new CargoAggregateState")
     }
   }
 
@@ -39,11 +54,15 @@ class Cargo(cargoId: AggregateRootId) extends AggregateRootActor with AggregateS
 
 object Cargo extends AggregateRootCreator {
 
-  case class CargoAggregateState(trackingId: TrackingId, routeSpecification: RouteSpecification) extends AggregateState {
+  case class CargoAggregateState(trackingId: TrackingId,
+                                 routeSpecification: RouteSpecification)
+      extends AggregateState {
     override def update(evt: DomainEvent): AggregateState = {
       evt match {
-        case CargoPlanned(meta, cargoId, trackingId, routeSpecification) => CargoAggregateState(trackingId, routeSpecification)
-        case NewRouteSpecified(meta, cargoId, routeSpecification) => this.copy(routeSpecification = routeSpecification)
+        case CargoPlanned(meta, cargoId, trackingId, routeSpecification) =>
+          CargoAggregateState(trackingId, routeSpecification)
+        case NewRouteSpecified(meta, cargoId, routeSpecification) =>
+          this.copy(routeSpecification = routeSpecification)
         case other => this
       }
     }
@@ -53,7 +72,7 @@ object Cargo extends AggregateRootCreator {
 
   final val aggregateRootTag = "ar-cargo" // used to tag the events and read them
 
-  override def create[A <: AggregateRootActor :ClassTag](id: AggregateRootId): A = new Cargo(id).asInstanceOf[A]
+  override def create[A <: AggregateRootActor: ClassTag](
+      id: AggregateRootId): A = new Cargo(id).asInstanceOf[A]
 
 }
-

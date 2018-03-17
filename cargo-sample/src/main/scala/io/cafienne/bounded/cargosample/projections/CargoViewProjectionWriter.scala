@@ -9,14 +9,20 @@ import akka.actor.ActorSystem
 import io.cafienne.bounded.akka.persistence.eventmaterializers.AbstractReplayableEventMaterializer
 import com.typesafe.scalalogging.Logger
 import io.cafienne.bounded.cargosample.domain.Cargo
-import io.cafienne.bounded.cargosample.domain.CargoDomainProtocol.{CargoId, CargoNotFound, CargoPlanned, NewRouteSpecified}
+import io.cafienne.bounded.cargosample.domain.CargoDomainProtocol.{
+  CargoId,
+  CargoNotFound,
+  CargoPlanned,
+  NewRouteSpecified
+}
 import io.cafienne.bounded.cargosample.projections.QueriesJsonProtocol.CargoViewItem
 import org.slf4j.LoggerFactory
 
 import scala.collection.parallel.mutable
 import scala.concurrent.Future
 
-class CargoViewProjectionWriter(actorSystem: ActorSystem) extends AbstractReplayableEventMaterializer(actorSystem) {
+class CargoViewProjectionWriter(actorSystem: ActorSystem)
+    extends AbstractReplayableEventMaterializer(actorSystem) {
 
   /**
     * Tagname used to identify eventstream to listen to
@@ -30,7 +36,8 @@ class CargoViewProjectionWriter(actorSystem: ActorSystem) extends AbstractReplay
 
   import CargoViewProjectionWriter._
 
-  override lazy val logger: Logger = Logger(LoggerFactory.getLogger(CargoViewProjectionWriter.getClass))
+  override lazy val logger: Logger = Logger(
+    LoggerFactory.getLogger(CargoViewProjectionWriter.getClass))
 
   override def handleReplayEvent(evt: Any): Future[Done] = handleEvent(evt)
 
@@ -38,20 +45,32 @@ class CargoViewProjectionWriter(actorSystem: ActorSystem) extends AbstractReplay
     try {
       evt match {
         case drEvent: CargoPlanned =>
-          addOrUpdate(CargoViewItem(drEvent.cargoId, drEvent.routeSpecification.origin.name, drEvent.routeSpecification.destination.name,
-            drEvent.routeSpecification.arrivalDeadline))
+          addOrUpdate(
+            CargoViewItem(drEvent.cargoId,
+                          drEvent.routeSpecification.origin.name,
+                          drEvent.routeSpecification.destination.name,
+                          drEvent.routeSpecification.arrivalDeadline))
           Future.successful(Done)
         case drEvent: NewRouteSpecified =>
-          addOrUpdate(CargoViewItem(drEvent.id, drEvent.routeSpecification.origin.name, drEvent.routeSpecification.destination.name,
-            drEvent.routeSpecification.arrivalDeadline))
+          addOrUpdate(
+            CargoViewItem(drEvent.id,
+                          drEvent.routeSpecification.origin.name,
+                          drEvent.routeSpecification.destination.name,
+                          drEvent.routeSpecification.arrivalDeadline))
           Future.successful(Done)
         case _ =>
           Future.successful(Done)
       }
     } catch {
       case ex: Throwable =>
-        logger.error("Unable to process command: " + evt.getClass.getSimpleName + Option(ex.getCause)
-          .map(ex => ex.getMessage).getOrElse("") + s" ${ex.getMessage} " + " exception: " + logException(ex), ex)
+        logger.error(
+          "Unable to process command: " + evt.getClass.getSimpleName + Option(
+            ex.getCause)
+            .map(ex => ex.getMessage)
+            .getOrElse("") + s" ${ex.getMessage} " + " exception: " + logException(
+            ex),
+          ex
+        )
         Future.successful(Done)
     }
   }
@@ -66,7 +85,11 @@ object CargoViewProjectionWriter {
   }
 
   def getCargo(cargoId: CargoId): Future[CargoViewItem] = {
-    inMemCargoStore.get(cargoId).fold(Future.failed[CargoViewItem](CargoNotFound(s"No Cargo item found for id $cargoId")))(item => Future.successful(item))
+    inMemCargoStore
+      .get(cargoId)
+      .fold(Future.failed[CargoViewItem](
+        CargoNotFound(s"No Cargo item found for id $cargoId")))(item =>
+        Future.successful(item))
   }
 
 }

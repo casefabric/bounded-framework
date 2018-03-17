@@ -9,10 +9,9 @@ import scala.collection.immutable.Seq
 import stamina.Persistable
 import io.cafienne.bounded.akka.persistence.eventmaterializers.EventNumber
 
-case class MetaData(
-  timestamp: ZonedDateTime,
-  userContext: Option[UserContext],
-  eventId: Option[EventNumber])
+case class MetaData(timestamp: ZonedDateTime,
+                    userContext: Option[UserContext],
+                    eventId: Option[EventNumber])
 
 trait DomainCommand {
   def id: AggregateRootId

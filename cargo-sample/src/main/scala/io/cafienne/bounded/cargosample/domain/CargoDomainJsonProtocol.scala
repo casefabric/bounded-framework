@@ -17,7 +17,8 @@ object CargoDomainJsonProtocol extends DefaultJsonProtocol {
 
     override def read(json: JsValue): CargoId = json match {
       case JsString(v) => CargoId(UUID.fromString(v))
-      case _ => deserializationError(s"value $json cannot be deserialized to a CargoId")
+      case _ =>
+        deserializationError(s"value $json cannot be deserialized to a CargoId")
     }
   }
 
@@ -26,7 +27,9 @@ object CargoDomainJsonProtocol extends DefaultJsonProtocol {
 
     override def read(json: JsValue): TrackingId = json match {
       case JsString(v) => TrackingId(UUID.fromString(v))
-      case _ => deserializationError(s"value $json cannot be deserialized to a TrackingId")
+      case _ =>
+        deserializationError(
+          s"value $json cannot be deserialized to a TrackingId")
     }
   }
 
@@ -34,13 +37,18 @@ object CargoDomainJsonProtocol extends DefaultJsonProtocol {
   implicit val routeSpecificationFmt = jsonFormat3(RouteSpecification)
 
   implicit object CargoNotFoundFmt extends RootJsonFormat[CargoNotFound] {
-    override def read(json: JsValue): CargoNotFound = json.asJsObject.getFields("message", "cause") match {
-      case Seq(JsString(message), JsString(cause)) => CargoNotFound(message, new Throwable(cause))
-      case Seq(JsString(message), JsNull) => CargoNotFound(message)
-    }
+    override def read(json: JsValue): CargoNotFound =
+      json.asJsObject.getFields("message", "cause") match {
+        case Seq(JsString(message), JsString(cause)) =>
+          CargoNotFound(message, new Throwable(cause))
+        case Seq(JsString(message), JsNull) => CargoNotFound(message)
+      }
 
-    override def write(obj: CargoNotFound): JsValue = JsObject(Map("message" -> JsString(obj.msg)).++:(Option(obj.getCause)
-      .fold(Map.empty[String,JsValue])(cause => Map("cause" -> JsString(cause.getMessage)))))
+    override def write(obj: CargoNotFound): JsValue =
+      JsObject(
+        Map("message" -> JsString(obj.msg)).++:(Option(obj.getCause)
+          .fold(Map.empty[String, JsValue])(cause =>
+            Map("cause" -> JsString(cause.getMessage)))))
   }
 
   implicit val planCargoFmt = jsonFormat4(PlanCargo)
