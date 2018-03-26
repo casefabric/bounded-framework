@@ -44,8 +44,7 @@ import OffsetTypes._
 class InMemoryBasedOffsetStore(offsetType: OffsetTypes) extends OffsetStore {
   val store: Map[String, Offset] = Map.empty
 
-  override def saveOffset(viewIdentifier: String,
-                          offset: Offset): Future[Unit] = {
+  override def saveOffset(viewIdentifier: String, offset: Offset): Future[Unit] = {
     store += ((viewIdentifier, offset))
     Future.successful({})
   }
@@ -60,19 +59,17 @@ class InMemoryBasedOffsetStore(offsetType: OffsetTypes) extends OffsetStore {
   }
 }
 
-class CassandraOffsetStore(readJournal: CassandraReadJournal,
-                           offsetType: OffsetTypes)
-    extends OffsetStore {
+class CassandraOffsetStore(readJournal: CassandraReadJournal, offsetType: OffsetTypes) extends OffsetStore {
   import EventMaterializerExecutionContext._
 
   Await.result(
     readJournal.session.executeWrite(
-      "CREATE TABLE IF NOT EXISTS akka.vw_offsetstore (view_identifier text PRIMARY KEY, offset_type text, offset_value text);"),
+      "CREATE TABLE IF NOT EXISTS akka.vw_offsetstore (view_identifier text PRIMARY KEY, offset_type text, offset_value text);"
+    ),
     3.seconds
   )
 
-  override def saveOffset(viewIdentifier: String,
-                          offset: Offset): Future[Unit] = {
+  override def saveOffset(viewIdentifier: String, offset: Offset): Future[Unit] = {
     val sov = if (offset == Offset.noOffset) startOffset else offset
 
     readJournal.session
@@ -87,20 +84,15 @@ class CassandraOffsetStore(readJournal: CassandraReadJournal,
 
   override def getOffset(viewIdentifier: String): Future[Offset] = {
     readJournal.session
-      .selectOne(
-        s"SELECT offset_value, offset_type FROM akka.vw_offsetstore WHERE view_identifier=\'$viewIdentifier\'")
-      .map(r =>
-        r.fold(startOffset)(r =>
-          string2Offset(r.getString("offset_value"),
-                        r.getString("offset_type"))))
+      .selectOne(s"SELECT offset_value, offset_type FROM akka.vw_offsetstore WHERE view_identifier=\'$viewIdentifier\'")
+      .map(r => r.fold(startOffset)(r => string2Offset(r.getString("offset_value"), r.getString("offset_type"))))
   }
 
   override def startOffset: Offset = offsetType match {
     case EventNumberType => Offset.noOffset
     case SequenceType    => Offset.sequence(0L)
     case _ =>
-      Offset.timeBasedUUID(
-        readJournal.asInstanceOf[CassandraReadJournal].firstOffset)
+      Offset.timeBasedUUID(readJournal.asInstanceOf[CassandraReadJournal].firstOffset)
   }
 
   private def offset2String(offset: Offset): String = offsetType match {
@@ -146,21 +138,18 @@ trait ReadJournalOffsetStore extends OffsetStore with OffsetType {
 
   val store: OffsetStore = {
     if (configuredJournal.endsWith("cassandra-journal")) {
-      new CassandraOffsetStore(readJournal.asInstanceOf[CassandraReadJournal],
-                               offsetType)
+      new CassandraOffsetStore(readJournal.asInstanceOf[CassandraReadJournal], offsetType)
     } else if (configuredJournal.endsWith("inmemory-journal")) {
       new InMemoryBasedOffsetStore(offsetType)
     } else if (configuredJournal.endsWith("leveldb")) {
       //TODO write a specific leveldb offset store implementation (HIGH priority)
       new InMemoryBasedOffsetStore(offsetType)
     } else {
-      throw new RuntimeException(
-        s"Offsetstore $configuredJournal is not supported as ReadJournalOffsetStore")
+      throw new RuntimeException(s"Offsetstore $configuredJournal is not supported as ReadJournalOffsetStore")
     }
   }
 
-  override def saveOffset(viewIdentifier: String,
-                          offset: Offset): Future[Unit] =
+  override def saveOffset(viewIdentifier: String, offset: Offset): Future[Unit] =
     store.saveOffset(viewIdentifier, offset)
 
   override def getOffset(viewIdentifier: String): Future[Offset] =

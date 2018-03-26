@@ -28,12 +28,11 @@ object CargoDomainJsonProtocol extends DefaultJsonProtocol {
     override def read(json: JsValue): TrackingId = json match {
       case JsString(v) => TrackingId(UUID.fromString(v))
       case _ =>
-        deserializationError(
-          s"value $json cannot be deserialized to a TrackingId")
+        deserializationError(s"value $json cannot be deserialized to a TrackingId")
     }
   }
 
-  implicit val locationFmt = jsonFormat1(Location)
+  implicit val locationFmt           = jsonFormat1(Location)
   implicit val routeSpecificationFmt = jsonFormat3(RouteSpecification)
 
   implicit object CargoNotFoundFmt extends RootJsonFormat[CargoNotFound] {
@@ -46,12 +45,14 @@ object CargoDomainJsonProtocol extends DefaultJsonProtocol {
 
     override def write(obj: CargoNotFound): JsValue =
       JsObject(
-        Map("message" -> JsString(obj.msg)).++:(Option(obj.getCause)
-          .fold(Map.empty[String, JsValue])(cause =>
-            Map("cause" -> JsString(cause.getMessage)))))
+        Map("message" -> JsString(obj.msg)).++:(
+          Option(obj.getCause)
+            .fold(Map.empty[String, JsValue])(cause => Map("cause" -> JsString(cause.getMessage)))
+        )
+      )
   }
 
-  implicit val planCargoFmt = jsonFormat4(PlanCargo)
+  implicit val planCargoFmt       = jsonFormat4(PlanCargo)
   implicit val specifyNewRouteFmt = jsonFormat3(SpecifyNewRoute)
 
 }

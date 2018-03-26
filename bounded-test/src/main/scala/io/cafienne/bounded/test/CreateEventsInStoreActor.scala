@@ -8,8 +8,7 @@ import akka.actor.{ActorContext, ActorRef}
 import akka.persistence.PersistentActor
 import io.cafienne.bounded.aggregate.{DomainEvent, AggregateRootId}
 
-class CreateEventsInStoreActor(aggregateId: AggregateRootId)
-    extends PersistentActor {
+class CreateEventsInStoreActor(aggregateId: AggregateRootId) extends PersistentActor {
   override def persistenceId: String = aggregateId.idAsString
 
   override def receiveRecover: Receive = {
@@ -22,8 +21,7 @@ class CreateEventsInStoreActor(aggregateId: AggregateRootId)
     case other            => context.system.log.error(s"cannot handle command $other")
   }
 
-  private def storeAndReply(replyTo: ActorRef, evt: Any)(
-      implicit context: ActorContext): Unit = {
+  private def storeAndReply(replyTo: ActorRef, evt: Any)(implicit context: ActorContext): Unit = {
     persist(evt) { e =>
       context.system.log.debug(s"persisted $e")
       replyTo ! e

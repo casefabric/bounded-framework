@@ -22,11 +22,10 @@ import scala.util.{Failure, Success}
 /**
   * This service wires all provided service routes together and ensures proper handling issues in the requests
   */
-class HttpApiEndpoint(commandGateway: CommandGateway,
-                      cargoQueries: CargoQueries)(
-    implicit system: ActorSystem,
-    implicit val materializer: ActorMaterializer)
-    extends Configured
+class HttpApiEndpoint(commandGateway: CommandGateway, cargoQueries: CargoQueries)(
+  implicit system: ActorSystem,
+  implicit val materializer: ActorMaterializer
+) extends Configured
     with SprayJsonSupport {
 
   import Directives._
@@ -38,9 +37,7 @@ class HttpApiEndpoint(commandGateway: CommandGateway,
   val logger = Logging(system, HttpApiEndpoint.getClass)
 
   def log(e: Throwable)(handle: Route): Route = rc => {
-    logger.error(
-      s"Request ${rc.request} could not be handled normally. Cause: ${e.getMessage}",
-      e)
+    logger.error(s"Request ${rc.request} could not be handled normally. Cause: ${e.getMessage}", e)
     handle(rc)
   }
 
@@ -49,7 +46,8 @@ class HttpApiEndpoint(commandGateway: CommandGateway,
       badRequest(
         e.getMessage + Option(e.getCause)
           .map(t => s" cause: ${t.getMessage}")
-          .getOrElse(""))
+          .getOrElse("")
+      )
     }
 
   def badRequest(msg: String): Route =
@@ -81,14 +79,11 @@ class HttpApiEndpoint(commandGateway: CommandGateway,
       }
       .handle {
         case ValidationRejection(msg, _) ⇒
-          complete(
-            StatusCodes.InternalServerError -> ErrorResponse("Internal error due to: " + msg))
+          complete(StatusCodes.InternalServerError -> ErrorResponse("Internal error due to: " + msg))
       }
       .handleAll[MethodRejection] { methodRejections ⇒
         val names = methodRejections.map(_.supported.name)
-        complete(
-          StatusCodes.MethodNotAllowed -> ErrorResponse(
-            s"Can't do that! Supported: ${names mkString " or "}!"))
+        complete(StatusCodes.MethodNotAllowed -> ErrorResponse(s"Can't do that! Supported: ${names mkString " or "}!"))
       }
       .handleNotFound {
         complete(StatusCodes.NotFound -> ErrorResponse("Not here!"))
@@ -97,7 +92,7 @@ class HttpApiEndpoint(commandGateway: CommandGateway,
 
   // API documentation frontend.
   val swaggerService = new SwaggerHttpServiceRoute(system, materializer)
-  val cargoRoute = new CargoRoute(commandGateway, cargoQueries)
+  val cargoRoute     = new CargoRoute(commandGateway, cargoQueries)
 
   val route = {
     options {
@@ -112,7 +107,7 @@ class HttpApiEndpoint(commandGateway: CommandGateway,
 
     httpServer onComplete {
       case Success(answer) ⇒ logger.info("service is available: " + answer)
-      case Failure(msg) ⇒ logger.error("service failed: " + msg)
+      case Failure(msg)    ⇒ logger.error("service failed: " + msg)
     }
   }
 

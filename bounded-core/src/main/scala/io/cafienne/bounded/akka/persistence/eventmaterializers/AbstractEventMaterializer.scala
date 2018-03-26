@@ -28,8 +28,7 @@ import scala.concurrent.duration._
   * @param actorSystem
   * @param keepCurrentOffset Set this to false if current offset must not be stored.
   */
-abstract class AbstractEventMaterializer(actorSystem: ActorSystem,
-                                         keepCurrentOffset: Boolean = true)
+abstract class AbstractEventMaterializer(actorSystem: ActorSystem, keepCurrentOffset: Boolean = true)
     extends ActorSystemProvider
     with ReadJournalProvider
     with OffsetStore
@@ -72,18 +71,15 @@ abstract class AbstractEventMaterializer(actorSystem: ActorSystem,
     * Register listener for events. Should be registered *after* replay is finished
     * @return Future
     */
-  override def registerListener(
-      maybeStartOffset: Option[Offset]): Future[Done] = {
+  override def registerListener(maybeStartOffset: Option[Offset]): Future[Done] = {
     val (_, offsetFuture) = registerListenerWithKillSwitch(maybeStartOffset)
     offsetFuture.mapTo[Done]
   }
 
-  def registerListenerWithKillSwitch(
-      maybeStartOffset: Option[Offset]): (UniqueKillSwitch, Future[Offset]) = {
+  def registerListenerWithKillSwitch(maybeStartOffset: Option[Offset]): (UniqueKillSwitch, Future[Offset]) = {
     logger.info(s"Registering listener with killswitch $viewIdentifier")
 
-    val listenStartOffset = maybeStartOffset.getOrElse(
-      Await.result(getOffset(viewIdentifier), 10.seconds))
+    val listenStartOffset = maybeStartOffset.getOrElse(Await.result(getOffset(viewIdentifier), 10.seconds))
     val source: Source[EventEnvelope, NotUsed] =
       journal.eventsByTag(tagName, listenStartOffset)
     val lastSnk = Sink.last[Offset]
@@ -91,13 +87,13 @@ abstract class AbstractEventMaterializer(actorSystem: ActorSystem,
       .mapAsync(1) {
         case EventEnvelope(evtOffset, persistenceId, sequenceNo, evt) =>
           logger.debug(
-            s"$matMappingName: runStream: Received event: $evt(offset: $evtOffset, persistenceId: $persistenceId, sequenceNo: $sequenceNo)")
+            s"$matMappingName: runStream: Received event: $evt(offset: $evtOffset, persistenceId: $persistenceId, sequenceNo: $sequenceNo)"
+          )
           handleEvent(evt) map { _ =>
             if (keepCurrentOffset) {
               saveOffset(viewIdentifier, evtOffset)
             }
-            logger.debug(
-              s"$matMappingName: runStream: Completed processing of event: $evt")
+            logger.debug(s"$matMappingName: runStream: Completed processing of event: $evt")
             evtOffset
           }
       }

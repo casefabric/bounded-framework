@@ -13,19 +13,16 @@ import io.cafienne.bounded.aggregate.DefaultCommandGateway
 import io.cafienne.bounded.akka.persistence.eventmaterializers._
 import io.cafienne.bounded.cargosample.domain.Cargo
 import io.cafienne.bounded.cargosample.httpapi.HttpApiEndpoint
-import io.cafienne.bounded.cargosample.projections.{
-  CargoQueriesImpl,
-  CargoViewProjectionWriter
-}
+import io.cafienne.bounded.cargosample.projections.{CargoQueriesImpl, CargoViewProjectionWriter}
 import io.cafienne.bounded.config.Configured
 
 import scala.concurrent.Await
 import scala.util.{Failure, Success}
 
 object Boot extends App with Configured {
-  implicit val system = ActorSystem("cargo-service")
+  implicit val system       = ActorSystem("cargo-service")
   implicit val materializer = ActorMaterializer()
-  implicit val http = Http()
+  implicit val http         = Http()
 
   import system.dispatcher
   import scala.concurrent.duration._
@@ -43,17 +40,17 @@ object Boot extends App with Configured {
     }
   }
 
-  val cargoQueries = new CargoQueriesImpl()
-  val cargoViewProjectionWriter = new CargoViewProjectionWriter(system)
-  with ReadJournalOffsetStore with OffsetTypeUuid
+  val cargoQueries              = new CargoQueriesImpl()
+  val cargoViewProjectionWriter = new CargoViewProjectionWriter(system) with ReadJournalOffsetStore with OffsetTypeUuid
 
   val eventMaterializers = new EventMaterializers(
     List(
       cargoViewProjectionWriter
-    ))
+    )
+  )
 
   implicit val timeout = Timeout(5.seconds)
-  val commandGateway = new DefaultCommandGateway(system, Cargo)
+  val commandGateway   = new DefaultCommandGateway(system, Cargo)
 
   val httpApiEndpoint = new HttpApiEndpoint(
     commandGateway,
@@ -67,9 +64,10 @@ object Boot extends App with Configured {
         logger.info(s"Start HTTP server")
         httpApiEndpoint.runServer(host, port)
       case Failure(msg) =>
-        logger.error("Could not start Cargo Service due to {}",
-                     msg.getMessage + Option(msg.getCause).fold("")(t =>
-                       s" Cause: ${t.getMessage} "))
+        logger.error(
+          "Could not start Cargo Service due to {}",
+          msg.getMessage + Option(msg.getCause).fold("")(t => s" Cause: ${t.getMessage} ")
+        )
     }
   } catch {
     case t: Throwable =>

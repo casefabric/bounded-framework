@@ -21,6 +21,8 @@ lazy val basicSettings = {
       "-Ywarn-dead-code"
     ),
     scalastyleConfig := baseDirectory.value / "project/scalastyle-config.xml",
+    scalafmtConfig := Some((baseDirectory in ThisBuild).value / "project/.scalafmt.conf"),
+    scalafmtOnCompile := true,
 
     startYear := Some(2018),
     licenses := Seq("Apache-2.0" -> url("https://www.apache.org/licenses/LICENSE-2.0")),

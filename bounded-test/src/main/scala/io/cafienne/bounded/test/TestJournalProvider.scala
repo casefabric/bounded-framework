@@ -6,11 +6,7 @@ package io.cafienne.bounded.test
 
 import akka.NotUsed
 import akka.actor.ActorSystem
-import akka.persistence.inmemory.extension.{
-  InMemoryJournalStorage,
-  InMemorySnapshotStorage,
-  StorageExtension
-}
+import akka.persistence.inmemory.extension.{InMemoryJournalStorage, InMemorySnapshotStorage, StorageExtension}
 import akka.persistence.inmemory.query.scaladsl.InMemoryReadJournal
 import akka.persistence.query.scaladsl._
 import akka.persistence.query.{EventEnvelope, PersistenceQuery}
@@ -28,20 +24,19 @@ trait TestJournalProvider {
 
   private lazy val readJournal = PersistenceQuery(journalActorSystem)
     .readJournalFor[InMemoryReadJournal](InMemoryReadJournal.Identifier)
-    .asInstanceOf[ReadJournal with CurrentPersistenceIdsQuery with CurrentEventsByPersistenceIdQuery with CurrentEventsByTagQuery with EventsByPersistenceIdQuery with EventsByTagQuery]
+    .asInstanceOf[
+      ReadJournal with CurrentPersistenceIdsQuery with CurrentEventsByPersistenceIdQuery with CurrentEventsByTagQuery with EventsByPersistenceIdQuery with EventsByTagQuery
+    ]
 
   protected def resetJournal(): Unit = {
     val tp = TestProbe()
-    tp.send(StorageExtension(journalActorSystem).journalStorage,
-            InMemoryJournalStorage.ClearJournal)
+    tp.send(StorageExtension(journalActorSystem).journalStorage, InMemoryJournalStorage.ClearJournal)
     tp.expectMsg(akka.actor.Status.Success(""))
-    tp.send(StorageExtension(journalActorSystem).snapshotStorage,
-            InMemorySnapshotStorage.ClearSnapshots)
+    tp.send(StorageExtension(journalActorSystem).snapshotStorage, InMemorySnapshotStorage.ClearSnapshots)
     tp.expectMsg(akka.actor.Status.Success(""))
   }
 
-  protected def waitForEvent(persistenceId: String,
-                             maxWaitTimeMillis: Long): Boolean = {
+  protected def waitForEvent(persistenceId: String, maxWaitTimeMillis: Long): Boolean = {
     var hasEvent = false
 
     val start = System.currentTimeMillis()

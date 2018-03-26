@@ -15,26 +15,16 @@ import scala.collection.immutable.Seq
   * Aggregate root that keeps the logic of the cargo.
   * @param cargoId unique identifier for cargo.
   */
-class Cargo(cargoId: AggregateRootId)
-    extends AggregateRootActor
-    with AggregateStateCreator
-    with ActorLogging {
+class Cargo(cargoId: AggregateRootId) extends AggregateRootActor with AggregateStateCreator with ActorLogging {
 
   override def aggregateId: AggregateRootId = cargoId
 
-  override def handleCommand(command: DomainCommand,
-                             currentState: AggregateState): Reply = {
+  override def handleCommand(command: DomainCommand, currentState: AggregateState): Reply = {
     command match {
       case cmd: PlanCargo =>
-        Ok(
-          Seq(
-            CargoPlanned(cmd.metaData,
-                         cmd.cargoId,
-                         cmd.trackingId,
-                         cmd.routeSpecification)))
+        Ok(Seq(CargoPlanned(cmd.metaData, cmd.cargoId, cmd.trackingId, cmd.routeSpecification)))
       case cmd: SpecifyNewRoute =>
-        Ok(Seq(
-          NewRouteSpecified(cmd.metaData, cmd.cargoId, cmd.routeSpecification)))
+        Ok(Seq(NewRouteSpecified(cmd.metaData, cmd.cargoId, cmd.routeSpecification)))
       case other => Ko(new UnexpectedCommand(other))
     }
   }
@@ -44,8 +34,7 @@ class Cargo(cargoId: AggregateRootId)
       case evt: CargoPlanned =>
         new CargoAggregateState(evt.trackingId, evt.routeSpecification)
       case _ =>
-        throw new IllegalArgumentException(
-          s"Event $evt is not valid to create a new CargoAggregateState")
+        throw new IllegalArgumentException(s"Event $evt is not valid to create a new CargoAggregateState")
     }
   }
 
@@ -53,8 +42,7 @@ class Cargo(cargoId: AggregateRootId)
 
 object Cargo extends AggregateRootCreator {
 
-  case class CargoAggregateState(trackingId: TrackingId,
-                                 routeSpecification: RouteSpecification)
+  case class CargoAggregateState(trackingId: TrackingId, routeSpecification: RouteSpecification)
       extends AggregateState {
     override def update(evt: DomainEvent): AggregateState = {
       evt match {

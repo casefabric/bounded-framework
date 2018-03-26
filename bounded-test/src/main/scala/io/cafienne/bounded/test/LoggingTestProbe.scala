@@ -13,7 +13,7 @@ object LoggingTestProbe {
     probe.setAutoPilot(new TestActor.AutoPilot {
       def run(sender: ActorRef, msg: Any) = {
         val other = sender.path
-        val me = probe.ref.path
+        val me    = probe.ref.path
         system.log.debug(s"$me received $msg from $other")
         this
       }

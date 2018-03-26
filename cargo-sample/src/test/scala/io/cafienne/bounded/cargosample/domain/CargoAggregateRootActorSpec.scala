@@ -18,8 +18,12 @@ import org.scalatest.{BeforeAndAfterAll, Matchers, WordSpecLike}
 
 import scala.concurrent.duration._
 
-class CargoAggregateRootActorSpec extends TestKit(ActorSystem("CargoTestSystem", SpecConfig.testConfigAkkaInMem))
-  with ImplicitSender with WordSpecLike with Matchers with BeforeAndAfterAll {
+class CargoAggregateRootActorSpec
+    extends TestKit(ActorSystem("CargoTestSystem", SpecConfig.testConfigAkkaInMem))
+    with ImplicitSender
+    with WordSpecLike
+    with Matchers
+    with BeforeAndAfterAll {
 
   implicit val timeout = Timeout(10.seconds) //dilated
 
@@ -34,9 +38,13 @@ class CargoAggregateRootActorSpec extends TestKit(ActorSystem("CargoTestSystem",
   "CargoAggregateRoot" must {
 
     "Plan a new Cargo Delivery" in {
-      val cargoId1 = CargoId(java.util.UUID.fromString("AC935D2D-DD41-4D6C-9302-62C33525B1D2"))
+      val cargoId1   = CargoId(java.util.UUID.fromString("AC935D2D-DD41-4D6C-9302-62C33525B1D2"))
       val trackingId = TrackingId(UUID.fromString("53f53841-0bf3-467f-98e2-578d360ee573"))
-      val routeSpecification = RouteSpecification(Location("home"), Location("destination"), ZonedDateTime.parse("2018-03-03T10:15:30+01:00[Europe/Amsterdam]"))
+      val routeSpecification = RouteSpecification(
+        Location("home"),
+        Location("destination"),
+        ZonedDateTime.parse("2018-03-03T10:15:30+01:00[Europe/Amsterdam]")
+      )
       val planCargoCommand = PlanCargo(metaData, cargoId1, trackingId, routeSpecification)
 
       val aggregateRootActor = system.actorOf(Cargo.props(cargoId1), "test-aggregate")
@@ -49,11 +57,15 @@ class CargoAggregateRootActorSpec extends TestKit(ActorSystem("CargoTestSystem",
     }
 
     "Change the route specification for an existing Cargo Delivery" in {
-      val cargoId2 = CargoId(java.util.UUID.fromString("72DEB9B4-D33F-467E-B1F1-4B0B15D2092F"))
+      val cargoId2   = CargoId(java.util.UUID.fromString("72DEB9B4-D33F-467E-B1F1-4B0B15D2092F"))
       val trackingId = TrackingId(UUID.fromString("53f53841-0bf3-467f-98e2-578d360ee573"))
-      val routeSpecification = RouteSpecification(Location("home"), Location("destination"), ZonedDateTime.parse("2018-03-03T10:15:30+01:00[Europe/Amsterdam]"))
+      val routeSpecification = RouteSpecification(
+        Location("home"),
+        Location("destination"),
+        ZonedDateTime.parse("2018-03-03T10:15:30+01:00[Europe/Amsterdam]")
+      )
       val cargoPlannedEvent = CargoPlanned(metaData, cargoId2, trackingId, routeSpecification)
-      val storeEventsActor = system.actorOf(Props(classOf[CreateEventsInStoreActor], cargoId2), "create-events-actor")
+      val storeEventsActor  = system.actorOf(Props(classOf[CreateEventsInStoreActor], cargoId2), "create-events-actor")
 
       storeEventsActor ! cargoPlannedEvent
       fishForMessage(10.seconds, "CargoPlanned") {
@@ -70,8 +82,11 @@ class CargoAggregateRootActorSpec extends TestKit(ActorSystem("CargoTestSystem",
 
       val aggregateRootActorBackToLife = system.actorOf(Props(classOf[Cargo], cargoId2), "test-aggregate2")
 
-      val newRouteSpecification = RouteSpecification(Location("home"), Location("newDestination"),
-        ZonedDateTime.parse("2018-03-04T10:45:45+01:00[Europe/Amsterdam]"))
+      val newRouteSpecification = RouteSpecification(
+        Location("home"),
+        Location("newDestination"),
+        ZonedDateTime.parse("2018-03-04T10:45:45+01:00[Europe/Amsterdam]")
+      )
       val specifyNewRouteCommand = SpecifyNewRoute(metaData, cargoId2, newRouteSpecification)
 
       // expect this one to have the Planned State
@@ -85,6 +100,6 @@ class CargoAggregateRootActorSpec extends TestKit(ActorSystem("CargoTestSystem",
 
   override protected def afterAll(): Unit = {
     TestKit.shutdownActorSystem(system)
- }
+  }
 
 }

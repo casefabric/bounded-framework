@@ -29,7 +29,8 @@ class CargoRouteSpec extends FlatSpec with MustMatchers with ScalatestRouteTest 
   val logger = Logging(system, getClass)
 
   val cargoId1 = CargoId(UUID.fromString("8CD15DA4-006B-478C-8640-2FA52AA7657E"))
-  val cargoViewItem1 = CargoViewItem(cargoId1, "Amsterdam", "New York", ZonedDateTime.parse("2018-01-01T12:25:38+01:00"))
+  val cargoViewItem1 =
+    CargoViewItem(cargoId1, "Amsterdam", "New York", ZonedDateTime.parse("2018-01-01T12:25:38+01:00"))
   val metadata = MetaData(ZonedDateTime.now, None, None)
 
   val cargoQueries = new CargoQueries {
@@ -45,15 +46,26 @@ class CargoRouteSpec extends FlatSpec with MustMatchers with ScalatestRouteTest 
   val commandGateway = new CommandGateway {
     override def send[T <: DomainCommand](command: T)(implicit validator: ValidateableCommand[T]): Future[Unit] = ???
 
-    override def sendAndAsk[T <: DomainCommand](command: T)(implicit validator: ValidateableCommand[T]): Future[_] = command match {
+    override def sendAndAsk[T <: DomainCommand](command: T)(implicit validator: ValidateableCommand[T]): Future[_] =
+      command match {
         case cmd: CargoDomainProtocol.PlanCargo =>
           logger.debug("Received plancargo {}", cmd)
-          Future.successful(CargoPlanned(metadata, cargoId1, TrackingId(UUID.fromString("83AB1887-CC3D-434C-855C-34674E746BC0")),
-          RouteSpecification(Location("Amsterdam"), Location("New York"), ZonedDateTime.parse("2018-01-01T13:40:00+01:00"))))
+          Future.successful(
+            CargoPlanned(
+              metadata,
+              cargoId1,
+              TrackingId(UUID.fromString("83AB1887-CC3D-434C-855C-34674E746BC0")),
+              RouteSpecification(
+                Location("Amsterdam"),
+                Location("New York"),
+                ZonedDateTime.parse("2018-01-01T13:40:00+01:00")
+              )
+            )
+          )
         case other =>
           logger.debug("Received other {}", other)
           Future.failed[DomainEvent](new RuntimeException("broken"))
-    }
+      }
   }
 
   val cargoRoute = new CargoRoute(commandGateway, cargoQueries)
@@ -67,7 +79,7 @@ class CargoRouteSpec extends FlatSpec with MustMatchers with ScalatestRouteTest 
   }
 
   it should "respond with a not found when the cargo does not exist" in {
-    val notExistingCargoId = CargoId(UUID.fromString("92E597FA-9099-408A-A1D4-5AF7F1A6E761"))
+    val notExistingCargoId    = CargoId(UUID.fromString("92E597FA-9099-408A-A1D4-5AF7F1A6E761"))
     val expectedErrorResponse = ErrorResponse("Cargo with id 92e597fa-9099-408a-a1d4-5af7f1a6e761 is not found")
     Get(s"/cargo/${notExistingCargoId.id}") ~> Route.seal(cargoRoute.routes) ~> check {
       status must be(StatusCodes.NotFound)
@@ -77,8 +89,10 @@ class CargoRouteSpec extends FlatSpec with MustMatchers with ScalatestRouteTest 
   }
 
   it should "send a command to plan the cargo after a post" in {
-    val planCargo = HttpJsonProtocol.PlanCargo(UUID.fromString("83AB1887-CC3D-434C-855C-34674E746BC0"),
-      RouteSpecification(Location("Amsterdam"), Location("New York"), ZonedDateTime.parse("2018-01-01T13:40:00+01:00")))
+    val planCargo = HttpJsonProtocol.PlanCargo(
+      UUID.fromString("83AB1887-CC3D-434C-855C-34674E746BC0"),
+      RouteSpecification(Location("Amsterdam"), Location("New York"), ZonedDateTime.parse("2018-01-01T13:40:00+01:00"))
+    )
     Post(s"/cargo", planCargo.toJson) ~> cargoRoute.routes ~> check {
       status must be(StatusCodes.Created)
       val theResponse = responseAs[JsObject]

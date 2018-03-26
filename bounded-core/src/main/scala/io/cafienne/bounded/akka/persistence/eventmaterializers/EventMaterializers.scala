@@ -15,8 +15,7 @@ class EventMaterializers(replayables: List[Resumable]) {
 
   import EventMaterializerExecutionContext._
 
-  lazy val logger: Logger = Logger(
-    LoggerFactory.getLogger("bounded.eventmaterializers"))
+  lazy val logger: Logger = Logger(LoggerFactory.getLogger("bounded.eventmaterializers"))
 
   case class ReplayResult(viewMaterializer: Resumable, offset: Offset)
 
@@ -33,30 +32,21 @@ class EventMaterializers(replayables: List[Resumable]) {
       case replayable: ResumableReplayable =>
         replayable
           .replayEvents()
-          .map(replayOffset =>
-            startListing(ReplayResult(replayable, replayOffset),
-                         keepListenersRunning))
+          .map(replayOffset => startListing(ReplayResult(replayable, replayOffset), keepListenersRunning))
       case nonReplayable: Resumable =>
-        Future(
-          startListing(ReplayResult(nonReplayable, NoOffset),
-                       keepListenersRunning))
+        Future(startListing(ReplayResult(nonReplayable, NoOffset), keepListenersRunning))
     })
   }
 
-  private def startListing(replayed: ReplayResult,
-                           keepRunning: Boolean): ReplayResult = {
+  private def startListing(replayed: ReplayResult, keepRunning: Boolean): ReplayResult = {
     if (keepRunning) {
       replayed.viewMaterializer
         .registerListener(Some(replayed.offset))
         .onComplete({
           case Success(msg) =>
-            logger.info("Listener {} is done msg: {}",
-                        replayed.viewMaterializer,
-                        msg)
+            logger.info("Listener {} is done msg: {}", replayed.viewMaterializer, msg)
           case Failure(msg) =>
-            logger.error("Listener {} stopped with a failure: {}",
-                         replayed.viewMaterializer,
-                         msg)
+            logger.error("Listener {} stopped with a failure: {}", replayed.viewMaterializer, msg)
         })
     }
     replayed

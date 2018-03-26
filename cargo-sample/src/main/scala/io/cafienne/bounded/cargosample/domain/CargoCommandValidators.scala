@@ -25,21 +25,21 @@ trait CargoCommandValidators {
 
 trait ExistenceChecker extends ActorSystemProvider with ReadJournalProvider {
   implicit val materializer = ActorMaterializer()
-  implicit val ec = system.dispatcher
+  implicit val ec           = system.dispatcher
 
   def exists[A <: CargoDomainCommand](cmd: A): Future[A] =
     readJournal
       .currentEventsByPersistenceId(cmd.id.idAsString, 0, 1)
       .runFold(false)((_, _) => true)
-      .flatMap(f =>
-        if (f) Future.successful(cmd)
-        else
-          Future.failed(CargoNotFound(
-            s"Cargo with id ${cmd.id} not found while processing command $cmd")))
+      .flatMap(
+        f =>
+          if (f) Future.successful(cmd)
+          else
+            Future.failed(CargoNotFound(s"Cargo with id ${cmd.id} not found while processing command $cmd"))
+      )
 }
 
-class CargoCommandValidatorsImpl(actorSystem: ActorSystem)
-    extends CargoCommandValidators {
+class CargoCommandValidatorsImpl(actorSystem: ActorSystem) extends CargoCommandValidators {
 
   implicit val PlanCargoValidator = new PlanCargoValidator()
   implicit val SpecifyNewRouteValidator =

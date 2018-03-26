@@ -21,8 +21,7 @@ trait Configured {
     * @param defaultState default state of feature when not configured. Defaults to true
     * @return boolean indicating whether the feauture is enabled.
     */
-  def isFeatureEnabled(featurePath: String,
-                       defaultState: Boolean = true): Boolean =
+  def isFeatureEnabled(featurePath: String, defaultState: Boolean = true): Boolean =
     (config.hasPath(featurePath) && config.getBoolean(featurePath)) || (!config
       .hasPath(featurePath) && defaultState)
 }

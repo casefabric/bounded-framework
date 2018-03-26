@@ -17,7 +17,6 @@ object CommandValidationException {
   def apply(reason: String, cause: Throwable): CommandValidationException =
     new CommandValidationException(reason, cause)
 
-  def unapply(
-      e: CommandValidationException): Option[(String, Option[Throwable])] =
+  def unapply(e: CommandValidationException): Option[(String, Option[Throwable])] =
     Some((e.getMessage, Option(e.getCause)))
 }

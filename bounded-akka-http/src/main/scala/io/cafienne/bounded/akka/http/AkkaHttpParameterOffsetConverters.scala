@@ -28,12 +28,14 @@ trait AkkaHttpParameterOffsetConverters extends Configured {
           case "inmemory-journal" => Sequence.apply(string.toLong)
           case other =>
             throw new IllegalArgumentException(
-              s"value $string cannot be transformed to an offset for journal $configuredJournal")
+              s"value $string cannot be transformed to an offset for journal $configuredJournal"
+            )
         }
       } catch {
         case ex: Exception =>
           throw new IllegalArgumentException(
-            s"Unmarshalling query parameter $string for $configuredJournal got error " + ex.getMessage)
+            s"Unmarshalling query parameter $string for $configuredJournal got error " + ex.getMessage
+          )
       }
     }
   }

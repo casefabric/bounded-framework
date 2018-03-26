@@ -23,9 +23,7 @@ trait UserContext {
   def roles: List[String]
 }
 
-case class MetaData(timestamp: ZonedDateTime,
-                    userContext: Option[UserContext],
-                    eventId: Option[EventNumber])
+case class MetaData(timestamp: ZonedDateTime, userContext: Option[UserContext], eventId: Option[EventNumber])
 
 trait DomainCommand {
   def id: AggregateRootId
@@ -43,7 +41,7 @@ trait DomainEvent extends Persistable {
 trait HandlingFailure
 
 class AggregateNotInitialized(id: AggregateRootId) extends HandlingFailure
-class UnexpectedCommand(command: DomainCommand) extends HandlingFailure
+class UnexpectedCommand(command: DomainCommand)    extends HandlingFailure
 
 sealed trait Reply
 

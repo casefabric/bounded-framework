@@ -43,10 +43,10 @@ object TestableAggregateRoot {
     * @tparam A The Aggregate Root Type that is tested.
     * @return a TestableAggregateRoot instance that is initialized and available to give a DomainCommand to.
     */
-  def given[A <: AggregateRootActor](id: AggregateRootId, evt: DomainEvent*)(
-      implicit system: ActorSystem,
-      timeout: Timeout,
-      ctag: reflect.ClassTag[A]): TestableAggregateRoot[A] = {
+  def given[A <: AggregateRootActor](
+    id: AggregateRootId,
+    evt: DomainEvent*
+  )(implicit system: ActorSystem, timeout: Timeout, ctag: reflect.ClassTag[A]): TestableAggregateRoot[A] = {
     new TestableAggregateRoot[A](id, evt)
   }
 
@@ -57,10 +57,9 @@ object TestableAggregateRoot {
     * @tparam A The Aggregate Root Type that is tested.
     * @return a TestableAggregateRoot instance that is initialized and available to give a DomainCommand to.
     */
-  def given[A <: AggregateRootActor](id: AggregateRootId)(
-      implicit system: ActorSystem,
-      timeout: Timeout,
-      ctag: reflect.ClassTag[A]): TestableAggregateRoot[A] = {
+  def given[A <: AggregateRootActor](
+    id: AggregateRootId
+  )(implicit system: ActorSystem, timeout: Timeout, ctag: reflect.ClassTag[A]): TestableAggregateRoot[A] = {
     new TestableAggregateRoot[A](id, Seq.empty[DomainEvent])
   }
 
@@ -76,18 +75,17 @@ object TestableAggregateRoot {
   }
 }
 
-class TestableAggregateRoot[A <: AggregateRootActor] private (
-    id: AggregateRootId,
-    evt: Seq[DomainEvent])(implicit system: ActorSystem,
-                           timeout: Timeout,
-                           ctag: reflect.ClassTag[A]) {
+class TestableAggregateRoot[A <: AggregateRootActor] private (id: AggregateRootId, evt: Seq[DomainEvent])(
+  implicit system: ActorSystem,
+  timeout: Timeout,
+  ctag: reflect.ClassTag[A]
+) {
 
   import TestableAggregateRoot.testId
   final val arTestId = testId(id)
 
-  private val storeEventsActor = system.actorOf(
-    Props(classOf[CreateEventsInStoreActor], arTestId),
-    "create-events-actor")
+  private val storeEventsActor =
+    system.actorOf(Props(classOf[CreateEventsInStoreActor], arTestId), "create-events-actor")
   private var handledEvents: List[DomainEvent] = List.empty
 
   implicit val duration: Duration = timeout.duration
@@ -106,8 +104,7 @@ class TestableAggregateRoot[A <: AggregateRootActor] private (
 
   private def createActor[B <: AggregateRootActor](id: AggregateRootId) = {
     handledEvents = List.empty
-    system.actorOf(Props(ctag.runtimeClass, arTestId),
-                   s"test-aggregate-$arTestId")
+    system.actorOf(Props(ctag.runtimeClass, arTestId), s"test-aggregate-$arTestId")
   }
 
   /**
@@ -121,9 +118,9 @@ class TestableAggregateRoot[A <: AggregateRootActor] private (
     //TODO IT maybe a better idea to actually return the results in a testable matter. (HOW?)
     if (command.id != id)
       throw new IllegalArgumentException(
-        s"Command for Aggregate Root ${command.id} cannot be handled by this aggregate root with id $id")
-    aggregateRootActor =
-      aggregateRootActor.fold(Some(createActor[A](arTestId)))(r => Some(r))
+        s"Command for Aggregate Root ${command.id} cannot be handled by this aggregate root with id $id"
+      )
+    aggregateRootActor = aggregateRootActor.fold(Some(createActor[A](arTestId)))(r => Some(r))
     val aggregateRootProbe = TestProbe()
     aggregateRootProbe watch aggregateRootActor.get
 
@@ -147,9 +144,9 @@ class TestableAggregateRoot[A <: AggregateRootActor] private (
     * @return Future with the AggregateState as defined for this Aggregate Root.
     */
   def currentState: Future[AggregateState] = {
-    aggregateRootActor.fold(
-      Future.failed[AggregateState](new IllegalStateException("")))(actor =>
-      (actor ? GetState).mapTo[AggregateState])
+    aggregateRootActor.fold(Future.failed[AggregateState](new IllegalStateException("")))(
+      actor => (actor ? GetState).mapTo[AggregateState]
+    )
   }
 
   /**

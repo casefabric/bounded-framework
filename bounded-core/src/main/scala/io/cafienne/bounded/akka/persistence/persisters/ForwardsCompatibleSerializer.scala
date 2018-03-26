@@ -15,13 +15,11 @@ object UnsupportedEventProtocol extends DefaultJsonProtocol {
   case class UnsupportedEventAggregateId(id: String) extends AggregateRootId {
     override def idAsString: String = id
   }
-  case class UnsupportedEvent(metaData: MetaData,
-                              id: UnsupportedEventAggregateId)
-      extends DomainEvent
+  case class UnsupportedEvent(metaData: MetaData, id: UnsupportedEventAggregateId) extends DomainEvent
 
-  implicit val unsupportedAggregateIdFmt
-    : RootJsonFormat[UnsupportedEventAggregateId] = jsonFormat1(
-    UnsupportedEventAggregateId)
+  implicit val unsupportedAggregateIdFmt: RootJsonFormat[UnsupportedEventAggregateId] = jsonFormat1(
+    UnsupportedEventAggregateId
+  )
   implicit val unsupportedEventFmt: RootJsonFormat[UnsupportedEvent] =
     jsonFormat2(UnsupportedEvent)
 }
@@ -34,14 +32,11 @@ object ApPersisters {
     persister[UnsupportedEvent]("UnsupportedEvent")
 }
 
-class ForwardsCompatibleSerializer(
-    persisters: List[Persister[_, _]],
-    codec: PersistedCodec = DefaultPersistedCodec)
+class ForwardsCompatibleSerializer(persisters: List[Persister[_, _]], codec: PersistedCodec = DefaultPersistedCodec)
     extends StaminaAkkaSerializer(persisters, codec)
     with LazyLogging {
 
-  override def fromBinary(bytes: Array[Byte],
-                          clazz: Option[Class[_]]): AnyRef = {
+  override def fromBinary(bytes: Array[Byte], clazz: Option[Class[_]]): AnyRef = {
     try {
       super.fromBinary(bytes, clazz)
     } catch {
@@ -51,12 +46,10 @@ class ForwardsCompatibleSerializer(
         val persisted = codec.readPersisted(bytes)
         if (persisted.key == "UnsupportedEvent") throw ude
 
-        logger.warn("Unsupported event, converting to UnsupportedEvent event",
-                    ude)
+        logger.warn("Unsupported event, converting to UnsupportedEvent event", ude)
         // This will stop the persister (reader/writer) completely in case of failure.
         // In case of failure we either have rubbish, or an event which does not originate from DomainEvent
-        ApPersisters.unsupportedEventPersister.unpersist(
-          persisted.copy(key = "UnsupportedEvent", version = 1))
+        ApPersisters.unsupportedEventPersister.unpersist(persisted.copy(key = "UnsupportedEvent", version = 1))
     }
   }
 

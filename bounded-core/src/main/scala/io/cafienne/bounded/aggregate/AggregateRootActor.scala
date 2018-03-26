@@ -24,10 +24,7 @@ trait AggregateStateCreator {
 /**
   * The AggregateRootActor ensures focus on the transformation of domain commands towards domain event.
   */
-trait AggregateRootActor
-    extends PersistentActor
-    with AggregateStateCreator
-    with ActorLogging {
+trait AggregateRootActor extends PersistentActor with AggregateStateCreator with ActorLogging {
 
   /**
     * When extending the AggregateRootActor you must return the unique id of the aggregate root.
@@ -58,7 +55,7 @@ trait AggregateRootActor
   final def receiveCommand: Actor.Receive = {
     case cmd: DomainCommand =>
       val originalSender = sender()
-      val reply = handleCommand(cmd, internalState getOrElse NoState)
+      val reply          = handleCommand(cmd, internalState getOrElse NoState)
 
       reply match {
         case Ok(events) => persistAll(events)(updateState)

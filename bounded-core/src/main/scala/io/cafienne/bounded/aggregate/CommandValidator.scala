@@ -11,7 +11,6 @@ trait ValidateableCommand[T <: DomainCommand] {
 }
 
 object CommandValidator {
-  def validate[T <: DomainCommand](v: T)(
-      implicit validator: ValidateableCommand[T]): Future[T] =
+  def validate[T <: DomainCommand](v: T)(implicit validator: ValidateableCommand[T]): Future[T] =
     validator.validate(v)
 }

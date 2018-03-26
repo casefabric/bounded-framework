@@ -11,9 +11,7 @@ import akka.stream.scaladsl.Source
 
 import scala.concurrent.Future
 
-abstract class AbstractReplayableEventMaterializer(actorSystem: ActorSystem,
-                                                   withPartialReplay: Boolean =
-                                                     true)
+abstract class AbstractReplayableEventMaterializer(actorSystem: ActorSystem, withPartialReplay: Boolean = true)
     extends AbstractEventMaterializer(actorSystem, withPartialReplay)
     with ResumableReplayable {
 
@@ -49,17 +47,15 @@ abstract class AbstractReplayableEventMaterializer(actorSystem: ActorSystem,
       journal.currentEventsByTag(tagName, targetOffset)
     source
       .runFoldAsync(targetOffset) {
-        case (previousOffset,
-              EventEnvelope(offset, persistenceId, sequenceNo, evt)) =>
+        case (previousOffset, EventEnvelope(offset, persistenceId, sequenceNo, evt)) =>
           logger.debug(
-            s"$matMappingName: Received event: $evt(previousOffset: $previousOffset, offset: $offset, persistenceId: $persistenceId, sequenceNo: $sequenceNo)")
+            s"$matMappingName: Received event: $evt(previousOffset: $previousOffset, offset: $offset, persistenceId: $persistenceId, sequenceNo: $sequenceNo)"
+          )
           handleReplayEvent(evt) map { _ =>
-            logger.debug(
-              s"$matMappingName: Completed processing of event: $evt")
+            logger.debug(s"$matMappingName: Completed processing of event: $evt")
             eventsReplayed += 1
             if (eventsReplayed % 100 == 0) {
-              logger.info(
-                s"$viewIdentifier: [$tagName] events replayed: $eventsReplayed")
+              logger.info(s"$viewIdentifier: [$tagName] events replayed: $eventsReplayed")
               if (withPartialReplay) {
                 saveOffset(viewIdentifier, offset)
               }

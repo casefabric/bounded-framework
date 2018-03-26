@@ -15,5 +15,7 @@ trait InMemoryReadJournalProvider {
   def eventsQuery =
     PersistenceQuery(system)
       .readJournalFor[InMemoryReadJournal](InMemoryReadJournal.Identifier)
-      .asInstanceOf[ReadJournal with CurrentPersistenceIdsQuery with CurrentEventsByPersistenceIdQuery with CurrentEventsByTagQuery with EventsByPersistenceIdQuery with EventsByTagQuery]
+      .asInstanceOf[
+        ReadJournal with CurrentPersistenceIdsQuery with CurrentEventsByPersistenceIdQuery with CurrentEventsByTagQuery with EventsByPersistenceIdQuery with EventsByTagQuery
+      ]
 }
