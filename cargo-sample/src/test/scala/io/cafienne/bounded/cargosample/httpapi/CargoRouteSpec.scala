@@ -51,14 +51,18 @@ class CargoRouteSpec extends FlatSpec with MustMatchers with ScalatestRouteTest 
         case cmd: CargoDomainProtocol.PlanCargo =>
           logger.debug("Received plancargo {}", cmd)
           Future.successful(
-            CargoPlanned(
-              metadata,
-              cargoId1,
-              TrackingId(UUID.fromString("83AB1887-CC3D-434C-855C-34674E746BC0")),
-              RouteSpecification(
-                Location("Amsterdam"),
-                Location("New York"),
-                ZonedDateTime.parse("2018-01-01T13:40:00+01:00")
+            Ok(
+              List(
+                CargoPlanned(
+                  metadata,
+                  cargoId1,
+                  TrackingId(UUID.fromString("83AB1887-CC3D-434C-855C-34674E746BC0")),
+                  RouteSpecification(
+                    Location("Amsterdam"),
+                    Location("New York"),
+                    ZonedDateTime.parse("2018-01-01T13:40:00+01:00")
+                  )
+                )
               )
             )
           )
