@@ -10,7 +10,6 @@ import io.cafienne.bounded.cargosample.domain.Cargo.CargoAggregateState
 import io.cafienne.bounded.cargosample.domain.CargoDomainProtocol._
 
 import scala.collection.immutable.Seq
-import scala.reflect.ClassTag
 
 /**
   * Aggregate root that keeps the logic of the cargo.
@@ -68,11 +67,11 @@ object Cargo extends AggregateRootCreator {
     }
   }
 
-  def props(cargoId: AggregateRootId): Props = Props(classOf[Cargo], cargoId)
+  override def props(cargoId: AggregateRootId): Props = Props(classOf[Cargo], cargoId)
 
   final val aggregateRootTag = "ar-cargo" // used to tag the events and read them
 
-  override def create[A <: AggregateRootActor: ClassTag](
-      id: AggregateRootId): A = new Cargo(id).asInstanceOf[A]
+//  override def create[A <: AggregateRootActor: ClassTag](
+//      id: AggregateRootId): A = new Cargo(id).asInstanceOf[A]
 
 }

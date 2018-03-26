@@ -82,7 +82,7 @@ class HttpApiEndpoint(commandGateway: CommandGateway,
       .handle {
         case ValidationRejection(msg, _) ⇒
           complete(
-            StatusCodes.InternalServerError -> "Internal error due to: " + msg)
+            StatusCodes.InternalServerError -> ErrorResponse("Internal error due to: " + msg))
       }
       .handleAll[MethodRejection] { methodRejections ⇒
         val names = methodRejections.map(_.supported.name)

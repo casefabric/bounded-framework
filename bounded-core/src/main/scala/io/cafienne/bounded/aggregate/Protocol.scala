@@ -9,6 +9,20 @@ import scala.collection.immutable.Seq
 import stamina.Persistable
 import io.cafienne.bounded.akka.persistence.eventmaterializers.EventNumber
 
+trait Id {
+  def idAsString: String
+}
+
+trait AggregateRootId extends Id
+
+trait UserId extends Id
+
+trait UserContext {
+  def userId: UserId
+
+  def roles: List[String]
+}
+
 case class MetaData(timestamp: ZonedDateTime,
                     userContext: Option[UserContext],
                     eventId: Option[EventNumber])

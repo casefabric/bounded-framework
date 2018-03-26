@@ -46,6 +46,10 @@ object Dependencies {
       akkaHttpModule("http"),
       akkaHttpModule("http-spray-json"),
       akkaHttpModule("http-testkit") % Test,
+      "io.swagger" % "swagger-jaxrs" % "1.5.16",
+      // As suggested in https://stackoverflow.com/questions/43574426/how-to-resolve-java-lang-noclassdeffounderror-javax-xml-bind-jaxbexception-in-j
+      // to resolve blow-up due to swagger :  java.lang.NoClassDefFoundError: javax/xml/bind/annotation/XmlRootElement.
+      "javax.xml.bind" % "jaxb-api" % "2.3.0",
       "com.github.swagger-akka-http" %% "swagger-akka-http" % "0.14.0"
     ) ++ test
   }
@@ -55,6 +59,13 @@ object Dependencies {
       "org.scalatest"          %% "scalatest"                   % "3.0.1",
       "com.typesafe.akka"      %% "akka-testkit"                % akkaVersion
     ) ++ test
+  }
+
+  val persistenceLevelDBDeps = {
+    baseDeps ++ Seq(
+      "org.iq80.leveldb"            % "leveldb"        % "0.9",
+      "org.fusesource.leveldbjni"   % "leveldbjni-all" % "1.8"
+    )
   }
 
 }

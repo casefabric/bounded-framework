@@ -4,6 +4,9 @@
 
 package io.cafienne.bounded.cargosample.httpapi
 
+import java.util.UUID
+
+import io.cafienne.bounded.cargosample.domain.CargoDomainProtocol.RouteSpecification
 import spray.json._
 
 /**
@@ -12,6 +15,12 @@ import spray.json._
   * for all classes used with the http API.
   */
 object HttpJsonProtocol extends DefaultJsonProtocol {
+  import io.cafienne.bounded.aggregate.ProtocolJsonProtocol._
+  import io.cafienne.bounded.cargosample.domain.CargoDomainJsonProtocol._
+
+  case class PlanCargo(trackingId: UUID, routeSpecification: RouteSpecification)
+
+  implicit val planCargoFmt = jsonFormat2(PlanCargo)
 
   case class ErrorResponse(msg: String)
 

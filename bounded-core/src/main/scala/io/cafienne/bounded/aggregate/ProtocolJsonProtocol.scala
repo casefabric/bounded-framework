@@ -12,7 +12,7 @@ import java.util.UUID
 import io.cafienne.bounded.akka.persistence.eventmaterializers.EventNumber
 import spray.json._
 
-object CommandEventDatastructureJsonProtocol extends DefaultJsonProtocol {
+object ProtocolJsonProtocol extends DefaultJsonProtocol {
 
   def jsonEnum[T <: Enumeration](enu: T): JsonFormat[T#Value] =
     new JsonFormat[T#Value] {
@@ -59,7 +59,9 @@ object CommandEventDatastructureJsonProtocol extends DefaultJsonProtocol {
               override def roles: List[String] =
                 rolesArr.map(r => r.toString()).toList
 
-              override def userId: UserId = UserId(UUID.fromString(userStr))
+              override def userId: UserId = new UserId {
+                override def idAsString: String = userStr
+              }
             }
           case _ =>
             deserializationError(

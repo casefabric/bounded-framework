@@ -150,6 +150,9 @@ trait ReadJournalOffsetStore extends OffsetStore with OffsetType {
                                offsetType)
     } else if (configuredJournal.endsWith("inmemory-journal")) {
       new InMemoryBasedOffsetStore(offsetType)
+    } else if (configuredJournal.endsWith("leveldb")) {
+      //TODO write a specific leveldb offset store implementation (HIGH priority)
+      new InMemoryBasedOffsetStore(offsetType)
     } else {
       throw new RuntimeException(
         s"Offsetstore $configuredJournal is not supported as ReadJournalOffsetStore")

@@ -1,6 +1,7 @@
 /*
  * Copyright (C) 2016-2018 Cafienne B.V. <https://www.cafienne.io/bounded>
  */
+
 package io.cafienne.bounded.cargosample.domain
 
 import java.time.{ZoneOffset, ZonedDateTime}
@@ -22,7 +23,7 @@ class CargoAggregateRootActorSpec extends TestKit(ActorSystem("CargoTestSystem",
 
   implicit val timeout = Timeout(10.seconds) //dilated
 
-  val userId1 = UserId(UUID.fromString("53f53841-0bf3-467f-98e2-578d360ee572"))
+  val userId1 = CargoUserId(UUID.fromString("53f53841-0bf3-467f-98e2-578d360ee572"))
   val userContext = Some(new UserContext {
     override def roles: List[String] = List.empty
 

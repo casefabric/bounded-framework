@@ -10,8 +10,11 @@ import io.cafienne.bounded.aggregate.AggregateRootActor.{GetState, NoState}
 import scala.reflect.ClassTag
 
 trait AggregateRootCreator {
-  def create[A <: AggregateRootActor: ClassTag](id: AggregateRootId): A
+  def props(idToCreate: AggregateRootId): Props
+}
 
+trait AggregateState {
+  def update(event: DomainEvent): AggregateState
 }
 
 trait AggregateStateCreator {

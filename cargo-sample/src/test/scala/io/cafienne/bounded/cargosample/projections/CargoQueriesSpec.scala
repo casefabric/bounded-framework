@@ -1,6 +1,7 @@
 /*
  * Copyright (C) 2016-2018 Cafienne B.V. <https://www.cafienne.io/bounded>
  */
+
 package io.cafienne.bounded.cargosample.projections
 
 import java.time.ZonedDateTime
@@ -27,8 +28,8 @@ class CargoQueriesSpec extends TestKit(ActorSystem("testsystem", SpecConfig.test
   implicit val logger: LoggingAdapter = Logging(system, getClass)
 
   val expectedDeliveryTime = ZonedDateTime.parse("2018-01-01T17:43:00+01:00")
-  val userId1 = UserId(UUID.fromString("53f53841-0bf3-467f-98e2-578d360ee572"))
-  val userId2 = UserId(UUID.fromString("42f53841-0bf3-467f-98e2-578d360ed46f"))
+  val userId1 = CargoUserId(UUID.fromString("53f53841-0bf3-467f-98e2-578d360ee572"))
+  val userId2 = CargoUserId(UUID.fromString("42f53841-0bf3-467f-98e2-578d360ed46f"))
   private val userContext = Some(new UserContext {
 
     override def roles: List[String] = List.empty

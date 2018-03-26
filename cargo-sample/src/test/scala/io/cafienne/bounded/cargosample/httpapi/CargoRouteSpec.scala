@@ -1,6 +1,7 @@
 /*
  * Copyright (C) 2016-2018 Cafienne B.V. <https://www.cafienne.io/bounded>
  */
+
 package io.cafienne.bounded.cargosample.httpapi
 
 import java.time.ZonedDateTime
@@ -10,9 +11,9 @@ import akka.event.Logging
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.testkit.ScalatestRouteTest
-import io.cafienne.bounded.aggregate.{DomainCommand, CommandGateway, ValidateableCommand}
+import io.cafienne.bounded.aggregate._
 import io.cafienne.bounded.cargosample.domain.CargoDomainProtocol
-import io.cafienne.bounded.cargosample.domain.CargoDomainProtocol.{CargoId, CargoNotFound}
+import io.cafienne.bounded.cargosample.domain.CargoDomainProtocol._
 import io.cafienne.bounded.cargosample.httpapi.HttpJsonProtocol.ErrorResponse
 import io.cafienne.bounded.cargosample.projections.{CargoQueries, QueriesJsonProtocol}
 import org.scalatest._
@@ -23,11 +24,13 @@ class CargoRouteSpec extends FlatSpec with MustMatchers with ScalatestRouteTest 
 
   import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport._
   import QueriesJsonProtocol._
+  import spray.json._
 
   val logger = Logging(system, getClass)
 
   val cargoId1 = CargoId(UUID.fromString("8CD15DA4-006B-478C-8640-2FA52AA7657E"))
   val cargoViewItem1 = CargoViewItem(cargoId1, "Amsterdam", "New York", ZonedDateTime.parse("2018-01-01T12:25:38+01:00"))
+  val metadata = MetaData(ZonedDateTime.now, None, None)
 
   val cargoQueries = new CargoQueries {
     override def getCargo(cargoId: CargoDomainProtocol.CargoId): Future[CargoViewItem] = {
@@ -39,11 +42,18 @@ class CargoRouteSpec extends FlatSpec with MustMatchers with ScalatestRouteTest 
     }
   }
 
-  //TODO make use of testing command gateway ?
   val commandGateway = new CommandGateway {
     override def send[T <: DomainCommand](command: T)(implicit validator: ValidateableCommand[T]): Future[Unit] = ???
 
-    override def sendAndAsk[T <: DomainCommand](command: T)(implicit validator: ValidateableCommand[T]): Future[_] = ???
+    override def sendAndAsk[T <: DomainCommand](command: T)(implicit validator: ValidateableCommand[T]): Future[_] = command match {
+        case cmd: CargoDomainProtocol.PlanCargo =>
+          logger.debug("Received plancargo {}", cmd)
+          Future.successful(CargoPlanned(metadata, cargoId1, TrackingId(UUID.fromString("83AB1887-CC3D-434C-855C-34674E746BC0")),
+          RouteSpecification(Location("Amsterdam"), Location("New York"), ZonedDateTime.parse("2018-01-01T13:40:00+01:00"))))
+        case other =>
+          logger.debug("Received other {}", other)
+          Future.failed[DomainEvent](new RuntimeException("broken"))
+    }
   }
 
   val cargoRoute = new CargoRoute(commandGateway, cargoQueries)
@@ -64,7 +74,27 @@ class CargoRouteSpec extends FlatSpec with MustMatchers with ScalatestRouteTest 
       val theResponse = responseAs[ErrorResponse]
       theResponse must be(expectedErrorResponse)
     }
+  }
 
+  it should "send a command to plan the cargo after a post" in {
+    val planCargo = HttpJsonProtocol.PlanCargo(UUID.fromString("83AB1887-CC3D-434C-855C-34674E746BC0"),
+      RouteSpecification(Location("Amsterdam"), Location("New York"), ZonedDateTime.parse("2018-01-01T13:40:00+01:00")))
+    Post(s"/cargo", planCargo.toJson) ~> cargoRoute.routes ~> check {
+      status must be(StatusCodes.Created)
+      val theResponse = responseAs[JsObject]
+      theResponse.fields.get("cargoId") must be(Some(JsString("8cd15da4-006b-478c-8640-2fa52aa7657e")))
+    }
+  }
+
+  it should "give a clear error when the command is unknown" in {
+    case class MyHttpCommand(msg: String)
+    implicit val MyHttpCommandFmt = jsonFormat1(MyHttpCommand)
+
+    Post(s"/cargo", MyHttpCommand("will not work").toJson) ~> Route.seal(cargoRoute.routes) ~> check {
+      status must be(StatusCodes.BadRequest)
+      val theResponse = responseAs[String]
+      theResponse must be("The request content was malformed:\nObject is missing required member 'trackingId'")
+    }
   }
 
 }

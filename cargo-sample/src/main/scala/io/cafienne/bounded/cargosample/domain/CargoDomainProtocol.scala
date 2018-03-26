@@ -11,6 +11,10 @@ import scala.util.control.NoStackTrace
 
 object CargoDomainProtocol {
 
+  case class CargoUserId(id: UUID) extends UserId {
+    override def idAsString: String = id.toString
+  }
+
   case class CargoId(id: UUID) extends AggregateRootId {
     override def idAsString: String = id.toString
 

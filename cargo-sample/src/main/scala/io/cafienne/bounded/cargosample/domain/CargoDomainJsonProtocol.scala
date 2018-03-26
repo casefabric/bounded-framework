@@ -10,7 +10,7 @@ import io.cafienne.bounded.cargosample.domain.CargoDomainProtocol._
 import spray.json.{RootJsonFormat, _}
 
 object CargoDomainJsonProtocol extends DefaultJsonProtocol {
-  import io.cafienne.bounded.aggregate.CommandEventDatastructureJsonProtocol._
+  import io.cafienne.bounded.aggregate.ProtocolJsonProtocol._
 
   implicit object cargoIdFmt extends RootJsonFormat[CargoId] {
     override def write(obj: CargoId): JsValue = JsString(obj.id.toString)

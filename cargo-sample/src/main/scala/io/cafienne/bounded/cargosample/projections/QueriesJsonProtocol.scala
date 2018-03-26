@@ -12,7 +12,7 @@ import spray.json._
 
 object QueriesJsonProtocol extends DefaultJsonProtocol {
   import io.cafienne.bounded.cargosample.domain.CargoDomainJsonProtocol._
-  import io.cafienne.bounded.aggregate.CommandEventDatastructureJsonProtocol._
+  import io.cafienne.bounded.aggregate.ProtocolJsonProtocol._
   @ApiModel(description = "Details of a single Cargo")
   case class CargoViewItem(
       @(ApiModelProperty @field)(value = "Unique identifier of thie Cargo",

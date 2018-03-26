@@ -90,4 +90,4 @@ val cargoSample = (project in file("cargo-sample"))
   .settings(basicSettings: _*)
   .settings(
     name := "cargo-sample",
-    libraryDependencies ++= Dependencies.akkaHttpDeps ++ Dependencies.testDeps)
+    libraryDependencies ++= Dependencies.akkaHttpDeps ++ Dependencies.testDeps ++ Dependencies.persistenceLevelDBDeps)

@@ -10,7 +10,7 @@ import spray.json.{DefaultJsonProtocol, RootJsonFormat}
 import stamina._
 
 object UnsupportedEventProtocol extends DefaultJsonProtocol {
-  import CommandEventDatastructureJsonProtocol._
+  import ProtocolJsonProtocol._
 
   case class UnsupportedEventAggregateId(id: String) extends AggregateRootId {
     override def idAsString: String = id

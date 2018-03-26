@@ -5,6 +5,7 @@
 package io.cafienne.bounded.aggregate
 
 import akka.actor.{ActorRef, ActorSystem}
+import akka.event.{Logging, LoggingAdapter}
 import akka.pattern.ask
 import akka.util.Timeout
 
@@ -19,10 +20,11 @@ trait CommandGateway {
 
 class DefaultCommandGateway[A <: AggregateRootCreator](
     system: ActorSystem,
-    aggregateRootCreator: A)(implicit ec: ExecutionContext, timeout: Timeout)
+    aggregateRootCreator: A)(implicit timeout: Timeout, ec: ExecutionContext)
     extends CommandGateway {
 
   implicit val actorSystem = system
+  val logger: LoggingAdapter = Logging(system, getClass)
 
   //TODO normal Routee functionality + sleep of actors that were not used for a while
   val aggregateRootInstanceActors =
@@ -32,14 +34,14 @@ class DefaultCommandGateway[A <: AggregateRootCreator](
       implicit system: ActorSystem): ActorRef = {
     aggregateRootInstanceActors.getOrElseUpdate(
       c.id,
-      system.actorOf(aggregateRootCreator.create(c.id)))
+      system.actorOf(aggregateRootCreator.props(c.id)))
   }
 
   override def sendAndAsk[T <: DomainCommand](command: T)(
       implicit validator: ValidateableCommand[T]): Future[_] = {
     CommandValidator
       .validate(command)
-      .map(validatedCommand => getAggregateRoot(command) ? validatedCommand)
+      .flatMap(validatedCommand => getAggregateRoot(command) ? validatedCommand)
   }
 
   override def send[T <: DomainCommand](command: T)(
