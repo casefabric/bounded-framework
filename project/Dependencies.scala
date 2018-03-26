@@ -19,7 +19,7 @@ object Dependencies {
       akkaModule("testkit") % Test,
       "com.scalapenos"              %% "stamina-json"                           % staminaVersion,
       "io.spray"                    %% "spray-json"                             % "1.3.4",
-      "com.typesafe.akka"           %% "akka-persistence-cassandra"             % "0.81",
+      "com.typesafe.akka"           %% "akka-persistence-cassandra"             % "0.83",
       "com.github.dnvriend"         %% "akka-persistence-inmemory"              % persistenceInMemVersion,
       "com.typesafe.scala-logging"  %% "scala-logging"                          % "3.5.0"
     )
