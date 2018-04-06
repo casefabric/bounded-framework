@@ -15,7 +15,10 @@ import scala.collection.immutable.Seq
   * Aggregate root that keeps the logic of the cargo.
   * @param cargoId unique identifier for cargo.
   */
-class Cargo(cargoId: AggregateRootId) extends AggregateRootActor with AggregateStateCreator with ActorLogging {
+class Cargo(cargoId: AggregateRootId, locationsProvider: LocationsProvider)
+    extends AggregateRootActor
+    with AggregateStateCreator
+    with ActorLogging {
 
   override def aggregateId: AggregateRootId = cargoId
 
@@ -55,11 +58,8 @@ object Cargo extends AggregateRootCreator {
     }
   }
 
-  override def props(cargoId: AggregateRootId): Props = Props(classOf[Cargo], cargoId)
+  override def props(cargoId: AggregateRootId): Props = Props(classOf[Cargo], cargoId, FixedLocationsProvider())
 
   final val aggregateRootTag = "ar-cargo" // used to tag the events and read them
-
-//  override def create[A <: AggregateRootActor: ClassTag](
-//      id: AggregateRootId): A = new Cargo(id).asInstanceOf[A]
 
 }

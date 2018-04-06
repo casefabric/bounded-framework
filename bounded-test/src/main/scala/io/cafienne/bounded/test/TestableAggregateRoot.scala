@@ -5,6 +5,7 @@
 package io.cafienne.bounded.test
 
 import java.util.concurrent.atomic.AtomicInteger
+import scala.reflect.runtime.universe
 
 import akka.actor._
 import akka.pattern.ask
@@ -59,7 +60,9 @@ object TestableAggregateRoot {
     */
   def given[A <: AggregateRootActor](
     id: AggregateRootId
+//    aggregateRootCreator: AggregateRootCreator
   )(implicit system: ActorSystem, timeout: Timeout, ctag: reflect.ClassTag[A]): TestableAggregateRoot[A] = {
+
     new TestableAggregateRoot[A](id, Seq.empty[DomainEvent])
   }
 
@@ -102,9 +105,16 @@ class TestableAggregateRoot[A <: AggregateRootActor] private (id: AggregateRootI
 
   private var aggregateRootActor: Option[ActorRef] = None
 
+  private def aggregateRootCreator(): AggregateRootCreator = {
+    val runtimeMirror = universe.runtimeMirror(getClass.getClassLoader)
+    val module        = runtimeMirror.staticModule(ctag.runtimeClass.getCanonicalName)
+    val obj           = runtimeMirror.reflectModule(module)
+    obj.instance.asInstanceOf[AggregateRootCreator]
+  }
+
   private def createActor[B <: AggregateRootActor](id: AggregateRootId) = {
     handledEvents = List.empty
-    system.actorOf(Props(ctag.runtimeClass, arTestId), s"test-aggregate-$arTestId")
+    system.actorOf(aggregateRootCreator.props(arTestId), s"test-aggregate-$arTestId")
   }
 
   /**

@@ -80,7 +80,7 @@ class CargoAggregateRootActorSpec
       storeEventsActor ! PoisonPill
       testProbe.expectTerminated(storeEventsActor)
 
-      val aggregateRootActorBackToLife = system.actorOf(Props(classOf[Cargo], cargoId2), "test-aggregate2")
+      val aggregateRootActorBackToLife = system.actorOf(Cargo.props(cargoId2), "test-aggregate2")
 
       val newRouteSpecification = RouteSpecification(
         Location("home"),

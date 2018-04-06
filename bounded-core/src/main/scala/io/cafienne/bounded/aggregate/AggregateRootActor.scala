@@ -7,7 +7,6 @@ package io.cafienne.bounded.aggregate
 import akka.actor._
 import akka.persistence.{PersistentActor, RecoveryCompleted}
 import io.cafienne.bounded.aggregate.AggregateRootActor.{GetState, NoState}
-import scala.reflect.ClassTag
 
 trait AggregateRootCreator {
   def props(idToCreate: AggregateRootId): Props
