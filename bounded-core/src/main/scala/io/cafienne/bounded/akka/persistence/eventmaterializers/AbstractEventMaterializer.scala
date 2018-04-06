@@ -56,9 +56,7 @@ abstract class AbstractEventMaterializer(actorSystem: ActorSystem, keepCurrentOf
     */
   val matMappingName: String
 
-  val env = if (config.hasPath("pp.env")) config.getString("pp.env") else ""
-
-  def viewIdentifier: String = env + ":" + matMappingName
+  def viewIdentifier: String = matMappingName
 
   /**
     * Handle new incoming event
