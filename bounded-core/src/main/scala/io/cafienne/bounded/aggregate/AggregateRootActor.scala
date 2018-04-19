@@ -5,7 +5,7 @@
 package io.cafienne.bounded.aggregate
 
 import akka.actor._
-import akka.persistence.{PersistentActor, RecoveryCompleted}
+import akka.persistence.{PersistentActor, RecoveryCompleted, SnapshotOffer}
 import io.cafienne.bounded.aggregate.AggregateRootActor.{GetState, NoState}
 
 trait AggregateRootCreator {
@@ -51,14 +51,24 @@ trait AggregateRootActor extends PersistentActor with AggregateStateCreator with
 
   override def persistenceId: String = aggregateId.idAsString
 
+  val snapShotInterval: Option[Int] = None
+
   final def receiveCommand: Actor.Receive = {
     case cmd: DomainCommand =>
       val originalSender = sender()
       val reply          = handleCommand(cmd, internalState getOrElse NoState)
 
       reply match {
-        case Ok(events) => persistAll(events)(updateState)
-        case Ko(_)      => ()
+        case Ok(events) =>
+          persistAll(events) { evt =>
+            updateState(evt)
+            if (snapShotInterval.isDefined) {
+              if (lastSequenceNr % snapShotInterval.get == 0 && lastSequenceNr != 0) {
+                saveSnapshot(state)
+              }
+            }
+          }
+        case Ko(_) => ()
       }
 
       originalSender ! reply
@@ -68,8 +78,10 @@ trait AggregateRootActor extends PersistentActor with AggregateStateCreator with
   }
 
   override def receiveRecover: Receive = {
-    case _: RecoveryCompleted => // initialize further processing when required
-    case evt: DomainEvent     => updateState(evt)
+    case _: RecoveryCompleted                               => // initialize further processing when required
+    case SnapshotOffer(_, snapshot: Option[AggregateState]) => internalState = snapshot
+    case evt: DomainEvent                                   => updateState(evt)
+
     case other =>
       log.warning("Received unknown event {} during recovery", other)
   }
