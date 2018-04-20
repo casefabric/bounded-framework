@@ -43,7 +43,7 @@ class Cargo(cargoId: AggregateRootId, locationsProvider: LocationsProvider)
 
 }
 
-object Cargo extends AggregateRootCreator {
+object Cargo {
 
   case class CargoAggregateState(trackingId: TrackingId, routeSpecification: RouteSpecification)
       extends AggregateState {
@@ -58,8 +58,21 @@ object Cargo extends AggregateRootCreator {
     }
   }
 
-  override def props(cargoId: AggregateRootId): Props = Props(classOf[Cargo], cargoId, FixedLocationsProvider())
-
   final val aggregateRootTag = "ar-cargo" // used to tag the events and read them
+
+}
+
+/**
+  * The Aggregate Root needs dependencies. These are given via the Creator.
+  * A Creator returns the props that is used to create an Aggregate Root Actor.
+  * @param system as a sample dependency the actor system is passed.
+  * @param locations a dependency is used inside the Aggregate Root.
+  */
+class CargoCreator(system: ActorSystem, locations: LocationsProvider) extends AggregateRootCreator {
+
+  override def props(cargoId: AggregateRootId): Props = {
+    system.log.debug("Returning new Props for {}", cargoId)
+    Props(classOf[Cargo], cargoId, locations)
+  }
 
 }

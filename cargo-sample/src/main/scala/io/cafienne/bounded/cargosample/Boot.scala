@@ -11,7 +11,7 @@ import akka.stream.ActorMaterializer
 import akka.util.Timeout
 import io.cafienne.bounded.aggregate.DefaultCommandGateway
 import io.cafienne.bounded.akka.persistence.eventmaterializers._
-import io.cafienne.bounded.cargosample.domain.Cargo
+import io.cafienne.bounded.cargosample.domain.{CargoCreator, FixedLocationsProvider}
 import io.cafienne.bounded.cargosample.httpapi.HttpApiEndpoint
 import io.cafienne.bounded.cargosample.projections.{CargoQueriesImpl, CargoViewProjectionWriter}
 import io.cafienne.bounded.config.Configured
@@ -50,7 +50,7 @@ object Boot extends App with Configured {
   )
 
   implicit val timeout = Timeout(5.seconds)
-  val commandGateway   = new DefaultCommandGateway(system, Cargo)
+  val commandGateway   = new DefaultCommandGateway(system, new CargoCreator(system, new FixedLocationsProvider()))
 
   val httpApiEndpoint = new HttpApiEndpoint(
     commandGateway,
