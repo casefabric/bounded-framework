@@ -7,25 +7,26 @@ package io.cafienne.bounded.cargosample.domain
 import java.time.{ZoneOffset, ZonedDateTime}
 import java.util.UUID
 
-import akka.actor.{ActorSystem, PoisonPill, Props}
-import akka.testkit.{ImplicitSender, TestKit, TestProbe}
+import akka.actor.ActorSystem
+import akka.testkit.TestKit
 import akka.util.Timeout
+import io.cafienne.bounded.cargosample.domain.Cargo.CargoAggregateState
+import io.cafienne.bounded.cargosample.domain.CargoDomainProtocol._
 import io.cafienne.bounded.aggregate._
 import io.cafienne.bounded.cargosample.SpecConfig
-import io.cafienne.bounded.cargosample.domain.CargoDomainProtocol._
-import io.cafienne.bounded.test.CreateEventsInStoreActor
-import org.scalatest.{BeforeAndAfterAll, Matchers, WordSpecLike}
+import io.cafienne.bounded.test.TestableAggregateRoot
+import org.scalatest._
 
 import scala.concurrent.duration._
 
-class CargoAggregateRootActorSpec
-    extends TestKit(ActorSystem("CargoTestSystem", SpecConfig.testConfigAkkaInMem))
-    with ImplicitSender
-    with WordSpecLike
-    with Matchers
-    with BeforeAndAfterAll {
+class CargoAggregateRootActorSpec extends AsyncWordSpec with Matchers with BeforeAndAfterAll {
 
   implicit val timeout = Timeout(10.seconds) //dilated
+  implicit val system  = ActorSystem("CargoTestSystem", SpecConfig.testConfigAkkaInMem)
+
+  //Creation of Aggregate Roots that make use of dependencies is organized via the Creator
+  //as a separate class that contains the required dependencies.
+  val cargoAggregateRootCreator = new CargoCreator(system, new FixedLocationsProvider())
 
   val userId1 = CargoUserId(UUID.fromString("53f53841-0bf3-467f-98e2-578d360ee572"))
   val userContext = Some(new UserContext {
@@ -37,62 +38,53 @@ class CargoAggregateRootActorSpec
 
   "CargoAggregateRoot" must {
 
-    "Plan a new Cargo Delivery" in {
-      val cargoId1   = CargoId(java.util.UUID.fromString("AC935D2D-DD41-4D6C-9302-62C33525B1D2"))
+    "Create a new aggregate" in {
+      val cargoId2   = CargoId(java.util.UUID.fromString("49A6553D-7E0A-49E8-BE20-925839F524B2"))
       val trackingId = TrackingId(UUID.fromString("53f53841-0bf3-467f-98e2-578d360ee573"))
       val routeSpecification = RouteSpecification(
         Location("home"),
         Location("destination"),
         ZonedDateTime.parse("2018-03-03T10:15:30+01:00[Europe/Amsterdam]")
       )
-      val planCargoCommand = PlanCargo(metaData, cargoId1, trackingId, routeSpecification)
 
-      val aggregateRootActor = system.actorOf(Cargo.props(cargoId1), "test-aggregate")
+      val ar = TestableAggregateRoot
+        .given[Cargo](cargoAggregateRootCreator, cargoId2)
+        .when(PlanCargo(metaData, cargoId2, trackingId, routeSpecification))
 
-      aggregateRootActor ! planCargoCommand
-
-      fishForMessage(10.seconds, hint = "CargoPlanned") {
-        case Ok(events) => events.headOption.exists(_.isInstanceOf[CargoPlanned])
+      ar.events should contain(CargoPlanned(metaData, cargoId2, trackingId, routeSpecification))
+      val targetState = CargoAggregateState(trackingId, routeSpecification)
+      ar.currentState map { state =>
+        assert(state == targetState)
       }
     }
 
-    "Change the route specification for an existing Cargo Delivery" in {
-      val cargoId2   = CargoId(java.util.UUID.fromString("72DEB9B4-D33F-467E-B1F1-4B0B15D2092F"))
+    "Change the route specification for an existing Cargo Delivery Using AggregateRootTestFixture" in {
+      val cargoId3   = CargoId(java.util.UUID.fromString("D31E3C57-E63E-4AD5-A00B-E5FA9196E80D"))
       val trackingId = TrackingId(UUID.fromString("53f53841-0bf3-467f-98e2-578d360ee573"))
       val routeSpecification = RouteSpecification(
         Location("home"),
         Location("destination"),
         ZonedDateTime.parse("2018-03-03T10:15:30+01:00[Europe/Amsterdam]")
       )
-      val cargoPlannedEvent = CargoPlanned(metaData, cargoId2, trackingId, routeSpecification)
-      val storeEventsActor  = system.actorOf(Props(classOf[CreateEventsInStoreActor], cargoId2), "create-events-actor")
-
-      storeEventsActor ! cargoPlannedEvent
-      fishForMessage(10.seconds, "CargoPlanned") {
-        case m: CargoPlanned =>
-          system.log.debug("Stored CargoPlanned Event for AR actor {}", storeEventsActor)
-          true
-      }
-
-      val testProbe = TestProbe()
-      testProbe watch storeEventsActor
-
-      storeEventsActor ! PoisonPill
-      testProbe.expectTerminated(storeEventsActor)
-
-      val aggregateRootActorBackToLife = system.actorOf(Cargo.props(cargoId2), "test-aggregate2")
+      val cargoPlannedEvent = CargoPlanned(metaData, cargoId3, trackingId, routeSpecification)
 
       val newRouteSpecification = RouteSpecification(
         Location("home"),
         Location("newDestination"),
         ZonedDateTime.parse("2018-03-04T10:45:45+01:00[Europe/Amsterdam]")
       )
-      val specifyNewRouteCommand = SpecifyNewRoute(metaData, cargoId2, newRouteSpecification)
+      val specifyNewRouteCommand = SpecifyNewRoute(metaData, cargoId3, newRouteSpecification)
 
-      // expect this one to have the Planned State
-      aggregateRootActorBackToLife ! specifyNewRouteCommand
-      fishForMessage(10.seconds, "New Route Specified") {
-        case Ok(events) => events.headOption.exists(_.isInstanceOf[NewRouteSpecified])
+      val ar = TestableAggregateRoot
+        .given[Cargo](cargoAggregateRootCreator, cargoId3, cargoPlannedEvent)
+        .when(specifyNewRouteCommand)
+
+      // You see that this only shows the events that are 'published' via when
+      ar.events should contain(NewRouteSpecified(metaData, cargoId3, newRouteSpecification))
+
+      val targetState = CargoAggregateState(trackingId, newRouteSpecification)
+      ar.currentState map { state =>
+        assert(state == targetState)
       }
     }
 

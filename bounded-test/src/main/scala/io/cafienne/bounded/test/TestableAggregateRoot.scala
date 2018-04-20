@@ -45,10 +45,11 @@ object TestableAggregateRoot {
     * @return a TestableAggregateRoot instance that is initialized and available to give a DomainCommand to.
     */
   def given[A <: AggregateRootActor](
+    creator: AggregateRootCreator,
     id: AggregateRootId,
     evt: DomainEvent*
   )(implicit system: ActorSystem, timeout: Timeout, ctag: reflect.ClassTag[A]): TestableAggregateRoot[A] = {
-    new TestableAggregateRoot[A](id, evt)
+    new TestableAggregateRoot[A](creator, id, evt)
   }
 
   /** Construct a test for a specific aggregate root that hos no initial state. This can be used to test creation of the
@@ -59,11 +60,11 @@ object TestableAggregateRoot {
     * @return a TestableAggregateRoot instance that is initialized and available to give a DomainCommand to.
     */
   def given[A <: AggregateRootActor](
+    creator: AggregateRootCreator,
     id: AggregateRootId
-//    aggregateRootCreator: AggregateRootCreator
   )(implicit system: ActorSystem, timeout: Timeout, ctag: reflect.ClassTag[A]): TestableAggregateRoot[A] = {
 
-    new TestableAggregateRoot[A](id, Seq.empty[DomainEvent])
+    new TestableAggregateRoot[A](creator, id, Seq.empty[DomainEvent])
   }
 
   //The tested aggregate root makes use of an additional counter in the id in order to prevent collision of parallel running tests.
@@ -78,7 +79,11 @@ object TestableAggregateRoot {
   }
 }
 
-class TestableAggregateRoot[A <: AggregateRootActor] private (id: AggregateRootId, evt: Seq[DomainEvent])(
+class TestableAggregateRoot[A <: AggregateRootActor] private (
+  creator: AggregateRootCreator,
+  id: AggregateRootId,
+  evt: Seq[DomainEvent]
+)(
   implicit system: ActorSystem,
   timeout: Timeout,
   ctag: reflect.ClassTag[A]
@@ -105,16 +110,16 @@ class TestableAggregateRoot[A <: AggregateRootActor] private (id: AggregateRootI
 
   private var aggregateRootActor: Option[ActorRef] = None
 
-  private def aggregateRootCreator(): AggregateRootCreator = {
-    val runtimeMirror = universe.runtimeMirror(getClass.getClassLoader)
-    val module        = runtimeMirror.staticModule(ctag.runtimeClass.getCanonicalName)
-    val obj           = runtimeMirror.reflectModule(module)
-    obj.instance.asInstanceOf[AggregateRootCreator]
-  }
+//  private def aggregateRootCreator(): AggregateRootCreator = {
+//    val runtimeMirror = universe.runtimeMirror(getClass.getClassLoader)
+//    val module        = runtimeMirror.staticModule(ctag.runtimeClass.getCanonicalName)
+//    val obj           = runtimeMirror.reflectModule(module)
+//    obj.instance.asInstanceOf[AggregateRootCreator]
+//  }
 
   private def createActor[B <: AggregateRootActor](id: AggregateRootId) = {
     handledEvents = List.empty
-    system.actorOf(aggregateRootCreator.props(arTestId), s"test-aggregate-$arTestId")
+    system.actorOf(creator.props(arTestId), s"test-aggregate-$arTestId")
   }
 
   /**
