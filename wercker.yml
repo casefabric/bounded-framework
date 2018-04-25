@@ -1,0 +1,9 @@
+box: hseeberger/scala-sbt
+build:
+  steps:
+    - script:
+        name: get code / compile / stage for docker .
+        code: |
+          cd /pipeline/source
+          sbt clean test
+
