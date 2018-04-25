@@ -5,5 +5,5 @@ build:
         name: get code / compile / stage for docker .
         code: |
           cd /pipeline/source
-          sbt clean test
+          sbt clean coverage test
 
