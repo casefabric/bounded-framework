@@ -5,9 +5,11 @@
 package io.cafienne.bounded.akka.persistence.eventmaterializers
 
 import java.util.UUID
+import java.util.concurrent.TimeUnit
 
 import akka.persistence.cassandra.query.scaladsl.CassandraReadJournal
 import akka.persistence.query.{Offset, Sequence, TimeBasedUUID}
+import io.cafienne.bounded.akka.ActorSystemProvider
 import io.cafienne.bounded.akka.persistence.ReadJournalProvider
 
 import scala.collection.mutable.Map
@@ -59,14 +61,15 @@ class InMemoryBasedOffsetStore(offsetType: OffsetTypes) extends OffsetStore {
   }
 }
 
-class CassandraOffsetStore(readJournal: CassandraReadJournal, offsetType: OffsetTypes) extends OffsetStore {
+class CassandraOffsetStore(readJournal: CassandraReadJournal, offsetType: OffsetTypes, createTableTimeout: Duration)
+    extends OffsetStore {
   import EventMaterializerExecutionContext._
 
   Await.result(
     readJournal.session.executeWrite(
       "CREATE TABLE IF NOT EXISTS akka.vw_offsetstore (view_identifier text PRIMARY KEY, offset_type text, offset_value text);"
     ),
-    3.seconds
+    createTableTimeout
   )
 
   override def saveOffset(viewIdentifier: String, offset: Offset): Future[Unit] = {
@@ -134,11 +137,12 @@ trait OffsetTypeEventNumber extends OffsetType {
 }
 
 trait ReadJournalOffsetStore extends OffsetStore with OffsetType {
-  readJournalProvider: ReadJournalProvider =>
+  this: ReadJournalProvider with ActorSystemProvider =>
 
   val store: OffsetStore = {
+
     if (configuredJournal.endsWith("cassandra-journal")) {
-      new CassandraOffsetStore(readJournal.asInstanceOf[CassandraReadJournal], offsetType)
+      new CassandraOffsetStore(readJournal.asInstanceOf[CassandraReadJournal], offsetType, cassandraCreateTableTimeout)
     } else if (configuredJournal.endsWith("inmemory-journal")) {
       new InMemoryBasedOffsetStore(offsetType)
     } else if (configuredJournal.endsWith("leveldb")) {
@@ -147,6 +151,12 @@ trait ReadJournalOffsetStore extends OffsetStore with OffsetType {
     } else {
       throw new RuntimeException(s"Offsetstore $configuredJournal is not supported as ReadJournalOffsetStore")
     }
+  }
+
+  private def cassandraCreateTableTimeout = {
+    val timeout =
+      system.settings.config.getDuration("bounded.eventmaterializers.cassandra-offsetstore.createtable-timeout")
+    FiniteDuration(timeout.toNanos, TimeUnit.NANOSECONDS)
   }
 
   override def saveOffset(viewIdentifier: String, offset: Offset): Future[Unit] =
