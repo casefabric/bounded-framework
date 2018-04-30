@@ -91,7 +91,7 @@ class CargoAggregateRootActorSpec extends AsyncWordSpec with Matchers with Befor
   }
 
   override protected def afterAll(): Unit = {
-    TestKit.shutdownActorSystem(system)
+    TestKit.shutdownActorSystem(system, 30.seconds, verifySystemShutdown = true)
   }
 
 }

@@ -6,34 +6,33 @@ package io.cafienne.bounded.cargosample.projections
 
 import java.time.ZonedDateTime
 import java.util.UUID
-import akka.actor.{ActorSystem, Props}
+
+import akka.actor.ActorSystem
 import akka.event.{Logging, LoggingAdapter}
+import akka.persistence.query.Sequence
 import akka.testkit.{TestKit, _}
 import akka.util.Timeout
-import io.cafienne.bounded.akka.persistence.eventmaterializers.{
-  EventMaterializers,
-  OffsetTypeSequence,
-  ReadJournalOffsetStore
-}
-import io.cafienne.bounded.test.CreateEventsInStoreActor
 import io.cafienne.bounded.aggregate.{MetaData, UserContext, UserId}
+import io.cafienne.bounded.akka.persistence.eventmaterializers.{OffsetTypeSequence, ReadJournalOffsetStore}
 import io.cafienne.bounded.cargosample.SpecConfig
 import io.cafienne.bounded.cargosample.domain.CargoDomainProtocol._
 import io.cafienne.bounded.cargosample.projections.QueriesJsonProtocol.CargoViewItem
+import io.cafienne.bounded.test.TestableProjection
 import org.scalatest._
+import org.scalatest.concurrent.ScalaFutures
+import org.scalatest.time.{Millis, Seconds, Span}
 
 import scala.concurrent.duration._
-import scala.concurrent.Await
 
-class CargoQueriesSpec
-    extends TestKit(ActorSystem("testsystem", SpecConfig.testConfigDVriendInMem))
-    with WordSpecLike
-    with Matchers
-    with BeforeAndAfterAll {
+class CargoQueriesSpec extends WordSpec with Matchers with ScalaFutures with BeforeAndAfterAll {
 
+  //Setup required supporting classes
   implicit val timeout                = Timeout(10.seconds)
+  implicit val system                 = ActorSystem("CargoTestSystem", SpecConfig.testConfigDVriendInMem)
   implicit val logger: LoggingAdapter = Logging(system, getClass)
+  implicit val defaultPatience        = PatienceConfig(timeout = Span(4, Seconds), interval = Span(100, Millis))
 
+  //Create test data
   val expectedDeliveryTime = ZonedDateTime.parse("2018-01-01T17:43:00+01:00")
   val userId1              = CargoUserId(UUID.fromString("53f53841-0bf3-467f-98e2-578d360ee572"))
   val userId2              = CargoUserId(UUID.fromString("42f53841-0bf3-467f-98e2-578d360ed46f"))
@@ -52,43 +51,43 @@ class CargoQueriesSpec
   val trackingId         = TrackingId(UUID.fromString("67C1FBD1-E634-4B4E-BF31-BBA6D039C264"))
   val routeSpecification = RouteSpecification(Location("Amsterdam"), Location("New York"), expectedDeliveryTime)
 
-  //setup a journal with events for the writer
-  val storeEventsActor = system.actorOf(Props(classOf[CreateEventsInStoreActor], cargoId1), "storeevents-actor")
-  val tp               = TestProbe()
-
-  //boot the reader and check the written records
+  // Create Query and Writer for testing
   object cargoQueries extends CargoQueriesImpl()
-
-  val cargoWriter        = new CargoViewProjectionWriter(system) with ReadJournalOffsetStore with OffsetTypeSequence
-  val eventMaterializers = new EventMaterializers(List(cargoWriter))
-
-  //Note that the startup replays the events and needs an extended timeout for that !
-  Await.result(eventMaterializers.startUp(true), 10.seconds)
+  val cargoWriter = new CargoViewProjectionWriter(system) with ReadJournalOffsetStore with OffsetTypeSequence
 
   "Cargo Query" must {
-    "add and retrieve valid cargo" in {
-      val evt1 = CargoPlanned(metaData, cargoId1, trackingId, routeSpecification)
-      within(10.seconds) {
-        tp.send(storeEventsActor, evt1)
-        tp.expectMsg(evt1)
+    "add and retrieve valid cargo based on replay" in {
+      val evt1    = CargoPlanned(metaData, cargoId1, trackingId, routeSpecification)
+      val fixture = TestableProjection.given(Seq(evt1))
+
+      whenReady(fixture.startProjection(cargoWriter)) { replayResult =>
+        logger.debug("replayResult: {}", replayResult)
+        assert(replayResult.offset == Sequence(1L))
       }
 
-      //TODO given way of testing needs a way to understand *when* events are processed in the view.
-      //For now that is not possible yet THUS a sleep to ensure processing of the events.
-      //IDEA is to create a TestableEventMaterializer that will solve these issues and create an easy way of testing.
-      Thread.sleep(1000)
-
-      within(10.seconds) {
-        val cargo = Await.result(cargoQueries.getCargo(cargoId1), 5.seconds)
+      whenReady(cargoQueries.getCargo(cargoId1)) { cargo =>
         cargo should be(CargoViewItem(cargoId1, "Amsterdam", "New York", expectedDeliveryTime))
       }
     }
+    "add and retrieve an update on valid cargo based on new event after replay" in {
+      val evt1    = CargoPlanned(metaData, cargoId1, trackingId, routeSpecification)
+      val fixture = TestableProjection.given(Seq(evt1))
 
+      whenReady(fixture.startProjection(cargoWriter)) { replayResult =>
+        logger.debug("replayResult: {}", replayResult)
+        assert(replayResult.offset == Sequence(1L))
+      }
+
+      val evt2 = NewRouteSpecified(metaData, cargoId1, routeSpecification.copy(destination = Location("Oslo")))
+      fixture.addEvents(Seq(evt2))
+      whenReady(cargoQueries.getCargo(cargoId1)) { cargo =>
+        cargo should be(CargoViewItem(cargoId1, "Amsterdam", "Oslo", expectedDeliveryTime))
+      }
+
+    }
   }
 
-  override def beforeAll {}
-
   override def afterAll {
-    TestKit.shutdownActorSystem(system)
+    TestKit.shutdownActorSystem(system, 30.seconds, verifySystemShutdown = true)
   }
 }

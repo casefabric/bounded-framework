@@ -14,10 +14,9 @@ import scala.util.{Failure, Success}
 class EventMaterializers(replayables: List[Resumable]) {
 
   import EventMaterializerExecutionContext._
+  import EventMaterializers._
 
   lazy val logger: Logger = Logger(LoggerFactory.getLogger("bounded.eventmaterializers"))
-
-  case class ReplayResult(viewMaterializer: Resumable, offset: Offset)
 
   /**
     * Start event listeners in given order: First do a replay and *after* all replays have
@@ -51,4 +50,9 @@ class EventMaterializers(replayables: List[Resumable]) {
     }
     replayed
   }
+}
+
+object EventMaterializers {
+
+  case class ReplayResult(viewMaterializer: Resumable, offset: Offset)
 }

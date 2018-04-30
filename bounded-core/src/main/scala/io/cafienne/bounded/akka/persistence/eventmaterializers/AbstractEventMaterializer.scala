@@ -4,6 +4,8 @@
 
 package io.cafienne.bounded.akka.persistence.eventmaterializers
 
+import java.util.UUID
+
 import akka.{Done, NotUsed}
 import akka.actor.ActorSystem
 import akka.persistence.query.{EventEnvelope, Offset}
@@ -38,6 +40,11 @@ abstract class AbstractEventMaterializer(actorSystem: ActorSystem, keepCurrentOf
 
   import EventMaterializerExecutionContext._
 
+  /**
+    * Unique ID for this materializer
+    */
+  val materializerId = UUID.randomUUID()
+
   override implicit def system: ActorSystem = actorSystem
 
   val logger: Logger
@@ -66,6 +73,13 @@ abstract class AbstractEventMaterializer(actorSystem: ActorSystem, keepCurrentOf
   def handleEvent(evt: Any): Future[Done]
 
   /**
+    * Publish an event on the AKKA eventbus after the event is processed.
+    */
+  val isPublishRequired: Boolean = if (actorSystem.settings.config.hasPath("io.bounded.eventmaterializers.publish")) {
+    actorSystem.settings.config.getBoolean("io.bounded.eventmaterializers.publish")
+  } else false
+
+  /**
     * Register listener for events. Should be registered *after* replay is finished
     * @return Future
     */
@@ -88,6 +102,10 @@ abstract class AbstractEventMaterializer(actorSystem: ActorSystem, keepCurrentOf
             s"$matMappingName: runStream: Received event: $evt(offset: $evtOffset, persistenceId: $persistenceId, sequenceNo: $sequenceNo)"
           )
           handleEvent(evt) map { _ =>
+            if (isPublishRequired) {
+              system.eventStream.publish(EventProcessed(materializerId, evtOffset, persistenceId, sequenceNo, evt))
+            }
+
             if (keepCurrentOffset) {
               saveOffset(viewIdentifier, evtOffset)
             }

@@ -67,6 +67,7 @@ object SpecConfig {
       |      refresh-interval = "10ms"
       |      max-buffer-size = "1000"
       |    }
+      |    io.bounded.eventmaterializers.publish = true
     """.stripMargin
   )
 
@@ -111,6 +112,8 @@ object SpecConfig {
       |        timefactor = 1
       |      }
       |    }
+      |
+      |    io.bounded.eventmaterializers.publish = true
     """.stripMargin
   )
 
