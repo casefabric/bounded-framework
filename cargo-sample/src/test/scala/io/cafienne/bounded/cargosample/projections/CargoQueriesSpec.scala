@@ -62,7 +62,7 @@ class CargoQueriesSpec extends WordSpec with Matchers with ScalaFutures with Bef
 
       whenReady(fixture.startProjection(cargoWriter)) { replayResult =>
         logger.debug("replayResult: {}", replayResult)
-        assert(replayResult.offset == Sequence(1L))
+        assert(replayResult.offset == Some(Sequence(1L)))
       }
 
       whenReady(cargoQueries.getCargo(cargoId1)) { cargo =>
@@ -75,7 +75,7 @@ class CargoQueriesSpec extends WordSpec with Matchers with ScalaFutures with Bef
 
       whenReady(fixture.startProjection(cargoWriter)) { replayResult =>
         logger.debug("replayResult: {}", replayResult)
-        assert(replayResult.offset == Sequence(1L))
+        assert(replayResult.offset == Some(Sequence(1L)))
       }
 
       val evt2 = NewRouteSpecified(metaData, cargoId1, routeSpecification.copy(destination = Location("Oslo")))

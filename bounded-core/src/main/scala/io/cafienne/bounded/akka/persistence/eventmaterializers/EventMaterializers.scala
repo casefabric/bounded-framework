@@ -4,7 +4,7 @@
 
 package io.cafienne.bounded.akka.persistence.eventmaterializers
 
-import akka.persistence.query.{NoOffset, Offset}
+import akka.persistence.query.{Offset}
 import com.typesafe.scalalogging.Logger
 import org.slf4j.LoggerFactory
 
@@ -31,16 +31,16 @@ class EventMaterializers(replayables: List[Resumable]) {
       case replayable: ResumableReplayable =>
         replayable
           .replayEvents()
-          .map(replayOffset => startListing(ReplayResult(replayable, replayOffset), keepListenersRunning))
+          .map(replayOffset => startListing(ReplayResult(replayable, Some(replayOffset)), keepListenersRunning))
       case nonReplayable: Resumable =>
-        Future(startListing(ReplayResult(nonReplayable, NoOffset), keepListenersRunning))
+        Future(startListing(ReplayResult(nonReplayable, None), keepListenersRunning))
     })
   }
 
   private def startListing(replayed: ReplayResult, keepRunning: Boolean): ReplayResult = {
     if (keepRunning) {
       replayed.viewMaterializer
-        .registerListener(Some(replayed.offset))
+        .registerListener(replayed.offset)
         .onComplete({
           case Success(msg) =>
             logger.info("Listener {} is done msg: {}", replayed.viewMaterializer, msg)
@@ -54,5 +54,5 @@ class EventMaterializers(replayables: List[Resumable]) {
 
 object EventMaterializers {
 
-  case class ReplayResult(viewMaterializer: Resumable, offset: Offset)
+  case class ReplayResult(viewMaterializer: Resumable, offset: Option[Offset])
 }
