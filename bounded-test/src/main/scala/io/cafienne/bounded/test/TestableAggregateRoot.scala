@@ -5,6 +5,8 @@
 package io.cafienne.bounded.test
 
 import java.util.concurrent.atomic.AtomicInteger
+
+import scala.reflect.ClassTag
 //import scala.reflect.runtime.universe
 import akka.actor._
 import akka.pattern.ask
@@ -43,12 +45,12 @@ object TestableAggregateRoot {
     * @tparam A The Aggregate Root Type that is tested.
     * @return a TestableAggregateRoot instance that is initialized and available to give a DomainCommand to.
     */
-  def given[A <: AggregateRootActor](
+  def given[A <: AggregateRootActor[B], B <: AggregateState[B]: ClassTag](
     creator: AggregateRootCreator,
     id: AggregateRootId,
     evt: DomainEvent*
-  )(implicit system: ActorSystem, timeout: Timeout, ctag: reflect.ClassTag[A]): TestableAggregateRoot[A] = {
-    new TestableAggregateRoot[A](creator, id, evt)
+  )(implicit system: ActorSystem, timeout: Timeout, ctag: reflect.ClassTag[A]): TestableAggregateRoot[A, B] = {
+    new TestableAggregateRoot[A, B](creator, id, evt)
   }
 
   /** Construct a test for a specific aggregate root that hos no initial state. This can be used to test creation of the
@@ -58,12 +60,12 @@ object TestableAggregateRoot {
     * @tparam A The Aggregate Root Type that is tested.
     * @return a TestableAggregateRoot instance that is initialized and available to give a DomainCommand to.
     */
-  def given[A <: AggregateRootActor](
+  def given[A <: AggregateRootActor[B], B <: AggregateState[B]: ClassTag](
     creator: AggregateRootCreator,
     id: AggregateRootId
-  )(implicit system: ActorSystem, timeout: Timeout, ctag: reflect.ClassTag[A]): TestableAggregateRoot[A] = {
+  )(implicit system: ActorSystem, timeout: Timeout, ctag: reflect.ClassTag[A]): TestableAggregateRoot[A, B] = {
 
-    new TestableAggregateRoot[A](creator, id, Seq.empty[DomainEvent])
+    new TestableAggregateRoot[A, B](creator, id, Seq.empty[DomainEvent])
   }
 
   //The tested aggregate root makes use of an additional counter in the id in order to prevent collision of parallel running tests.
@@ -78,7 +80,7 @@ object TestableAggregateRoot {
   }
 }
 
-class TestableAggregateRoot[A <: AggregateRootActor] private (
+class TestableAggregateRoot[A <: AggregateRootActor[B], B <: AggregateState[B]: ClassTag] private (
   creator: AggregateRootCreator,
   id: AggregateRootId,
   evt: Seq[DomainEvent]
@@ -116,7 +118,7 @@ class TestableAggregateRoot[A <: AggregateRootActor] private (
 //    obj.instance.asInstanceOf[AggregateRootCreator]
 //  }
 
-  private def createActor[B <: AggregateRootActor](id: AggregateRootId) = {
+  private def createActor(id: AggregateRootId) = {
     handledEvents = List.empty
     system.actorOf(creator.props(arTestId), s"test-aggregate-$arTestId")
   }
@@ -128,13 +130,13 @@ class TestableAggregateRoot[A <: AggregateRootActor] private (
     * @param command The DomainCommand that the aggregate root needs to process.
     * @return This initialized TestableAggregateRoot that processed the command.
     */
-  def when(command: DomainCommand): TestableAggregateRoot[A] = {
+  def when(command: DomainCommand): TestableAggregateRoot[A, B] = {
     //TODO IT maybe a better idea to actually return the results in a testable matter. (HOW?)
     if (command.id != id)
       throw new IllegalArgumentException(
         s"Command for Aggregate Root ${command.id} cannot be handled by this aggregate root with id $id"
       )
-    aggregateRootActor = aggregateRootActor.fold(Some(createActor[A](arTestId)))(r => Some(r))
+    aggregateRootActor = aggregateRootActor.fold(Some(createActor(arTestId)))(r => Some(r))
     val aggregateRootProbe = TestProbe()
     aggregateRootProbe watch aggregateRootActor.get
 
@@ -157,11 +159,10 @@ class TestableAggregateRoot[A <: AggregateRootActor] private (
     *
     * @return Future with the AggregateState as defined for this Aggregate Root.
     */
-  def currentState: Future[AggregateState] = {
-    aggregateRootActor.fold(Future.failed[AggregateState](new IllegalStateException("")))(
-      actor => (actor ? GetState).mapTo[AggregateState]
+  def currentState: Future[Option[B]] =
+    aggregateRootActor.fold(Future.failed[Option[B]](new IllegalStateException("")))(
+      actor => (actor ? GetState).mapTo[Option[B]]
     )
-  }
 
   /**
     * Give the events that are created by the command that was given to the aggregate root by when.

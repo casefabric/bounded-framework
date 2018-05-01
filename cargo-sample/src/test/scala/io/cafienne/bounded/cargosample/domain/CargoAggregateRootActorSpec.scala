@@ -48,13 +48,13 @@ class CargoAggregateRootActorSpec extends AsyncWordSpec with Matchers with Befor
       )
 
       val ar = TestableAggregateRoot
-        .given[Cargo](cargoAggregateRootCreator, cargoId2)
+        .given[Cargo, CargoAggregateState](cargoAggregateRootCreator, cargoId2)
         .when(PlanCargo(metaData, cargoId2, trackingId, routeSpecification))
 
       ar.events should contain(CargoPlanned(metaData, cargoId2, trackingId, routeSpecification))
       val targetState = CargoAggregateState(trackingId, routeSpecification)
       ar.currentState map { state =>
-        assert(state == targetState)
+        assert(state.get == targetState)
       }
     }
 
@@ -76,7 +76,7 @@ class CargoAggregateRootActorSpec extends AsyncWordSpec with Matchers with Befor
       val specifyNewRouteCommand = SpecifyNewRoute(metaData, cargoId3, newRouteSpecification)
 
       val ar = TestableAggregateRoot
-        .given[Cargo](cargoAggregateRootCreator, cargoId3, cargoPlannedEvent)
+        .given[Cargo, CargoAggregateState](cargoAggregateRootCreator, cargoId3, cargoPlannedEvent)
         .when(specifyNewRouteCommand)
 
       // You see that this only shows the events that are 'published' via when
@@ -84,7 +84,7 @@ class CargoAggregateRootActorSpec extends AsyncWordSpec with Matchers with Befor
 
       val targetState = CargoAggregateState(trackingId, newRouteSpecification)
       ar.currentState map { state =>
-        assert(state == targetState)
+        assert(state.get == targetState)
       }
     }
 

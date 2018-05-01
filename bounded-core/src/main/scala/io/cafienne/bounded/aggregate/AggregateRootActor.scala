@@ -6,24 +6,27 @@ package io.cafienne.bounded.aggregate
 
 import akka.actor._
 import akka.persistence.{PersistentActor, RecoveryCompleted, SnapshotOffer}
-import io.cafienne.bounded.aggregate.AggregateRootActor.{GetState, NoState}
+import io.cafienne.bounded.aggregate.AggregateRootActor.GetState
 
 trait AggregateRootCreator {
   def props(idToCreate: AggregateRootId): Props
 }
 
-trait AggregateState {
-  def update(event: DomainEvent): AggregateState
+trait AggregateState[A <: AggregateState[A]] {
+  def update(event: DomainEvent): Option[A]
 }
 
-trait AggregateStateCreator {
-  def newState(evt: DomainEvent): AggregateState
+trait AggregateStateCreator[A <: AggregateState[A]] {
+  def newState(evt: DomainEvent): Option[A]
 }
 
 /**
   * The AggregateRootActor ensures focus on the transformation of domain commands towards domain event.
   */
-trait AggregateRootActor extends PersistentActor with AggregateStateCreator with ActorLogging {
+trait AggregateRootActor[A <: AggregateState[A]]
+    extends PersistentActor
+    with AggregateStateCreator[A]
+    with ActorLogging {
 
   /**
     * When extending the AggregateRootActor you must return the unique id of the aggregate root.
@@ -35,18 +38,18 @@ trait AggregateRootActor extends PersistentActor with AggregateStateCreator with
     * When extending the AggregateRootActor you MUST implement the handleCommand method.
     *
     * @param command one of the commands your aggregate root expects
-    * @param state of the Aggregate Root at the moment of handling command
+    * @param state of the Aggregate Root at the moment of handling command, optional: state could not be set yet
     * @return a sequence of events when everything is Right, or an Failure (Left)
     */
-  def handleCommand(command: DomainCommand, state: AggregateState): Reply
+  def handleCommand(command: DomainCommand, state: Option[A]): Reply
 
   // Below this line is the internal implementation of the Aggregate Root Actor.
-  private var internalState: Option[AggregateState] = None
+  private var internalState: Option[A] = None
 
-  def state: Option[AggregateState] = { internalState }
+  def state: Option[A] = { internalState }
 
   private def updateState(evt: DomainEvent) {
-    internalState = Some(internalState.fold(newState(evt))(_ update evt))
+    internalState = internalState.fold(newState(evt))(_ update evt)
   }
 
   override def persistenceId: String = aggregateId.idAsString
@@ -56,7 +59,7 @@ trait AggregateRootActor extends PersistentActor with AggregateStateCreator with
   final def receiveCommand: Actor.Receive = {
     case cmd: DomainCommand =>
       val originalSender = sender()
-      val reply          = handleCommand(cmd, internalState getOrElse NoState)
+      val reply          = handleCommand(cmd, internalState)
 
       reply match {
         case Ok(events) =>
@@ -74,24 +77,19 @@ trait AggregateRootActor extends PersistentActor with AggregateStateCreator with
       originalSender ! reply
 
     case _: GetState.type =>
-      sender() ! state.getOrElse(NoState)
+      sender() ! state
   }
 
   override def receiveRecover: Receive = {
-    case _: RecoveryCompleted                               => // initialize further processing when required
-    case SnapshotOffer(_, snapshot: Option[AggregateState]) => internalState = snapshot
-    case evt: DomainEvent                                   => updateState(evt)
+    case _: RecoveryCompleted                  => // initialize further processing when required
+    case SnapshotOffer(_, snapshot: Option[A]) => internalState = snapshot
+    case evt: DomainEvent                      => updateState(evt)
 
     case other =>
       log.warning("Received unknown event {} during recovery", other)
   }
-
 }
 
 object AggregateRootActor {
   case object GetState
-  case object NoState extends AggregateState {
-    override def update(evt: DomainEvent): AggregateState = NoState
-  }
-
 }

@@ -16,13 +16,11 @@ import scala.collection.immutable.Seq
   * @param cargoId unique identifier for cargo.
   */
 class Cargo(cargoId: AggregateRootId, locationsProvider: LocationsProvider)
-    extends AggregateRootActor
-    with AggregateStateCreator
-    with ActorLogging {
+    extends AggregateRootActor[CargoAggregateState] {
 
   override def aggregateId: AggregateRootId = cargoId
 
-  override def handleCommand(command: DomainCommand, currentState: AggregateState): Reply = {
+  override def handleCommand(command: DomainCommand, state: Option[CargoAggregateState]): Reply = {
     command match {
       case cmd: PlanCargo =>
         Ok(Seq(CargoPlanned(cmd.metaData, cmd.cargoId, cmd.trackingId, cmd.routeSpecification)))
@@ -32,10 +30,10 @@ class Cargo(cargoId: AggregateRootId, locationsProvider: LocationsProvider)
     }
   }
 
-  override def newState(evt: DomainEvent): AggregateState = {
+  override def newState(evt: DomainEvent): Option[CargoAggregateState] = {
     evt match {
       case evt: CargoPlanned =>
-        new CargoAggregateState(evt.trackingId, evt.routeSpecification)
+        Some(CargoAggregateState(evt.trackingId, evt.routeSpecification))
       case _ =>
         throw new IllegalArgumentException(s"Event $evt is not valid to create a new CargoAggregateState")
     }
@@ -46,14 +44,15 @@ class Cargo(cargoId: AggregateRootId, locationsProvider: LocationsProvider)
 object Cargo {
 
   case class CargoAggregateState(trackingId: TrackingId, routeSpecification: RouteSpecification)
-      extends AggregateState {
-    override def update(evt: DomainEvent): AggregateState = {
+      extends AggregateState[CargoAggregateState] {
+
+    override def update(evt: DomainEvent): Option[CargoAggregateState] = {
       evt match {
-        case CargoPlanned(meta, cargoId, trackingId, routeSpecification) =>
-          CargoAggregateState(trackingId, routeSpecification)
-        case NewRouteSpecified(meta, cargoId, routeSpecification) =>
-          this.copy(routeSpecification = routeSpecification)
-        case other => this
+        case CargoPlanned(_, _, newTrackingId, newRouteSpecification) =>
+          Some(CargoAggregateState(newTrackingId, newRouteSpecification))
+        case NewRouteSpecified(_, _, newRouteSpecification) =>
+          Some(this.copy(routeSpecification = newRouteSpecification))
+        case _ => Some(this)
       }
     }
   }
