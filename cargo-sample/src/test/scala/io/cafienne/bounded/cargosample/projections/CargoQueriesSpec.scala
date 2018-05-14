@@ -79,7 +79,7 @@ class CargoQueriesSpec extends WordSpec with Matchers with ScalaFutures with Bef
       }
 
       val evt2 = NewRouteSpecified(metaData, cargoId1, routeSpecification.copy(destination = Location("Oslo")))
-      fixture.addEvents(Seq(evt2))
+      fixture.addEvent(evt2)
       whenReady(cargoQueries.getCargo(cargoId1)) { cargo =>
         cargo should be(CargoViewItem(cargoId1, "Amsterdam", "Oslo", expectedDeliveryTime))
       }

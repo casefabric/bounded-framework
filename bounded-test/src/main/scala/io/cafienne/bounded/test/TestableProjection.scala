@@ -63,6 +63,12 @@ class TestableProjection private (system: ActorSystem, timeout: Timeout) {
     })
   }
 
+  def addEvent(evt: DomainEvent): Unit = {
+    eventMaterializers.fold(throw new IllegalStateException("You start the projection before you add events"))(_ => {
+      storeEvents(Seq(evt))
+    })
+  }
+
   // Blocking way to store events.
   private def storeEvents(evt: Seq[DomainEvent]): Unit = {
     val storeEventsActor = system.actorOf(Props(classOf[CreateEventsInStoreActor], evt.head.id), "create-events-actor")
