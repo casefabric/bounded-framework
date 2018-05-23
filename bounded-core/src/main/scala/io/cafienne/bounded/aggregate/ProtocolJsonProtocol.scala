@@ -9,7 +9,6 @@ import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 import java.util.UUID
 
-import io.cafienne.bounded.akka.persistence.eventmaterializers.EventNumber
 import spray.json._
 
 object ProtocolJsonProtocol extends DefaultJsonProtocol {
@@ -77,6 +76,5 @@ object ProtocolJsonProtocol extends DefaultJsonProtocol {
     }
   }
 
-  implicit val EventNumberFormat  = jsonFormat1(EventNumber)
-  implicit val MetaDataJsonFormat = jsonFormat3(MetaData)
+  implicit val MetaDataJsonFormat = jsonFormat2(MetaData)
 }

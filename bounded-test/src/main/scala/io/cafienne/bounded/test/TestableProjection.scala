@@ -14,8 +14,10 @@ import io.cafienne.bounded.aggregate._
 import io.cafienne.bounded.akka.persistence.eventmaterializers.{
   AbstractEventMaterializer,
   EventMaterializers,
-  EventProcessed
+  EventProcessed,
+  OffsetStoreProvider
 }
+
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -30,6 +32,7 @@ object TestableProjection {
     tp.expectMsg(akka.actor.Status.Success(""))
 
     val testedProjection = new TestableProjection(system, timeout)
+    OffsetStoreProvider.getInMemoryStore().clear()
     testedProjection.storeEvents(evt)
     testedProjection
   }
@@ -45,10 +48,10 @@ class TestableProjection private (system: ActorSystem, timeout: Timeout) {
 
   val eventStreamListener = TestProbe()
 
-  if (!system.settings.config.hasPath("io.bounded.eventmaterializers.publish") || !system.settings.config.getBoolean(
-        "io.bounded.eventmaterializers.publish"
+  if (!system.settings.config.hasPath("bounded.eventmaterializers.publish") || !system.settings.config.getBoolean(
+        "bounded.eventmaterializers.publish"
       )) {
-    system.log.error("Config property io.bounded.eventmaterializers.publish must be enabled")
+    system.log.error("Config property bounded.eventmaterializers.publish must be enabled")
   }
 
   def startProjection(projector: AbstractEventMaterializer): Future[EventMaterializers.ReplayResult] = {

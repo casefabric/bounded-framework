@@ -68,4 +68,10 @@ object Dependencies {
     )
   }
 
+  val persistanceLmdbDBDeps = {
+    baseDeps ++ Seq(
+      "org.lmdbjava"                % "lmdbjava"        % "0.6.0"
+    )
+  }
+
 }

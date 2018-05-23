@@ -35,7 +35,7 @@ abstract class AbstractReplayableEventMaterializer(actorSystem: ActorSystem, wit
         doReplay(targetOffset)
       }
     } else {
-      doReplay(startOffset)
+      doReplay(Offset.noOffset)
     }
   }
 
@@ -56,9 +56,9 @@ abstract class AbstractReplayableEventMaterializer(actorSystem: ActorSystem, wit
             eventsReplayed += 1
             if (eventsReplayed % 100 == 0) {
               logger.info(s"$viewIdentifier: [$tagName] events replayed: $eventsReplayed")
-              if (withPartialReplay) {
-                saveOffset(viewIdentifier, offset)
-              }
+            }
+            if (withPartialReplay) {
+              saveOffset(viewIdentifier, offset)
             }
             offset
           }

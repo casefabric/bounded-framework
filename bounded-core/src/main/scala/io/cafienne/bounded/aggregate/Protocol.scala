@@ -5,9 +5,9 @@
 package io.cafienne.bounded.aggregate
 
 import java.time.ZonedDateTime
+
 import scala.collection.immutable.Seq
 import stamina.Persistable
-import io.cafienne.bounded.akka.persistence.eventmaterializers.EventNumber
 
 trait Id {
   def idAsString: String
@@ -23,7 +23,7 @@ trait UserContext {
   def roles: List[String]
 }
 
-case class MetaData(timestamp: ZonedDateTime, userContext: Option[UserContext], eventId: Option[EventNumber])
+case class MetaData(timestamp: ZonedDateTime, userContext: Option[UserContext])
 
 trait DomainCommand {
   def id: AggregateRootId

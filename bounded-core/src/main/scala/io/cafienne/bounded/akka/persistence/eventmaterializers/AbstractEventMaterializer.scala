@@ -15,6 +15,7 @@ import io.cafienne.bounded.akka.ActorSystemProvider
 import io.cafienne.bounded.akka.persistence.ReadJournalProvider
 import io.cafienne.bounded.config.Configured
 import com.typesafe.scalalogging.Logger
+import io.cafienne.bounded.akka.persistence.eventmaterializers.offsetstores.OffsetStore
 
 import scala.concurrent.{Await, Future}
 import scala.concurrent.duration._
@@ -75,8 +76,8 @@ abstract class AbstractEventMaterializer(actorSystem: ActorSystem, keepCurrentOf
   /**
     * Publish an event on the AKKA eventbus after the event is processed.
     */
-  val isPublishRequired: Boolean = if (actorSystem.settings.config.hasPath("io.bounded.eventmaterializers.publish")) {
-    actorSystem.settings.config.getBoolean("io.bounded.eventmaterializers.publish")
+  val isPublishRequired: Boolean = if (actorSystem.settings.config.hasPath("bounded.eventmaterializers.publish")) {
+    actorSystem.settings.config.getBoolean("bounded.eventmaterializers.publish")
   } else false
 
   /**

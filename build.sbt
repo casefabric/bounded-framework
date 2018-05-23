@@ -68,7 +68,7 @@ val boundedCore = (project in file("bounded-core"))
   .settings(basicSettings: _*)
   .settings(
     name := "bounded-core",
-    libraryDependencies ++= Dependencies.baseDeps)
+    libraryDependencies ++= Dependencies.baseDeps ++ Dependencies.persistanceLmdbDBDeps)
 
 val boundedAkkaHttp = (project in file("bounded-akka-http"))
   .dependsOn(boundedCore)

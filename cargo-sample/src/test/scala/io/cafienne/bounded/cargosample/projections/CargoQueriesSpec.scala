@@ -4,6 +4,7 @@
 
 package io.cafienne.bounded.cargosample.projections
 
+import java.io.File
 import java.time.ZonedDateTime
 import java.util.UUID
 
@@ -13,7 +14,7 @@ import akka.persistence.query.Sequence
 import akka.testkit.{TestKit, _}
 import akka.util.Timeout
 import io.cafienne.bounded.aggregate.{MetaData, UserContext, UserId}
-import io.cafienne.bounded.akka.persistence.eventmaterializers.{OffsetTypeSequence, ReadJournalOffsetStore}
+import io.cafienne.bounded.akka.persistence.eventmaterializers.{OffsetStoreProvider, ReadJournalOffsetStore}
 import io.cafienne.bounded.cargosample.SpecConfig
 import io.cafienne.bounded.cargosample.domain.CargoDomainProtocol._
 import io.cafienne.bounded.cargosample.projections.QueriesJsonProtocol.CargoViewItem
@@ -43,17 +44,20 @@ class CargoQueriesSpec extends WordSpec with Matchers with ScalaFutures with Bef
     override def userId: UserId = userId1
   })
 
-  val metaData  = MetaData(expectedDeliveryTime, None, None)
-  val metaData2 = MetaData(expectedDeliveryTime, userContext, None)
+  val metaData  = MetaData(expectedDeliveryTime, None)
+  val metaData2 = MetaData(expectedDeliveryTime, userContext)
 
   val cargoId1           = CargoId(UUID.fromString("93ea7372-3181-11e7-93ae-92361f002671"))
   val cargoId2           = CargoId(UUID.fromString("93ea7372-3181-11e7-93ae-92361f002672"))
   val trackingId         = TrackingId(UUID.fromString("67C1FBD1-E634-4B4E-BF31-BBA6D039C264"))
   val routeSpecification = RouteSpecification(Location("Amsterdam"), Location("New York"), expectedDeliveryTime)
 
+  val lmdbFile = new File("target", "cargo")
+  val cargoLmdbClient = new CargoLmdbClient(lmdbFile)
+
   // Create Query and Writer for testing
-  object cargoQueries extends CargoQueriesImpl()
-  val cargoWriter = new CargoViewProjectionWriter(system) with ReadJournalOffsetStore with OffsetTypeSequence
+  object cargoQueries extends CargoQueriesImpl(cargoLmdbClient)
+  val cargoWriter = new CargoViewProjectionWriter(system, cargoLmdbClient) with OffsetStoreProvider
 
   "Cargo Query" must {
     "add and retrieve valid cargo based on replay" in {
@@ -66,7 +70,7 @@ class CargoQueriesSpec extends WordSpec with Matchers with ScalaFutures with Bef
       }
 
       whenReady(cargoQueries.getCargo(cargoId1)) { cargo =>
-        cargo should be(CargoViewItem(cargoId1, "Amsterdam", "New York", expectedDeliveryTime))
+        cargo should be(Some(CargoViewItem(cargoId1, "Amsterdam", "New York", expectedDeliveryTime)))
       }
     }
     "add and retrieve an update on valid cargo based on new event after replay" in {
@@ -81,7 +85,7 @@ class CargoQueriesSpec extends WordSpec with Matchers with ScalaFutures with Bef
       val evt2 = NewRouteSpecified(metaData, cargoId1, routeSpecification.copy(destination = Location("Oslo")))
       fixture.addEvent(evt2)
       whenReady(cargoQueries.getCargo(cargoId1)) { cargo =>
-        cargo should be(CargoViewItem(cargoId1, "Amsterdam", "Oslo", expectedDeliveryTime))
+        cargo should be(Some(CargoViewItem(cargoId1, "Amsterdam", "Oslo", expectedDeliveryTime)))
       }
 
     }
@@ -89,5 +93,16 @@ class CargoQueriesSpec extends WordSpec with Matchers with ScalaFutures with Bef
 
   override def afterAll {
     TestKit.shutdownActorSystem(system, 30.seconds, verifySystemShutdown = true)
+    cleanupDb()
+  }
+
+  private def cleanupDb() = {
+    val txn = cargoLmdbClient.env.txnWrite()
+    try {
+      cargoLmdbClient.dbi.drop(txn)
+      txn.commit()
+    } finally {
+      txn.close()
+    }
   }
 }

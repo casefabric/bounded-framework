@@ -4,16 +4,18 @@
 
 package io.cafienne.bounded.cargosample
 
+import java.io.File
+
 import akka.actor.ActorSystem
 import akka.event.{Logging, LoggingAdapter}
 import akka.http.scaladsl.Http
 import akka.stream.ActorMaterializer
 import akka.util.Timeout
 import io.cafienne.bounded.aggregate.DefaultCommandGateway
-import io.cafienne.bounded.akka.persistence.eventmaterializers._
+import io.cafienne.bounded.akka.persistence.eventmaterializers.{OffsetStoreProvider, _}
 import io.cafienne.bounded.cargosample.domain.{CargoCreator, FixedLocationsProvider}
 import io.cafienne.bounded.cargosample.httpapi.HttpApiEndpoint
-import io.cafienne.bounded.cargosample.projections.{CargoQueriesImpl, CargoViewProjectionWriter}
+import io.cafienne.bounded.cargosample.projections.{CargoLmdbClient, CargoQueriesImpl, CargoViewProjectionWriter}
 import io.cafienne.bounded.config.Configured
 
 import scala.concurrent.Await
@@ -40,8 +42,11 @@ object Boot extends App with Configured {
     }
   }
 
-  val cargoQueries              = new CargoQueriesImpl()
-  val cargoViewProjectionWriter = new CargoViewProjectionWriter(system) with ReadJournalOffsetStore with OffsetTypeUuid
+  val lmdbPath        = config.getString("application.lmdb-path")
+  val cargoLmdbClient = new CargoLmdbClient(new File(lmdbPath, "cargo"))
+
+  val cargoQueries              = new CargoQueriesImpl(cargoLmdbClient)
+  val cargoViewProjectionWriter = new CargoViewProjectionWriter(system, cargoLmdbClient) with ReadJournalOffsetStore
 
   val eventMaterializers = new EventMaterializers(
     List(

@@ -14,7 +14,7 @@ import akka.event.{Logging, LoggingAdapter}
 import akka.http.scaladsl.server.{PathMatchers, Route}
 import io.cafienne.bounded.aggregate.{CommandGateway, Ko, MetaData, Ok}
 import io.cafienne.bounded.cargosample.domain.{CargoCommandValidatorsImpl, CargoDomainProtocol}
-import io.cafienne.bounded.cargosample.domain.CargoDomainProtocol.{CargoId, CargoNotFound, CargoPlanned, TrackingId}
+import io.cafienne.bounded.cargosample.domain.CargoDomainProtocol.{CargoId, CargoPlanned, TrackingId}
 import io.cafienne.bounded.cargosample.projections.CargoQueries
 import io.cafienne.bounded.cargosample.projections.QueriesJsonProtocol.CargoViewItem
 import io.swagger.annotations._
@@ -72,12 +72,12 @@ class CargoRoute(commandGateway: CommandGateway, cargoQueries: CargoQueries)(imp
       path("cargo" / PathMatchers.JavaUUID) { id =>
         val cargoId = CargoId(id)
         onComplete(cargoQueries.getCargo(cargoId)) {
-          case Success(cargoResponse) =>
+          case Success(cargoResponse) if cargoResponse.isDefined =>
             complete(StatusCodes.OK -> cargoResponse)
+          case Success(cargoResponse) =>
+            complete(StatusCodes.NotFound -> ErrorResponse(s"Cargo with id $cargoId is not found"))
           case Failure(err) => {
             err match {
-              case notFound: CargoNotFound =>
-                complete(StatusCodes.NotFound -> ErrorResponse(notFound.msg))
               case ex: Throwable =>
                 complete(
                   StatusCodes.InternalServerError -> ErrorResponse(
@@ -122,7 +122,7 @@ class CargoRoute(commandGateway: CommandGateway, cargoQueries: CargoQueries)(imp
     post {
       path("cargo") {
         entity(as[PlanCargo]) { planCargo =>
-          val metadata = MetaData(ZonedDateTime.now(), None, None)
+          val metadata = MetaData(ZonedDateTime.now(), None)
           onComplete(
             commandGateway.sendAndAsk(
               CargoDomainProtocol.PlanCargo(

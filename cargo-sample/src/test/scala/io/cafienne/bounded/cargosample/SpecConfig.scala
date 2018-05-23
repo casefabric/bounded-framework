@@ -67,7 +67,12 @@ object SpecConfig {
       |      refresh-interval = "10ms"
       |      max-buffer-size = "1000"
       |    }
-      |    io.bounded.eventmaterializers.publish = true
+      |
+      |    bounded.eventmaterializers.publish = true
+      |
+      |    bounded.eventmaterializers.offsetstore {
+      |       type = "inmemory"
+      |   }
     """.stripMargin
   )
 
@@ -113,7 +118,11 @@ object SpecConfig {
       |      }
       |    }
       |
-      |    io.bounded.eventmaterializers.publish = true
+      |    bounded.eventmaterializers.publish = true
+      |
+      |    bounded.eventmaterializers.offsetstore {
+      |       type = "inmemory"
+      |   }
     """.stripMargin
   )
 

@@ -34,7 +34,7 @@ class CargoAggregateRootActorSpec extends AsyncWordSpec with Matchers with Befor
 
     override def userId: UserId = userId1
   })
-  val metaData = MetaData(ZonedDateTime.now(ZoneOffset.UTC), userContext, None)
+  val metaData = MetaData(ZonedDateTime.now(ZoneOffset.UTC), userContext)
 
   "CargoAggregateRoot" must {
 

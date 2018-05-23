@@ -31,14 +31,14 @@ class CargoRouteSpec extends FlatSpec with MustMatchers with ScalatestRouteTest 
   val cargoId1 = CargoId(UUID.fromString("8CD15DA4-006B-478C-8640-2FA52AA7657E"))
   val cargoViewItem1 =
     CargoViewItem(cargoId1, "Amsterdam", "New York", ZonedDateTime.parse("2018-01-01T12:25:38+01:00"))
-  val metadata = MetaData(ZonedDateTime.now, None, None)
+  val metadata = MetaData(ZonedDateTime.now, None)
 
   val cargoQueries = new CargoQueries {
-    override def getCargo(cargoId: CargoDomainProtocol.CargoId): Future[CargoViewItem] = {
+    override def getCargo(cargoId: CargoDomainProtocol.CargoId): Future[Option[CargoViewItem]] = {
       if (cargoId.id.compareTo(cargoId1.id) == 0) {
-        Future.successful(cargoViewItem1)
+        Future.successful(Some(cargoViewItem1))
       } else {
-        Future.failed[CargoViewItem](CargoNotFound(s"Cargo with id $cargoId is not found"))
+        Future.successful(None)
       }
     }
   }
