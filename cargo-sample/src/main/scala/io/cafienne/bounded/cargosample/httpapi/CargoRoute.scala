@@ -107,7 +107,7 @@ class CargoRoute(commandGateway: CommandGateway, cargoQueries: CargoQueries)(imp
       new ApiImplicitParam(
         required = true,
         paramType = "body",
-        dataType = "io.cafienne.bounded.cargosample.httpapi.HttpJsonProtocol$PlanCargo"
+        dataType = "io.cafienne.bounded.cargosample.httpapi.HttpJsonProtocol$" + "PlanCargo" // concat to remove interpolator warning
       )
     )
   )

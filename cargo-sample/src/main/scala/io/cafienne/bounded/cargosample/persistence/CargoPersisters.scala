@@ -4,7 +4,6 @@
 
 package io.cafienne.bounded.cargosample.persistence
 
-import io.cafienne.bounded.akka.persistence.persisters.ForwardsCompatibleSerializer
 import io.cafienne.bounded.cargosample.domain.CargoDomainProtocol.{CargoPlanned, NewRouteSpecified}
 import stamina.json.persister
 

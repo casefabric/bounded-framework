@@ -21,6 +21,8 @@ object CargoDomainProtocol {
     override def toString: String = id.toString
   }
 
+  case class CargoUserContext(userId: UserId, roles: List[String]) extends UserContext
+
   case class TrackingId(id: UUID)
   case class Location(name: String)
   case class RouteSpecification(origin: Location, destination: Location, arrivalDeadline: ZonedDateTime)

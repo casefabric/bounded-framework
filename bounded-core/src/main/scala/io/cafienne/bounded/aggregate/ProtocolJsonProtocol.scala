@@ -41,31 +41,6 @@ object ProtocolJsonProtocol extends DefaultJsonProtocol {
     }
   }
 
-  implicit object UserContextJsonFormat extends RootJsonFormat[UserContext] {
-    override def write(obj: UserContext): JsValue = JsObject(
-      "userId" -> JsString(obj.userId.idAsString),
-      "roles"  -> JsArray(obj.roles.map(r => JsString(r)).toVector)
-    )
-
-    override def read(json: JsValue): UserContext = json match {
-      case JsObject(fields) if fields.contains("userId") =>
-        (fields("userId"), fields("roles")) match {
-          case (JsString(userStr), JsArray(rolesArr)) =>
-            new UserContext {
-
-              override def roles: List[String] =
-                rolesArr.map(r => r.toString()).toList
-
-              override def userId: UserId = new UserId {
-                override def idAsString: String = userStr
-              }
-            }
-          case _ =>
-            deserializationError(s"value $json does not conform the UserContext json object")
-        }
-    }
-  }
-
   implicit object JavaUUIDFormat extends RootJsonFormat[UUID] {
     override def write(obj: UUID): JsValue = JsString(obj.toString)
 
@@ -76,5 +51,4 @@ object ProtocolJsonProtocol extends DefaultJsonProtocol {
     }
   }
 
-  implicit val MetaDataJsonFormat = jsonFormat2(MetaData)
 }

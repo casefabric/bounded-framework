@@ -2,7 +2,7 @@
  * Copyright (C) 2016-2018 Cafienne B.V. <https://www.cafienne.io/bounded>
  */
 
-package io.cafienne.bounded.akka.persistence.persisters
+package io.cafienne.bounded.cargosample.persistence
 
 import io.cafienne.bounded.aggregate._
 import com.typesafe.scalalogging.LazyLogging
@@ -11,6 +11,7 @@ import stamina._
 
 object UnsupportedEventProtocol extends DefaultJsonProtocol {
   import ProtocolJsonProtocol._
+  import io.cafienne.bounded.cargosample.domain.CargoDomainJsonProtocol._
 
   case class UnsupportedEventAggregateId(id: String) extends AggregateRootId {
     override def idAsString: String = id
@@ -20,6 +21,7 @@ object UnsupportedEventProtocol extends DefaultJsonProtocol {
   implicit val unsupportedAggregateIdFmt: RootJsonFormat[UnsupportedEventAggregateId] = jsonFormat1(
     UnsupportedEventAggregateId
   )
+
   implicit val unsupportedEventFmt: RootJsonFormat[UnsupportedEvent] =
     jsonFormat2(UnsupportedEvent)
 }
