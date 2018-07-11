@@ -6,7 +6,7 @@ package io.cafienne.bounded.cargosample.projections
 
 import akka.Done
 import akka.actor.ActorSystem
-import io.cafienne.bounded.akka.persistence.eventmaterializers.AbstractReplayableEventMaterializer
+import io.cafienne.bounded.eventmaterializers.AbstractReplayableEventMaterializer
 import com.typesafe.scalalogging.Logger
 import io.cafienne.bounded.cargosample.domain.Cargo
 import io.cafienne.bounded.cargosample.domain.CargoDomainProtocol.{

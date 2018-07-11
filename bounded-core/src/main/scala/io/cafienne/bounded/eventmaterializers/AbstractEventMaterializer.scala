@@ -2,7 +2,7 @@
  * Copyright (C) 2016-2018 Cafienne B.V. <https://www.cafienne.io/bounded>
  */
 
-package io.cafienne.bounded.akka.persistence.eventmaterializers
+package io.cafienne.bounded.eventmaterializers
 
 import java.util.UUID
 
@@ -15,12 +15,12 @@ import io.cafienne.bounded.akka.ActorSystemProvider
 import io.cafienne.bounded.akka.persistence.ReadJournalProvider
 import io.cafienne.bounded.config.Configured
 import com.typesafe.scalalogging.Logger
-import io.cafienne.bounded.akka.persistence.eventmaterializers.offsetstores.OffsetStore
+import io.cafienne.bounded.{Compatibility, DefaultCompatibility}
+import io.cafienne.bounded.eventmaterializers.offsetstores.OffsetStore
 
 import scala.concurrent.{Await, Future}
 import scala.concurrent.duration._
 
-Compatibility = Runtime + Version (current + all  | all + all | all + current | current + current | all_not_newer ?)
 /**
   * Abstract class to be used to create eventlisteners. Use this class as a base for listening for
   * specific events. The class supports offset store to keep track of events received.
@@ -32,8 +32,11 @@ Compatibility = Runtime + Version (current + all  | all + all | all + current | 
   * @param actorSystem
   * @param keepCurrentOffset Set this to false if current offset must not be stored.
   */
-abstract class AbstractEventMaterializer(actorSystem: ActorSystem, keepCurrentOffset: Boolean = true, compatible: Compatibility)
-    extends ActorSystemProvider
+abstract class AbstractEventMaterializer(
+  actorSystem: ActorSystem,
+  keepCurrentOffset: Boolean = true,
+  compatible: Compatibility = DefaultCompatibility
+) extends ActorSystemProvider
     with ReadJournalProvider
     with OffsetStore
     with Resumable

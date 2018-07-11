@@ -35,7 +35,8 @@ trait ExistenceChecker extends ActorSystemProvider with ReadJournalProvider {
         f =>
           if (f) Future.successful(cmd)
           else
-            Future.failed(CargoNotFound(s"Cargo with id ${cmd.aggregateRootId} not found while processing command $cmd"))
+            Future
+              .failed(CargoNotFound(s"Cargo with id ${cmd.aggregateRootId} not found while processing command $cmd"))
       )
 }
 

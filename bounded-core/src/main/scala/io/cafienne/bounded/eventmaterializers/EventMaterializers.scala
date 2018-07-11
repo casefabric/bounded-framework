@@ -2,7 +2,7 @@
  * Copyright (C) 2016-2018 Cafienne B.V. <https://www.cafienne.io/bounded>
  */
 
-package io.cafienne.bounded.akka.persistence.eventmaterializers
+package io.cafienne.bounded.eventmaterializers
 
 import akka.persistence.query.{Offset}
 import com.typesafe.scalalogging.Logger

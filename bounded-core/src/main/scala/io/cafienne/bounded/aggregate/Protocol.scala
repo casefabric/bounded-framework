@@ -7,34 +7,25 @@ package io.cafienne.bounded.aggregate
 import java.time.ZonedDateTime
 import java.util.UUID
 
+import io.cafienne.bounded.{BuildInfo, Id, RuntimeInfo, UserContext}
+
 import scala.collection.immutable.Seq
 import stamina.Persistable
 
-trait Id {
-  def idAsString: String
-}
-
 trait AggregateRootId extends Id
-
-trait UserId extends Id
-
-trait UserContext {
-  def userId: UserId
-
-  def roles: List[String]
-}
 
 /**
   * Metadata of the event contains data that is used within the framework and may be used by the application
   * @param timestamp the moment the event was created
   * @param userContext contains an assumed known user, events generated via an HTTP API will most of the time be authenticated
   */
-case class CommandMetaData(timestamp: ZonedDateTime, userContext: Option[UserContext])
-
+case class CommandMetaData(
+  timestamp: ZonedDateTime,
+  userContext: Option[UserContext],
+  commandId: UUID = UUID.randomUUID()
+)
 
 trait DomainCommand {
-
-  def transactionId: UUID
 
   def aggregateRootId: AggregateRootId
 
@@ -42,27 +33,32 @@ trait DomainCommand {
 }
 
 /**
-  * Version number of the build info is based on the Apache Runtime Versioning rules:
-  * @see https://apr.apache.org/versioning.html
-  * @param major
-  * @param minor
-  * @param patch
-  */
-case class Version(major: Integer, minor: Integer, patch: Integer)
-//TODO it may not be a BuildInfo but a Runtime marker in order to confgure what components work together ?????
-trait BuildInfo {
-  def name: String
-  def version: Version
-}
-
-/**
   * Metadata of the event contains data that is used within the framework and may be used by the application
   * @param timestamp the moment the event was created
   * @param userContext contains an assumed known user, events generated via an HTTP API will most of the time be authenticated
-  * @param commandReference contains a reference to the command that has caused this event.
-  * @param buildInfo contains the build information of the applicaiton. The Version is used to ensure version specific routing of messages.
+  * @param causedByCommand contains a reference to the command that has caused this event.
+  * @param buildInfo contains the build information of the application. The Version is used to ensure version specific routing of messages.
+  * @param runTimeInfo contains information on the runtime the event is generated and stored
   */
-case class MetaData(timestamp: ZonedDateTime, userContext: Option[UserContext], commandReference: Option[String], buildInfo: BuildInfo)
+case class MetaData(
+  timestamp: ZonedDateTime,
+  userContext: Option[UserContext],
+  causedByCommand: Option[UUID],
+  buildInfo: BuildInfo,
+  runTimeInfo: RuntimeInfo
+)
+
+object MetaData {
+  def fromCommand(metadata: CommandMetaData): MetaData = {
+    MetaData(
+      metadata.timestamp,
+      metadata.userContext,
+      Some(metadata.commandId),
+      BuildInfo("name", "0.0.0"),
+      RuntimeInfo("runtimeid")
+    )
+  }
+}
 
 trait DomainEvent extends Persistable {
 

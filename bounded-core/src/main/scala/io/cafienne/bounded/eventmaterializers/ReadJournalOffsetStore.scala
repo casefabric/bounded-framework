@@ -2,7 +2,7 @@
  * Copyright (C) 2016-2018 Cafienne B.V. <https://www.cafienne.io/bounded>
  */
 
-package io.cafienne.bounded.akka.persistence.eventmaterializers
+package io.cafienne.bounded.eventmaterializers
 
 import java.util.concurrent.TimeUnit
 
@@ -11,7 +11,7 @@ import akka.persistence.query.Offset
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
 import io.cafienne.bounded.akka.ActorSystemProvider
 import io.cafienne.bounded.akka.persistence.ReadJournalProvider
-import io.cafienne.bounded.akka.persistence.eventmaterializers.offsetstores._
+import io.cafienne.bounded.eventmaterializers.offsetstores._
 
 import scala.concurrent.Future
 import scala.concurrent.duration._

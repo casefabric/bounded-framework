@@ -2,17 +2,21 @@
  * Copyright (C) 2016-2018 Cafienne B.V. <https://www.cafienne.io/bounded>
  */
 
-package io.cafienne.bounded.akka.persistence.eventmaterializers
+package io.cafienne.bounded.eventmaterializers
 
 import akka.{Done, NotUsed}
 import akka.actor.ActorSystem
 import akka.persistence.query.{EventEnvelope, Offset}
 import akka.stream.scaladsl.Source
+import io.cafienne.bounded.{Compatibility, DefaultCompatibility}
 
 import scala.concurrent.Future
 
-abstract class AbstractReplayableEventMaterializer(actorSystem: ActorSystem, withPartialReplay: Boolean = true)
-    extends AbstractEventMaterializer(actorSystem, withPartialReplay)
+abstract class AbstractReplayableEventMaterializer(
+  actorSystem: ActorSystem,
+  withPartialReplay: Boolean = true,
+  compatible: Compatibility = DefaultCompatibility
+) extends AbstractEventMaterializer(actorSystem, withPartialReplay, compatible)
     with ResumableReplayable {
 
   import EventMaterializerExecutionContext._

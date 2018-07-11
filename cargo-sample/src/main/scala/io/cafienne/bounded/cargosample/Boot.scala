@@ -12,7 +12,7 @@ import akka.http.scaladsl.Http
 import akka.stream.ActorMaterializer
 import akka.util.Timeout
 import io.cafienne.bounded.aggregate.DefaultCommandGateway
-import io.cafienne.bounded.akka.persistence.eventmaterializers._
+import io.cafienne.bounded.eventmaterializers._
 import io.cafienne.bounded.cargosample.domain.{CargoCreator, FixedLocationsProvider}
 import io.cafienne.bounded.cargosample.httpapi.HttpApiEndpoint
 import io.cafienne.bounded.cargosample.projections.{CargoLmdbClient, CargoQueriesImpl, CargoViewProjectionWriter}

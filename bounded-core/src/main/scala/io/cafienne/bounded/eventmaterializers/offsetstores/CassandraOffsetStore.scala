@@ -2,13 +2,13 @@
  * Copyright (C) 2016-2018 Cafienne B.V. <https://www.cafienne.io/bounded>
  */
 
-package io.cafienne.bounded.akka.persistence.eventmaterializers.offsetstores
+package io.cafienne.bounded.eventmaterializers.offsetstores
 
 import java.util.UUID
 
 import akka.persistence.cassandra.query.scaladsl.CassandraReadJournal
 import akka.persistence.query.{Offset, Sequence, TimeBasedUUID}
-import io.cafienne.bounded.akka.persistence.eventmaterializers.{EventMaterializerExecutionContext}
+import io.cafienne.bounded.eventmaterializers.{EventMaterializerExecutionContext}
 
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
