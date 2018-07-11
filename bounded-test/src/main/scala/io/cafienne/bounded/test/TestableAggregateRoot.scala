@@ -132,9 +132,9 @@ class TestableAggregateRoot[A <: AggregateRootActor[B], B <: AggregateState[B]: 
     */
   def when(command: DomainCommand): TestableAggregateRoot[A, B] = {
     //TODO IT maybe a better idea to actually return the results in a testable matter. (HOW?)
-    if (command.id != id)
+    if (command.aggregateRootId != id)
       throw new IllegalArgumentException(
-        s"Command for Aggregate Root ${command.id} cannot be handled by this aggregate root with id $id"
+        s"Command for Aggregate Root ${command.aggregateRootId} cannot be handled by this aggregate root with id $id"
       )
     aggregateRootActor = aggregateRootActor.fold(Some(createActor(arTestId)))(r => Some(r))
     val aggregateRootProbe = TestProbe()

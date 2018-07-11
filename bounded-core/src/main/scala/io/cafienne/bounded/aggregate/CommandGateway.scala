@@ -29,7 +29,7 @@ class DefaultCommandGateway[A <: AggregateRootCreator](system: ActorSystem, aggr
     collection.mutable.Map[AggregateRootId, ActorRef]()
 
   private def getAggregateRoot(c: DomainCommand)(implicit system: ActorSystem): ActorRef = {
-    aggregateRootInstanceActors.getOrElseUpdate(c.id, system.actorOf(aggregateRootCreator.props(c.id)))
+    aggregateRootInstanceActors.getOrElseUpdate(c.aggregateRootId, system.actorOf(aggregateRootCreator.props(c.aggregateRootId)))
   }
 
   override def sendAndAsk[T <: DomainCommand](command: T)(implicit validator: ValidateableCommand[T]): Future[_] = {

@@ -20,6 +20,7 @@ import io.cafienne.bounded.akka.persistence.eventmaterializers.offsetstores.Offs
 import scala.concurrent.{Await, Future}
 import scala.concurrent.duration._
 
+Compatibility = Runtime + Version (current + all  | all + all | all + current | current + current | all_not_newer ?)
 /**
   * Abstract class to be used to create eventlisteners. Use this class as a base for listening for
   * specific events. The class supports offset store to keep track of events received.
@@ -31,7 +32,7 @@ import scala.concurrent.duration._
   * @param actorSystem
   * @param keepCurrentOffset Set this to false if current offset must not be stored.
   */
-abstract class AbstractEventMaterializer(actorSystem: ActorSystem, keepCurrentOffset: Boolean = true)
+abstract class AbstractEventMaterializer(actorSystem: ActorSystem, keepCurrentOffset: Boolean = true, compatible: Compatibility)
     extends ActorSystemProvider
     with ReadJournalProvider
     with OffsetStore

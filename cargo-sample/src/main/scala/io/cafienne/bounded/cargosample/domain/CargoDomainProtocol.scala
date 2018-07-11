@@ -34,7 +34,7 @@ object CargoDomainProtocol {
     * @see DomainCommand for details.
     */
   trait CargoDomainCommand extends DomainCommand {
-    override def id: CargoId
+    override def aggregateRootId: CargoId
 
     val metaData: MetaData
   }
@@ -53,12 +53,12 @@ object CargoDomainProtocol {
     trackingId: TrackingId,
     routeSpecification: RouteSpecification
   ) extends CargoDomainCommand {
-    override def id: CargoId = cargoId
+    override def aggregateRootId: CargoId = cargoId
   }
 
   case class SpecifyNewRoute(metaData: MetaData, cargoId: CargoId, routeSpecification: RouteSpecification)
       extends CargoDomainCommand {
-    override def id: CargoId = cargoId
+    override def aggregateRootId: CargoId = cargoId
   }
 
   // Events
