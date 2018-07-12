@@ -10,7 +10,7 @@ import java.util.UUID
 import akka.actor.ActorSystem
 import akka.testkit.TestKit
 import akka.util.Timeout
-import io.cafienne.bounded.{UserContext, UserId}
+import io.cafienne.bounded.{BuildInfo, RuntimeInfo, UserContext, UserId}
 import io.cafienne.bounded.cargosample.domain.Cargo.CargoAggregateState
 import io.cafienne.bounded.cargosample.domain.CargoDomainProtocol._
 import io.cafienne.bounded.aggregate._
@@ -24,6 +24,10 @@ class CargoAggregateRootActorSpec extends AsyncWordSpec with Matchers with Befor
 
   implicit val timeout = Timeout(10.seconds) //dilated
   implicit val system  = ActorSystem("CargoTestSystem", SpecConfig.testConfigAkkaInMem)
+  implicit val buildInfo =
+    BuildInfo(io.cafienne.bounded.cargosample.BuildInfo.name, io.cafienne.bounded.cargosample.BuildInfo.version)
+//  implicit val runtimeInfo = RuntimeInfo(System.currentTimeMillis().toString)
+  implicit val runtimeInfo = RuntimeInfo("spec")
 
   //Creation of Aggregate Roots that make use of dependencies is organized via the Creator
   //as a separate class that contains the required dependencies.

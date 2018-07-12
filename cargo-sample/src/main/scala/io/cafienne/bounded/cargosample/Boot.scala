@@ -11,6 +11,7 @@ import akka.event.{Logging, LoggingAdapter}
 import akka.http.scaladsl.Http
 import akka.stream.ActorMaterializer
 import akka.util.Timeout
+import io.cafienne.bounded.RuntimeInfo
 import io.cafienne.bounded.aggregate.DefaultCommandGateway
 import io.cafienne.bounded.eventmaterializers._
 import io.cafienne.bounded.cargosample.domain.{CargoCreator, FixedLocationsProvider}
@@ -25,6 +26,9 @@ object Boot extends App with Configured {
   implicit val system       = ActorSystem("cargo-service")
   implicit val materializer = ActorMaterializer()
   implicit val http         = Http()
+  implicit val buildInfo = io.cafienne.bounded
+    .BuildInfo(io.cafienne.bounded.cargosample.BuildInfo.name, io.cafienne.bounded.cargosample.BuildInfo.version)
+  implicit val runtimeInfo = RuntimeInfo("changeme") //TODO change this
 
   import system.dispatcher
   import scala.concurrent.duration._

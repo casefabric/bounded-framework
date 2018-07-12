@@ -31,11 +31,13 @@ import scala.concurrent.duration._
   *
   * @param actorSystem
   * @param keepCurrentOffset Set this to false if current offset must not be stored.
+  * @param compatible indicate what events this materializer should process.
+  *                   @see io.cafienne.bounded.Compatibility for more info
   */
 abstract class AbstractEventMaterializer(
   actorSystem: ActorSystem,
   keepCurrentOffset: Boolean = true,
-  compatible: Compatibility = DefaultCompatibility
+  compatible: Compatibility = DefaultCompatibility //TODO EventFilter + CompatibilityEventFilter + NoOpEventFilter
 ) extends ActorSystemProvider
     with ReadJournalProvider
     with OffsetStore
@@ -80,9 +82,8 @@ abstract class AbstractEventMaterializer(
   /**
     * Publish an event on the AKKA eventbus after the event is processed.
     */
-  val isPublishRequired: Boolean = if (actorSystem.settings.config.hasPath("bounded.eventmaterializers.publish")) {
-    actorSystem.settings.config.getBoolean("bounded.eventmaterializers.publish")
-  } else false
+  val isPublishRequired: Boolean =
+    Option(actorSystem.settings.config.getBoolean("bounded.eventmaterializers.publish")).getOrElse(false)
 
   /**
     * Register listener for events. Should be registered *after* replay is finished
@@ -98,7 +99,7 @@ abstract class AbstractEventMaterializer(
 
     val listenStartOffset = maybeStartOffset.getOrElse(Await.result(getOffset(viewIdentifier), 10.seconds))
     val source: Source[EventEnvelope, NotUsed] =
-      journal.eventsByTag(tagName, listenStartOffset)
+      journal.eventsByTag(tagName, listenStartOffset).filter(eventEnvelope => eventFilter(eventEnvelope))
     val lastSnk = Sink.last[Offset]
     val answer = source
       .mapAsync(1) {
@@ -122,5 +123,10 @@ abstract class AbstractEventMaterializer(
       .toMat(lastSnk)(Keep.both)
 
     answer.run()
+  }
+
+  //TODO EventFilter + CompatibilityEventFilter + NoOpEventFilter
+  private def eventFilter(evtEnvelope: EventEnvelope): Boolean = {
+    true
   }
 }

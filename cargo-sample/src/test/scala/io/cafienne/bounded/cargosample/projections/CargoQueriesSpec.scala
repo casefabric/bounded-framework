@@ -14,7 +14,7 @@ import akka.persistence.query.Sequence
 import akka.testkit.TestKit
 import akka.util.Timeout
 import io.cafienne.bounded.aggregate.{CommandMetaData, MetaData}
-import io.cafienne.bounded.{UserContext, UserId}
+import io.cafienne.bounded.{BuildInfo, RuntimeInfo, UserContext, UserId}
 import io.cafienne.bounded.eventmaterializers.OffsetStoreProvider
 import io.cafienne.bounded.cargosample.SpecConfig
 import io.cafienne.bounded.cargosample.domain.CargoDomainProtocol._
@@ -33,6 +33,9 @@ class CargoQueriesSpec extends WordSpec with Matchers with ScalaFutures with Bef
   implicit val system                 = ActorSystem("CargoTestSystem", SpecConfig.testConfigDVriendInMem)
   implicit val logger: LoggingAdapter = Logging(system, getClass)
   implicit val defaultPatience        = PatienceConfig(timeout = Span(4, Seconds), interval = Span(100, Millis))
+  implicit val buildInfo =
+    BuildInfo(io.cafienne.bounded.cargosample.BuildInfo.name, io.cafienne.bounded.cargosample.BuildInfo.version)
+  implicit val runtimeInfo = RuntimeInfo(System.currentTimeMillis().toString)
 
   //Create test data
   val expectedDeliveryTime = ZonedDateTime.parse("2018-01-01T17:43:00+01:00")

@@ -49,13 +49,13 @@ case class MetaData(
 )
 
 object MetaData {
-  def fromCommand(metadata: CommandMetaData): MetaData = {
+  def fromCommand(metadata: CommandMetaData)(implicit buildInfo: BuildInfo, runtimeInfo: RuntimeInfo): MetaData = {
     MetaData(
       metadata.timestamp,
       metadata.userContext,
       Some(metadata.commandId),
-      BuildInfo("name", "0.0.0"),
-      RuntimeInfo("runtimeid")
+      buildInfo,
+      runtimeInfo
     )
   }
 }

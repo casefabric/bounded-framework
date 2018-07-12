@@ -5,6 +5,7 @@
 package io.cafienne.bounded.cargosample.domain
 
 import akka.actor._
+import io.cafienne.bounded.{BuildInfo, RuntimeInfo}
 import io.cafienne.bounded.aggregate._
 import io.cafienne.bounded.cargosample.domain.Cargo.CargoAggregateState
 import io.cafienne.bounded.cargosample.domain.CargoDomainProtocol._
@@ -15,8 +16,15 @@ import scala.collection.immutable.Seq
   * Aggregate root that keeps the logic of the cargo.
   * @param cargoId unique identifier for cargo.
   */
-class Cargo(cargoId: AggregateRootId, locationsProvider: LocationsProvider)
-    extends AggregateRootActor[CargoAggregateState] {
+class Cargo(
+  cargoId: AggregateRootId,
+  locationsProvider: LocationsProvider,
+  buildInfo: BuildInfo,
+  runtimeInfo: RuntimeInfo
+) extends AggregateRootActor[CargoAggregateState] {
+
+  implicit val bi = buildInfo
+  implicit val ri = runtimeInfo
 
   override def aggregateId: AggregateRootId = cargoId
 
@@ -67,11 +75,14 @@ object Cargo {
   * @param system as a sample dependency the actor system is passed.
   * @param locations a dependency is used inside the Aggregate Root.
   */
-class CargoCreator(system: ActorSystem, locations: LocationsProvider) extends AggregateRootCreator {
+class CargoCreator(system: ActorSystem, locations: LocationsProvider)(
+  implicit buildInfo: BuildInfo,
+  runtimeInfo: RuntimeInfo
+) extends AggregateRootCreator {
 
   override def props(cargoId: AggregateRootId): Props = {
     system.log.debug("Returning new Props for {}", cargoId)
-    Props(classOf[Cargo], cargoId, locations)
+    Props(classOf[Cargo], cargoId, locations, buildInfo, runtimeInfo)
   }
 
 }

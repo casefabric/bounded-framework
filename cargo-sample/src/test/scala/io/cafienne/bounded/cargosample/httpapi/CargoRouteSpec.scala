@@ -11,6 +11,7 @@ import akka.event.Logging
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.testkit.ScalatestRouteTest
+import io.cafienne.bounded.{BuildInfo, RuntimeInfo}
 import io.cafienne.bounded.aggregate._
 import io.cafienne.bounded.cargosample.domain.CargoDomainProtocol
 import io.cafienne.bounded.cargosample.domain.CargoDomainProtocol._
@@ -27,6 +28,9 @@ class CargoRouteSpec extends FlatSpec with MustMatchers with ScalatestRouteTest 
   import spray.json._
 
   val logger = Logging(system, getClass)
+  implicit val buildInfo =
+    BuildInfo(io.cafienne.bounded.cargosample.BuildInfo.name, io.cafienne.bounded.cargosample.BuildInfo.version)
+  implicit val runtimeInfo = RuntimeInfo(System.currentTimeMillis().toString)
 
   val cargoId1 = CargoId(UUID.fromString("8CD15DA4-006B-478C-8640-2FA52AA7657E"))
   val cargoViewItem1 =
