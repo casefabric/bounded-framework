@@ -16,7 +16,8 @@ abstract class AbstractReplayableEventMaterializer(
   actorSystem: ActorSystem,
   withPartialReplay: Boolean = true,
   compatible: Compatibility = DefaultCompatibility
-)(implicit buildInfo: BuildInfo, runtimeInfo: RuntimeInfo) extends AbstractEventMaterializer(actorSystem, withPartialReplay, compatible)
+)(implicit buildInfo: BuildInfo, runtimeInfo: RuntimeInfo)
+    extends AbstractEventMaterializer(actorSystem, withPartialReplay, compatible)
     with ResumableReplayable {
 
   import EventMaterializerExecutionContext._

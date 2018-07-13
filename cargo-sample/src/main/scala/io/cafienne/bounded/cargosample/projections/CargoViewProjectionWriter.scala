@@ -8,16 +8,14 @@ import akka.Done
 import akka.actor.ActorSystem
 import io.cafienne.bounded.eventmaterializers.AbstractReplayableEventMaterializer
 import com.typesafe.scalalogging.Logger
-import io.cafienne.bounded.{BuildInfo, RuntimeInfo}
 import io.cafienne.bounded.cargosample.domain.Cargo
-import io.cafienne.bounded.cargosample.domain.CargoDomainProtocol.{CargoId, CargoNotFound, CargoPlanned, NewRouteSpecified}
+import io.cafienne.bounded.cargosample.domain.CargoDomainProtocol.{CargoPlanned, NewRouteSpecified}
 import io.cafienne.bounded.cargosample.projections.QueriesJsonProtocol.CargoViewItem
 import org.slf4j.LoggerFactory
 
-import scala.collection.parallel.mutable
 import scala.concurrent.Future
 
-class CargoViewProjectionWriter(actorSystem: ActorSystem, lmdbClient: LmdbClient)(implicit buildInfo: BuildInfo, runtimeInfo: RuntimeInfo)
+class CargoViewProjectionWriter(actorSystem: ActorSystem, lmdbClient: LmdbClient)
     extends AbstractReplayableEventMaterializer(actorSystem) {
 
   /**
@@ -30,7 +28,7 @@ class CargoViewProjectionWriter(actorSystem: ActorSystem, lmdbClient: LmdbClient
     */
   override val matMappingName: String = "cargo-view"
 
-  override lazy val logger: Logger = Logger(LoggerFactory.getLogger(CargoViewProjectionWriter.getClass))
+  override lazy val logger: Logger = Logger(LoggerFactory.getLogger(CargoViewProjectionWriter.this.getClass))
 
   override def handleReplayEvent(evt: Any): Future[Done] = handleEvent(evt)
 
@@ -72,4 +70,4 @@ class CargoViewProjectionWriter(actorSystem: ActorSystem, lmdbClient: LmdbClient
 
 }
 
-object CargoViewProjectionWriter
+//object CargoViewProjectionWriter

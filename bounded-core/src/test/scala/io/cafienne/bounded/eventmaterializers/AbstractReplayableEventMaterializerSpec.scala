@@ -64,7 +64,7 @@ class AbstractReplayableEventMaterializerSpec extends WordSpec with Matchers wit
     "materialize all given events" in {
       val materializer = new TestMaterializer(DefaultCompatibility)
 
-      val toBeRun      = new EventMaterializers(List(materializer))
+      val toBeRun = new EventMaterializers(List(materializer))
       whenReady(toBeRun.startUp(false)) { replayResult =>
         logger.debug("replayResult: {}", replayResult)
         assert(replayResult.head.offset == Some(Sequence(6L)))
@@ -74,7 +74,7 @@ class AbstractReplayableEventMaterializerSpec extends WordSpec with Matchers wit
     "materialize all events within the current runtime and all versions" in {
       val materializer = new TestMaterializer(Compatibility(RuntimeCompatibility.CURRENT, VersionCompatibility.ALL))
 
-      val toBeRun      = new EventMaterializers(List(materializer))
+      val toBeRun = new EventMaterializers(List(materializer))
       whenReady(toBeRun.startUp(false)) { replayResult =>
         logger.debug("replayResult: {}", replayResult)
         assert(replayResult.head.offset == Some(Sequence(3L)))
@@ -84,7 +84,7 @@ class AbstractReplayableEventMaterializerSpec extends WordSpec with Matchers wit
     "materialize all events of all runtimes and the current version" in {
       val materializer = new TestMaterializer(Compatibility(RuntimeCompatibility.ALL, VersionCompatibility.CURRENT))
 
-      val toBeRun      = new EventMaterializers(List(materializer))
+      val toBeRun = new EventMaterializers(List(materializer))
       whenReady(toBeRun.startUp(false)) { replayResult =>
         logger.debug("replayResult: {}", replayResult)
         assert(replayResult.head.offset == Some(Sequence(2L)))
@@ -94,7 +94,7 @@ class AbstractReplayableEventMaterializerSpec extends WordSpec with Matchers wit
     "materialize all events of the current runtime and the current version" in {
       val materializer = new TestMaterializer(Compatibility(RuntimeCompatibility.CURRENT, VersionCompatibility.CURRENT))
 
-      val toBeRun      = new EventMaterializers(List(materializer))
+      val toBeRun = new EventMaterializers(List(materializer))
       whenReady(toBeRun.startUp(false)) { replayResult =>
         logger.debug("replayResult: {}", replayResult)
         assert(replayResult.head.offset == Some(Sequence(1L)))
@@ -102,9 +102,10 @@ class AbstractReplayableEventMaterializerSpec extends WordSpec with Matchers wit
     }
 
     "materialize all events of the current runtime and till current version" in {
-      val materializer = new TestMaterializer(Compatibility(RuntimeCompatibility.CURRENT, VersionCompatibility.TILL_DATE))
+      val materializer =
+        new TestMaterializer(Compatibility(RuntimeCompatibility.CURRENT, VersionCompatibility.TILL_DATE))
 
-      val toBeRun      = new EventMaterializers(List(materializer))
+      val toBeRun = new EventMaterializers(List(materializer))
       whenReady(toBeRun.startUp(false)) { replayResult =>
         logger.debug("replayResult: {}", replayResult)
         assert(replayResult.head.offset == Some(Sequence(2L)))
@@ -114,7 +115,7 @@ class AbstractReplayableEventMaterializerSpec extends WordSpec with Matchers wit
     "materialize all events of all runtimes and till current version" in {
       val materializer = new TestMaterializer(Compatibility(RuntimeCompatibility.ALL, VersionCompatibility.TILL_DATE))
 
-      val toBeRun      = new EventMaterializers(List(materializer))
+      val toBeRun = new EventMaterializers(List(materializer))
       whenReady(toBeRun.startUp(false)) { replayResult =>
         logger.debug("replayResult: {}", replayResult)
         assert(replayResult.head.offset == Some(Sequence(4L)))
@@ -150,7 +151,8 @@ class AbstractReplayableEventMaterializerSpec extends WordSpec with Matchers wit
     TestKit.shutdownActorSystem(system, 30.seconds, verifySystemShutdown = true)
   }
 
-  class TestMaterializer(compatible: Compatibility) extends AbstractReplayableEventMaterializer(system, false, compatible) {
+  class TestMaterializer(compatible: Compatibility)
+      extends AbstractReplayableEventMaterializer(system, false, compatible) {
 
     var storedEvents = Seq[DomainEvent]()
 
