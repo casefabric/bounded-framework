@@ -8,20 +8,16 @@ import akka.Done
 import akka.actor.ActorSystem
 import io.cafienne.bounded.eventmaterializers.AbstractReplayableEventMaterializer
 import com.typesafe.scalalogging.Logger
+import io.cafienne.bounded.{BuildInfo, RuntimeInfo}
 import io.cafienne.bounded.cargosample.domain.Cargo
-import io.cafienne.bounded.cargosample.domain.CargoDomainProtocol.{
-  CargoId,
-  CargoNotFound,
-  CargoPlanned,
-  NewRouteSpecified
-}
+import io.cafienne.bounded.cargosample.domain.CargoDomainProtocol.{CargoId, CargoNotFound, CargoPlanned, NewRouteSpecified}
 import io.cafienne.bounded.cargosample.projections.QueriesJsonProtocol.CargoViewItem
 import org.slf4j.LoggerFactory
 
 import scala.collection.parallel.mutable
 import scala.concurrent.Future
 
-class CargoViewProjectionWriter(actorSystem: ActorSystem, lmdbClient: LmdbClient)
+class CargoViewProjectionWriter(actorSystem: ActorSystem, lmdbClient: LmdbClient)(implicit buildInfo: BuildInfo, runtimeInfo: RuntimeInfo)
     extends AbstractReplayableEventMaterializer(actorSystem) {
 
   /**

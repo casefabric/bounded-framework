@@ -8,7 +8,7 @@ import akka.{Done, NotUsed}
 import akka.actor.ActorSystem
 import akka.persistence.query.{EventEnvelope, Offset}
 import akka.stream.scaladsl.Source
-import io.cafienne.bounded.{Compatibility, DefaultCompatibility}
+import io.cafienne.bounded.{BuildInfo, Compatibility, DefaultCompatibility, RuntimeInfo}
 
 import scala.concurrent.Future
 
@@ -16,7 +16,7 @@ abstract class AbstractReplayableEventMaterializer(
   actorSystem: ActorSystem,
   withPartialReplay: Boolean = true,
   compatible: Compatibility = DefaultCompatibility
-) extends AbstractEventMaterializer(actorSystem, withPartialReplay, compatible)
+)(implicit buildInfo: BuildInfo, runtimeInfo: RuntimeInfo) extends AbstractEventMaterializer(actorSystem, withPartialReplay, compatible)
     with ResumableReplayable {
 
   import EventMaterializerExecutionContext._
@@ -48,7 +48,7 @@ abstract class AbstractReplayableEventMaterializer(
 
     var eventsReplayed = 0
     val source: Source[EventEnvelope, NotUsed] =
-      journal.currentEventsByTag(tagName, targetOffset)
+      journal.currentEventsByTag(tagName, targetOffset).filter(eventEnvelope => eventFilter(eventEnvelope))
     source
       .runFoldAsync(targetOffset) {
         case (previousOffset, EventEnvelope(offset, persistenceId, sequenceNo, evt)) =>

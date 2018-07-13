@@ -15,7 +15,8 @@ import io.cafienne.bounded.akka.ActorSystemProvider
 import io.cafienne.bounded.akka.persistence.ReadJournalProvider
 import io.cafienne.bounded.config.Configured
 import com.typesafe.scalalogging.Logger
-import io.cafienne.bounded.{Compatibility, DefaultCompatibility}
+import io.cafienne.bounded.aggregate.DomainEvent
+import io.cafienne.bounded._
 import io.cafienne.bounded.eventmaterializers.offsetstores.OffsetStore
 
 import scala.concurrent.{Await, Future}
@@ -38,7 +39,7 @@ abstract class AbstractEventMaterializer(
   actorSystem: ActorSystem,
   keepCurrentOffset: Boolean = true,
   compatible: Compatibility = DefaultCompatibility //TODO EventFilter + CompatibilityEventFilter + NoOpEventFilter
-) extends ActorSystemProvider
+)(implicit buildInfo: BuildInfo, runtimeInfo: RuntimeInfo) extends ActorSystemProvider
     with ReadJournalProvider
     with OffsetStore
     with Resumable
@@ -126,7 +127,16 @@ abstract class AbstractEventMaterializer(
   }
 
   //TODO EventFilter + CompatibilityEventFilter + NoOpEventFilter
-  private def eventFilter(evtEnvelope: EventEnvelope): Boolean = {
-    true
+  //TODO how to get the runtime and buildinfo in here in a friendly way
+  protected def eventFilter(evtEnvelope: EventEnvelope): Boolean = {
+    compatible match {
+      case Compatibility(RuntimeCompatibility.ALL, VersionCompatibility.ALL) => true
+      case Compatibility(RuntimeCompatibility.ALL, VersionCompatibility.TILL_DATE) => true
+      case Compatibility(RuntimeCompatibility.ALL, VersionCompatibility.CURRENT) => true
+      case Compatibility(RuntimeCompatibility.CURRENT, VersionCompatibility.ALL) =>
+        evtEnvelope.event.asInstanceOf[DomainEvent].metaData.runTimeInfo.id.equals(runtimeInfo.id)
+      case Compatibility(RuntimeCompatibility.CURRENT, VersionCompatibility.TILL_DATE) => true
+      case Compatibility(RuntimeCompatibility.CURRENT, VersionCompatibility.CURRENT) => true
+    }
   }
 }
