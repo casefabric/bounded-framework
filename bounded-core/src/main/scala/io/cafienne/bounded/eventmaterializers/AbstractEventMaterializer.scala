@@ -38,9 +38,8 @@ import scala.concurrent.duration._
 abstract class AbstractEventMaterializer(
   actorSystem: ActorSystem,
   keepCurrentOffset: Boolean = true,
-  compatible: Compatibility = DefaultCompatibility //TODO EventFilter + CompatibilityEventFilter + NoOpEventFilter
-)(implicit buildInfo: BuildInfo, runtimeInfo: RuntimeInfo)
-    extends ActorSystemProvider
+  materialzerEventFilter: MaterializerEventFilter = NoFilterEventFilter
+) extends ActorSystemProvider
     with ReadJournalProvider
     with OffsetStore
     with Resumable
@@ -101,7 +100,9 @@ abstract class AbstractEventMaterializer(
 
     val listenStartOffset = maybeStartOffset.getOrElse(Await.result(getOffset(viewIdentifier), 10.seconds))
     val source: Source[EventEnvelope, NotUsed] =
-      journal.eventsByTag(tagName, listenStartOffset).filter(eventEnvelope => eventFilter(eventEnvelope))
+      journal
+        .eventsByTag(tagName, listenStartOffset)
+        .filter(eventEnvelope => materialzerEventFilter.filter(eventEnvelope.event.asInstanceOf[DomainEvent]))
     val lastSnk = Sink.last[Offset]
     val answer = source
       .mapAsync(1) {
@@ -125,19 +126,5 @@ abstract class AbstractEventMaterializer(
       .toMat(lastSnk)(Keep.both)
 
     answer.run()
-  }
-
-  //TODO EventFilter + CompatibilityEventFilter + NoOpEventFilter
-  //TODO how to get the runtime and buildinfo in here in a friendly way
-  protected def eventFilter(evtEnvelope: EventEnvelope): Boolean = {
-    compatible match {
-      case Compatibility(RuntimeCompatibility.ALL, VersionCompatibility.ALL)       => true
-      case Compatibility(RuntimeCompatibility.ALL, VersionCompatibility.TILL_DATE) => true
-      case Compatibility(RuntimeCompatibility.ALL, VersionCompatibility.CURRENT)   => true
-      case Compatibility(RuntimeCompatibility.CURRENT, VersionCompatibility.ALL) =>
-        evtEnvelope.event.asInstanceOf[DomainEvent].metaData.runTimeInfo.id.equals(runtimeInfo.id)
-      case Compatibility(RuntimeCompatibility.CURRENT, VersionCompatibility.TILL_DATE) => true
-      case Compatibility(RuntimeCompatibility.CURRENT, VersionCompatibility.CURRENT)   => true
-    }
   }
 }

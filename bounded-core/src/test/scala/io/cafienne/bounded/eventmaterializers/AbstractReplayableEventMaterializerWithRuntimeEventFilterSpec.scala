@@ -29,7 +29,11 @@ case class TestedEvent(metaData: MetaData, text: String) extends DomainEvent {
   }
 }
 
-class AbstractReplayableEventMaterializerSpec extends WordSpec with Matchers with ScalaFutures with BeforeAndAfterAll {
+class AbstractReplayableEventMaterializerWithRuntimeEventFilterSpec
+    extends WordSpec
+    with Matchers
+    with ScalaFutures
+    with BeforeAndAfterAll {
 
   //Setup required supporting classes
   implicit val timeout                = Timeout(10.seconds)
@@ -151,8 +155,12 @@ class AbstractReplayableEventMaterializerSpec extends WordSpec with Matchers wit
     TestKit.shutdownActorSystem(system, 30.seconds, verifySystemShutdown = true)
   }
 
-  class TestMaterializer(compatible: Compatibility)
-      extends AbstractReplayableEventMaterializer(system, false, compatible) {
+  class TestMaterializer(compatible: Compatibility)(implicit buildInfo: BuildInfo, runtimeInfo: RuntimeInfo)
+      extends AbstractReplayableEventMaterializer(
+        system,
+        false,
+        new RuntimeAndVersionMaterializerEventFilter(buildInfo, runtimeInfo, compatible)
+      ) {
 
     var storedEvents = Seq[DomainEvent]()
 
