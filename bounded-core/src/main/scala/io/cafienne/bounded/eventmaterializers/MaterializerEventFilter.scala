@@ -28,6 +28,7 @@ trait MaterializerEventFilter {
   * @param buildInfo Current build of the executing runtime
   * @param runtimeInfo Current indicator of the running system
   * @param compatible rules for compatibility to be used in the Event Materializer
+  *                   Note that the DefaultCompatibility basically has the same behaviour as the NoFilterEventFilter
   */
 class RuntimeAndVersionMaterializerEventFilter(
   buildInfo: BuildInfo,
@@ -38,12 +39,12 @@ class RuntimeAndVersionMaterializerEventFilter(
   override def filter(evt: DomainEvent): Boolean = {
     compatible match {
       case Compatibility(RuntimeCompatibility.ALL, VersionCompatibility.ALL)       => true
-      case Compatibility(RuntimeCompatibility.ALL, VersionCompatibility.TILL_DATE) => true
-      case Compatibility(RuntimeCompatibility.ALL, VersionCompatibility.CURRENT)   => true
+      case Compatibility(RuntimeCompatibility.ALL, VersionCompatibility.CURRENT)   =>
+        evt.metaData.buildInfo.version.equals(buildInfo.version)
       case Compatibility(RuntimeCompatibility.CURRENT, VersionCompatibility.ALL) =>
         evt.metaData.runTimeInfo.id.equals(runtimeInfo.id)
-      case Compatibility(RuntimeCompatibility.CURRENT, VersionCompatibility.TILL_DATE) => true
-      case Compatibility(RuntimeCompatibility.CURRENT, VersionCompatibility.CURRENT)   => true
+      case Compatibility(RuntimeCompatibility.CURRENT, VersionCompatibility.CURRENT)   =>
+        evt.metaData.buildInfo.version.equals(buildInfo.version) && evt.metaData.runTimeInfo.id.equals(runtimeInfo.id)
     }
   }
 }

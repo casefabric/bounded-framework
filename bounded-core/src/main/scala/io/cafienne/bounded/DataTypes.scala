@@ -36,7 +36,7 @@ object RuntimeCompatibility extends Enumeration {
 
 object VersionCompatibility extends Enumeration {
   type VersionCompatibility = Value
-  val ALL, CURRENT, TILL_DATE = Value
+  val ALL, CURRENT = Value
 }
 
 case class Compatibility(

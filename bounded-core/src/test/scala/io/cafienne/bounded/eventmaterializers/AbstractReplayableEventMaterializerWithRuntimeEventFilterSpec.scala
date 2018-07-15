@@ -105,27 +105,6 @@ class AbstractReplayableEventMaterializerWithRuntimeEventFilterSpec
       }
     }
 
-    "materialize all events of the current runtime and till current version" in {
-      val materializer =
-        new TestMaterializer(Compatibility(RuntimeCompatibility.CURRENT, VersionCompatibility.TILL_DATE))
-
-      val toBeRun = new EventMaterializers(List(materializer))
-      whenReady(toBeRun.startUp(false)) { replayResult =>
-        logger.debug("replayResult: {}", replayResult)
-        assert(replayResult.head.offset == Some(Sequence(2L)))
-      }
-    }
-
-    "materialize all events of all runtimes and till current version" in {
-      val materializer = new TestMaterializer(Compatibility(RuntimeCompatibility.ALL, VersionCompatibility.TILL_DATE))
-
-      val toBeRun = new EventMaterializers(List(materializer))
-      whenReady(toBeRun.startUp(false)) { replayResult =>
-        logger.debug("replayResult: {}", replayResult)
-        assert(replayResult.head.offset == Some(Sequence(4L)))
-      }
-    }
-
   }
 
   private def populateEventStore(evt: Seq[DomainEvent]): Unit = {
