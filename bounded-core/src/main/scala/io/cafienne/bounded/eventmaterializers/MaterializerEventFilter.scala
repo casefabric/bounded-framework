@@ -38,12 +38,12 @@ class RuntimeAndVersionMaterializerEventFilter(
 
   override def filter(evt: DomainEvent): Boolean = {
     compatible match {
-      case Compatibility(RuntimeCompatibility.ALL, VersionCompatibility.ALL)       => true
-      case Compatibility(RuntimeCompatibility.ALL, VersionCompatibility.CURRENT)   =>
+      case Compatibility(RuntimeCompatibility.ALL, VersionCompatibility.ALL) => true
+      case Compatibility(RuntimeCompatibility.ALL, VersionCompatibility.CURRENT) =>
         evt.metaData.buildInfo.version.equals(buildInfo.version)
       case Compatibility(RuntimeCompatibility.CURRENT, VersionCompatibility.ALL) =>
         evt.metaData.runTimeInfo.id.equals(runtimeInfo.id)
-      case Compatibility(RuntimeCompatibility.CURRENT, VersionCompatibility.CURRENT)   =>
+      case Compatibility(RuntimeCompatibility.CURRENT, VersionCompatibility.CURRENT) =>
         evt.metaData.buildInfo.version.equals(buildInfo.version) && evt.metaData.runTimeInfo.id.equals(runtimeInfo.id)
     }
   }

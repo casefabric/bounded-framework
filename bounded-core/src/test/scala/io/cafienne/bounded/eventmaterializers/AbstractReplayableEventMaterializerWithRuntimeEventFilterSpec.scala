@@ -96,8 +96,8 @@ class AbstractReplayableEventMaterializerWithRuntimeEventFilterSpec
       whenReady(toBeRun.startUp(false)) { replayResult =>
         logger.debug("replayResult: {}", replayResult)
         logger.debug("DUMP all runtimes, current version {} ", materializer.storedEvents)
-        //TODO check if the replay sequency should always be 6L (as all events are replayed)
-        //assert(replayResult.head.offset == Some(Sequence(2L)))
+      //TODO check if the replay sequency should always be 6L (as all events are replayed)
+      //assert(replayResult.head.offset == Some(Sequence(2L)))
       }
       logger.debug("DUMP all runtimes, current version {} ", materializer.storedEvents)
       assert(materializer.storedEvents.size == 2)
