@@ -10,6 +10,7 @@ import java.util.UUID
 import akka.actor.ActorSystem
 import akka.testkit.TestKit
 import akka.util.Timeout
+import io.cafienne.bounded.{BuildInfo, RuntimeInfo, UserContext, UserId}
 import io.cafienne.bounded.cargosample.domain.Cargo.CargoAggregateState
 import io.cafienne.bounded.cargosample.domain.CargoDomainProtocol._
 import io.cafienne.bounded.aggregate._
@@ -23,6 +24,10 @@ class CargoAggregateRootActorSpec extends AsyncWordSpec with Matchers with Befor
 
   implicit val timeout = Timeout(10.seconds) //dilated
   implicit val system  = ActorSystem("CargoTestSystem", SpecConfig.testConfigAkkaInMem)
+  implicit val buildInfo =
+    BuildInfo(io.cafienne.bounded.cargosample.BuildInfo.name, io.cafienne.bounded.cargosample.BuildInfo.version)
+//  implicit val runtimeInfo = RuntimeInfo(System.currentTimeMillis().toString)
+  implicit val runtimeInfo = RuntimeInfo("spec")
 
   //Creation of Aggregate Roots that make use of dependencies is organized via the Creator
   //as a separate class that contains the required dependencies.
@@ -34,7 +39,7 @@ class CargoAggregateRootActorSpec extends AsyncWordSpec with Matchers with Befor
 
     override def userId: UserId = userId1
   })
-  val metaData = MetaData(ZonedDateTime.now(ZoneOffset.UTC), userContext)
+  val metaData = CommandMetaData(ZonedDateTime.now(ZoneOffset.UTC), userContext)
 
   "CargoAggregateRoot" must {
 
@@ -51,7 +56,7 @@ class CargoAggregateRootActorSpec extends AsyncWordSpec with Matchers with Befor
         .given[Cargo, CargoAggregateState](cargoAggregateRootCreator, cargoId2)
         .when(PlanCargo(metaData, cargoId2, trackingId, routeSpecification))
 
-      ar.events should contain(CargoPlanned(metaData, cargoId2, trackingId, routeSpecification))
+      ar.events should contain(CargoPlanned(MetaData.fromCommand(metaData), cargoId2, trackingId, routeSpecification))
       val targetState = CargoAggregateState(trackingId, routeSpecification)
       ar.currentState map { state =>
         assert(state.get == targetState)
@@ -66,7 +71,7 @@ class CargoAggregateRootActorSpec extends AsyncWordSpec with Matchers with Befor
         Location("destination"),
         ZonedDateTime.parse("2018-03-03T10:15:30+01:00[Europe/Amsterdam]")
       )
-      val cargoPlannedEvent = CargoPlanned(metaData, cargoId3, trackingId, routeSpecification)
+      val cargoPlannedEvent = CargoPlanned(MetaData.fromCommand(metaData), cargoId3, trackingId, routeSpecification)
 
       val newRouteSpecification = RouteSpecification(
         Location("home"),
@@ -80,7 +85,7 @@ class CargoAggregateRootActorSpec extends AsyncWordSpec with Matchers with Befor
         .when(specifyNewRouteCommand)
 
       // You see that this only shows the events that are 'published' via when
-      ar.events should contain(NewRouteSpecified(metaData, cargoId3, newRouteSpecification))
+      ar.events should contain(NewRouteSpecified(MetaData.fromCommand(metaData), cargoId3, newRouteSpecification))
 
       val targetState = CargoAggregateState(trackingId, newRouteSpecification)
       ar.currentState map { state =>

@@ -2,17 +2,21 @@
  * Copyright (C) 2016-2018 Cafienne B.V. <https://www.cafienne.io/bounded>
  */
 
-package io.cafienne.bounded.akka.persistence.eventmaterializers
+package io.cafienne.bounded.eventmaterializers
 
 import akka.{Done, NotUsed}
 import akka.actor.ActorSystem
 import akka.persistence.query.{EventEnvelope, Offset}
 import akka.stream.scaladsl.Source
+import io.cafienne.bounded.aggregate.DomainEvent
 
 import scala.concurrent.Future
 
-abstract class AbstractReplayableEventMaterializer(actorSystem: ActorSystem, withPartialReplay: Boolean = true)
-    extends AbstractEventMaterializer(actorSystem, withPartialReplay)
+abstract class AbstractReplayableEventMaterializer(
+  actorSystem: ActorSystem,
+  withPartialReplay: Boolean = true,
+  materializerEventFilter: MaterializerEventFilter = NoFilterEventFilter
+) extends AbstractEventMaterializer(actorSystem, withPartialReplay, materializerEventFilter)
     with ResumableReplayable {
 
   import EventMaterializerExecutionContext._
@@ -44,7 +48,9 @@ abstract class AbstractReplayableEventMaterializer(actorSystem: ActorSystem, wit
 
     var eventsReplayed = 0
     val source: Source[EventEnvelope, NotUsed] =
-      journal.currentEventsByTag(tagName, targetOffset)
+      journal
+        .currentEventsByTag(tagName, targetOffset)
+        .filter(eventEnvelope => materializerEventFilter.filter(eventEnvelope.event.asInstanceOf[DomainEvent]))
     source
       .runFoldAsync(targetOffset) {
         case (previousOffset, EventEnvelope(offset, persistenceId, sequenceNo, evt)) =>

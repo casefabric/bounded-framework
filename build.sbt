@@ -1,3 +1,4 @@
+
 lazy val basicSettings = {
   val currentScalaVersion = "2.12.3"
   val scala211Version     = "2.11.11"
@@ -68,7 +69,7 @@ val boundedCore = (project in file("bounded-core"))
   .settings(basicSettings: _*)
   .settings(
     name := "bounded-core",
-    libraryDependencies ++= Dependencies.baseDeps ++ Dependencies.persistanceLmdbDBDeps)
+    libraryDependencies ++= Dependencies.baseDeps ++ Dependencies.persistanceLmdbDBDeps ++ Dependencies.testDeps)
 
 val boundedAkkaHttp = (project in file("bounded-akka-http"))
   .dependsOn(boundedCore)
@@ -89,6 +90,13 @@ val boundedTest = (project in file("bounded-test"))
 val cargoSample = (project in file("cargo-sample"))
   .dependsOn(boundedCore, boundedAkkaHttp, boundedTest)
   .enablePlugins(ReleasePlugin, AutomateHeaderPlugin)
+  .enablePlugins(BuildInfoPlugin)
+  .settings(
+    buildInfoKeys := Seq[BuildInfoKey](name, version, scalaVersion, sbtVersion),
+    buildInfoPackage := "io.cafienne.bounded.cargosample",
+    buildInfoOptions += BuildInfoOption.BuildTime,
+    buildInfoOptions += BuildInfoOption.ToMap
+  )
   .settings(basicSettings: _*)
   .settings(
     name := "cargo-sample",

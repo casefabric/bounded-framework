@@ -2,7 +2,7 @@
  * Copyright (C) 2016-2018 Cafienne B.V. <https://www.cafienne.io/bounded>
  */
 
-package io.cafienne.bounded.akka.persistence.eventmaterializers.offsetstores
+package io.cafienne.bounded.eventmaterializers.offsetstores
 
 import java.io.File
 import java.nio.ByteBuffer

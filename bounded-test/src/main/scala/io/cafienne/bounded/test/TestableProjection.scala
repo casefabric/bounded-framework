@@ -11,7 +11,7 @@ import akka.persistence.inmemory.extension.{InMemoryJournalStorage, InMemorySnap
 import akka.testkit.TestProbe
 import akka.util.Timeout
 import io.cafienne.bounded.aggregate._
-import io.cafienne.bounded.akka.persistence.eventmaterializers.{
+import io.cafienne.bounded.eventmaterializers.{
   AbstractEventMaterializer,
   EventMaterializers,
   EventProcessed,

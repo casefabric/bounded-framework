@@ -5,14 +5,16 @@
 package io.cafienne.bounded.cargosample
 
 import java.io.File
+import java.util.UUID
 
 import akka.actor.ActorSystem
 import akka.event.{Logging, LoggingAdapter}
 import akka.http.scaladsl.Http
 import akka.stream.ActorMaterializer
 import akka.util.Timeout
+import io.cafienne.bounded.RuntimeInfo
 import io.cafienne.bounded.aggregate.DefaultCommandGateway
-import io.cafienne.bounded.akka.persistence.eventmaterializers._
+import io.cafienne.bounded.eventmaterializers._
 import io.cafienne.bounded.cargosample.domain.{CargoCreator, FixedLocationsProvider}
 import io.cafienne.bounded.cargosample.httpapi.HttpApiEndpoint
 import io.cafienne.bounded.cargosample.projections.{CargoLmdbClient, CargoQueriesImpl, CargoViewProjectionWriter}
@@ -25,6 +27,10 @@ object Boot extends App with Configured {
   implicit val system       = ActorSystem("cargo-service")
   implicit val materializer = ActorMaterializer()
   implicit val http         = Http()
+  implicit val buildInfo = io.cafienne.bounded
+    .BuildInfo(io.cafienne.bounded.cargosample.BuildInfo.name, io.cafienne.bounded.cargosample.BuildInfo.version)
+  //Ensure that this running process in uniquely identifiable.
+  implicit val runtimeInfo = RuntimeInfo(UUID.randomUUID().toString)
 
   import system.dispatcher
   import scala.concurrent.duration._

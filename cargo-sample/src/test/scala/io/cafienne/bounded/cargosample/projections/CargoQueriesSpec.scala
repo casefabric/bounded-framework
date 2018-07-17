@@ -11,10 +11,11 @@ import java.util.UUID
 import akka.actor.ActorSystem
 import akka.event.{Logging, LoggingAdapter}
 import akka.persistence.query.Sequence
-import akka.testkit.{TestKit, _}
+import akka.testkit.TestKit
 import akka.util.Timeout
-import io.cafienne.bounded.aggregate.{MetaData, UserContext, UserId}
-import io.cafienne.bounded.akka.persistence.eventmaterializers.{OffsetStoreProvider, ReadJournalOffsetStore}
+import io.cafienne.bounded.aggregate.{CommandMetaData, MetaData}
+import io.cafienne.bounded.{BuildInfo, RuntimeInfo, UserContext, UserId}
+import io.cafienne.bounded.eventmaterializers.OffsetStoreProvider
 import io.cafienne.bounded.cargosample.SpecConfig
 import io.cafienne.bounded.cargosample.domain.CargoDomainProtocol._
 import io.cafienne.bounded.cargosample.projections.QueriesJsonProtocol.CargoViewItem
@@ -32,6 +33,9 @@ class CargoQueriesSpec extends WordSpec with Matchers with ScalaFutures with Bef
   implicit val system                 = ActorSystem("CargoTestSystem", SpecConfig.testConfigDVriendInMem)
   implicit val logger: LoggingAdapter = Logging(system, getClass)
   implicit val defaultPatience        = PatienceConfig(timeout = Span(4, Seconds), interval = Span(100, Millis))
+  implicit val buildInfo =
+    BuildInfo(io.cafienne.bounded.cargosample.BuildInfo.name, io.cafienne.bounded.cargosample.BuildInfo.version)
+  implicit val runtimeInfo = RuntimeInfo(System.currentTimeMillis().toString)
 
   //Create test data
   val expectedDeliveryTime = ZonedDateTime.parse("2018-01-01T17:43:00+01:00")
@@ -44,8 +48,8 @@ class CargoQueriesSpec extends WordSpec with Matchers with ScalaFutures with Bef
     override def userId: UserId = userId1
   })
 
-  val metaData  = MetaData(expectedDeliveryTime, None)
-  val metaData2 = MetaData(expectedDeliveryTime, userContext)
+  val metaData  = CommandMetaData(expectedDeliveryTime, None)
+  val metaData2 = CommandMetaData(expectedDeliveryTime, userContext)
 
   val cargoId1           = CargoId(UUID.fromString("93ea7372-3181-11e7-93ae-92361f002671"))
   val cargoId2           = CargoId(UUID.fromString("93ea7372-3181-11e7-93ae-92361f002672"))
@@ -61,7 +65,7 @@ class CargoQueriesSpec extends WordSpec with Matchers with ScalaFutures with Bef
 
   "Cargo Query" must {
     "add and retrieve valid cargo based on replay" in {
-      val evt1    = CargoPlanned(metaData, cargoId1, trackingId, routeSpecification)
+      val evt1    = CargoPlanned(MetaData.fromCommand(metaData), cargoId1, trackingId, routeSpecification)
       val fixture = TestableProjection.given(Seq(evt1))
 
       whenReady(fixture.startProjection(cargoWriter)) { replayResult =>
@@ -74,7 +78,7 @@ class CargoQueriesSpec extends WordSpec with Matchers with ScalaFutures with Bef
       }
     }
     "add and retrieve an update on valid cargo based on new event after replay" in {
-      val evt1    = CargoPlanned(metaData, cargoId1, trackingId, routeSpecification)
+      val evt1    = CargoPlanned(MetaData.fromCommand(metaData), cargoId1, trackingId, routeSpecification)
       val fixture = TestableProjection.given(Seq(evt1))
 
       whenReady(fixture.startProjection(cargoWriter)) { replayResult =>
@@ -82,7 +86,11 @@ class CargoQueriesSpec extends WordSpec with Matchers with ScalaFutures with Bef
         assert(replayResult.offset == Some(Sequence(1L)))
       }
 
-      val evt2 = NewRouteSpecified(metaData, cargoId1, routeSpecification.copy(destination = Location("Oslo")))
+      val evt2 = NewRouteSpecified(
+        MetaData.fromCommand(metaData),
+        cargoId1,
+        routeSpecification.copy(destination = Location("Oslo"))
+      )
       fixture.addEvent(evt2)
       whenReady(cargoQueries.getCargo(cargoId1)) { cargo =>
         cargo should be(Some(CargoViewItem(cargoId1, "Amsterdam", "Oslo", expectedDeliveryTime)))

@@ -2,13 +2,13 @@
  * Copyright (C) 2016-2018 Cafienne B.V. <https://www.cafienne.io/bounded>
  */
 
-package io.cafienne.bounded.akka.persistence.eventmaterializers
+package io.cafienne.bounded.eventmaterializers
 
 import akka.Done
 import akka.persistence.query.Offset
 import com.typesafe.config.Config
 import io.cafienne.bounded.akka.ActorSystemProvider
-import io.cafienne.bounded.akka.persistence.eventmaterializers.offsetstores.{
+import io.cafienne.bounded.eventmaterializers.offsetstores.{
   InMemoryBasedOffsetStore,
   LmdbConfig,
   LmdbOffsetStore,

@@ -2,7 +2,7 @@
  * Copyright (C) 2016-2018 Cafienne B.V. <https://www.cafienne.io/bounded>
  */
 
-package io.cafienne.bounded.akka.persistence.eventmaterializers
+package io.cafienne.bounded.eventmaterializers
 
 import java.util.UUID
 
@@ -15,7 +15,9 @@ import io.cafienne.bounded.akka.ActorSystemProvider
 import io.cafienne.bounded.akka.persistence.ReadJournalProvider
 import io.cafienne.bounded.config.Configured
 import com.typesafe.scalalogging.Logger
-import io.cafienne.bounded.akka.persistence.eventmaterializers.offsetstores.OffsetStore
+import io.cafienne.bounded.aggregate.DomainEvent
+import io.cafienne.bounded._
+import io.cafienne.bounded.eventmaterializers.offsetstores.OffsetStore
 
 import scala.concurrent.{Await, Future}
 import scala.concurrent.duration._
@@ -30,9 +32,14 @@ import scala.concurrent.duration._
   *
   * @param actorSystem
   * @param keepCurrentOffset Set this to false if current offset must not be stored.
+  * @param compatible indicate what events this materializer should process.
+  *                   @see io.cafienne.bounded.Compatibility for more info
   */
-abstract class AbstractEventMaterializer(actorSystem: ActorSystem, keepCurrentOffset: Boolean = true)
-    extends ActorSystemProvider
+abstract class AbstractEventMaterializer(
+  actorSystem: ActorSystem,
+  keepCurrentOffset: Boolean = true,
+  materialzerEventFilter: MaterializerEventFilter = NoFilterEventFilter
+) extends ActorSystemProvider
     with ReadJournalProvider
     with OffsetStore
     with Resumable
@@ -76,9 +83,8 @@ abstract class AbstractEventMaterializer(actorSystem: ActorSystem, keepCurrentOf
   /**
     * Publish an event on the AKKA eventbus after the event is processed.
     */
-  val isPublishRequired: Boolean = if (actorSystem.settings.config.hasPath("bounded.eventmaterializers.publish")) {
-    actorSystem.settings.config.getBoolean("bounded.eventmaterializers.publish")
-  } else false
+  val isPublishRequired: Boolean =
+    Option(actorSystem.settings.config.getBoolean("bounded.eventmaterializers.publish")).getOrElse(false)
 
   /**
     * Register listener for events. Should be registered *after* replay is finished
@@ -94,7 +100,9 @@ abstract class AbstractEventMaterializer(actorSystem: ActorSystem, keepCurrentOf
 
     val listenStartOffset = maybeStartOffset.getOrElse(Await.result(getOffset(viewIdentifier), 10.seconds))
     val source: Source[EventEnvelope, NotUsed] =
-      journal.eventsByTag(tagName, listenStartOffset)
+      journal
+        .eventsByTag(tagName, listenStartOffset)
+        .filter(eventEnvelope => materialzerEventFilter.filter(eventEnvelope.event.asInstanceOf[DomainEvent]))
     val lastSnk = Sink.last[Offset]
     val answer = source
       .mapAsync(1) {
