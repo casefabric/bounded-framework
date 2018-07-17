@@ -10,6 +10,7 @@ import java.time.temporal.ChronoUnit
 import java.util.UUID
 
 import io.cafienne.bounded._
+import io.cafienne.bounded.eventmaterializers.{Compatibility, RuntimeCompatibility}
 import spray.json._
 
 object ProtocolJsonProtocol extends DefaultJsonProtocol {
@@ -17,8 +18,7 @@ object ProtocolJsonProtocol extends DefaultJsonProtocol {
   implicit val BuildInfoJsonFormat            = jsonFormat2(BuildInfo)
   implicit val RuntimeInfoJsonFormat          = jsonFormat1(RuntimeInfo)
   implicit val RuntimeCompatibilityJsonFormat = jsonEnum(RuntimeCompatibility)
-  implicit val VersionCompatibilityJsonFormat = jsonEnum(VersionCompatibility)
-  implicit val CompatibilityJsonFormat        = jsonFormat2(Compatibility)
+  implicit val CompatibilityJsonFormat        = jsonFormat1(Compatibility)
 
   def jsonEnum[T <: Enumeration](enu: T): JsonFormat[T#Value] =
     new JsonFormat[T#Value] {

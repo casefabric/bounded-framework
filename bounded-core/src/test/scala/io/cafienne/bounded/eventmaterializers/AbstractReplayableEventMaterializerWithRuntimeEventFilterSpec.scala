@@ -62,7 +62,7 @@ class AbstractReplayableEventMaterializerWithRuntimeEventFilterSpec
     TestedEvent(currentMeta.copy(buildInfo = previousBuild, runTimeInfo = otherRuntime), "previous-other"),
     TestedEvent(currentMeta.copy(buildInfo = futureBuild, runTimeInfo = otherRuntime), "future-other")
   )
-  //TODO the metadata specifies build - runtime but specifies runtime - build => make this consistent
+
   "The Event Materializer" must {
 
     "materialize all given events" in {
@@ -77,8 +77,8 @@ class AbstractReplayableEventMaterializerWithRuntimeEventFilterSpec
       assert(materializer.storedEvents.size == 6)
     }
 
-    "materialize all events within the current runtime and all versions" in {
-      val materializer = new TestMaterializer(Compatibility(RuntimeCompatibility.CURRENT, VersionCompatibility.ALL))
+    "materialize all events within the current runtime" in {
+      val materializer = new TestMaterializer(Compatibility(RuntimeCompatibility.CURRENT))
 
       val toBeRun = new EventMaterializers(List(materializer))
       whenReady(toBeRun.startUp(false)) { replayResult =>
@@ -87,32 +87,6 @@ class AbstractReplayableEventMaterializerWithRuntimeEventFilterSpec
       }
       logger.debug("DUMP current runtime and all versions {}", materializer.storedEvents)
       assert(materializer.storedEvents.size == 3)
-    }
-
-    "materialize all events of all runtimes and the current version" in {
-      val materializer = new TestMaterializer(Compatibility(RuntimeCompatibility.ALL, VersionCompatibility.CURRENT))
-
-      val toBeRun = new EventMaterializers(List(materializer))
-      whenReady(toBeRun.startUp(false)) { replayResult =>
-        logger.debug("replayResult: {}", replayResult)
-        logger.debug("DUMP all runtimes, current version {} ", materializer.storedEvents)
-      //TODO check if the replay sequency should always be 6L (as all events are replayed)
-      //assert(replayResult.head.offset == Some(Sequence(2L)))
-      }
-      logger.debug("DUMP all runtimes, current version {} ", materializer.storedEvents)
-      assert(materializer.storedEvents.size == 2)
-    }
-
-    "materialize all events of the current runtime and the current version" in {
-      val materializer = new TestMaterializer(Compatibility(RuntimeCompatibility.CURRENT, VersionCompatibility.CURRENT))
-
-      val toBeRun = new EventMaterializers(List(materializer))
-      whenReady(toBeRun.startUp(false)) { replayResult =>
-        logger.debug("replayResult: {}", replayResult)
-        assert(replayResult.head.offset == Some(Sequence(1L)))
-      }
-      logger.debug("DUMP current runtime and version {}", materializer.storedEvents)
-      assert(materializer.storedEvents.size == 1)
     }
 
   }
@@ -144,11 +118,11 @@ class AbstractReplayableEventMaterializerWithRuntimeEventFilterSpec
     TestKit.shutdownActorSystem(system, 30.seconds, verifySystemShutdown = true)
   }
 
-  class TestMaterializer(compatible: Compatibility)(implicit buildInfo: BuildInfo, runtimeInfo: RuntimeInfo)
+  class TestMaterializer(compatible: Compatibility)(implicit runtimeInfo: RuntimeInfo)
       extends AbstractReplayableEventMaterializer(
         system,
         false,
-        new RuntimeAndVersionMaterializerEventFilter(buildInfo, runtimeInfo, compatible)
+        new RuntimeMaterializerEventFilter(runtimeInfo, compatible)
       ) {
 
     var storedEvents = Seq[DomainEvent]()

@@ -131,7 +131,6 @@ class TestableAggregateRoot[A <: AggregateRootActor[B], B <: AggregateState[B]: 
     * @return This initialized TestableAggregateRoot that processed the command.
     */
   def when(command: DomainCommand): TestableAggregateRoot[A, B] = {
-    //TODO IT maybe a better idea to actually return the results in a testable matter. (HOW?)
     if (command.aggregateRootId != id)
       throw new IllegalArgumentException(
         s"Command for Aggregate Root ${command.aggregateRootId} cannot be handled by this aggregate root with id $id"

@@ -5,6 +5,7 @@
 package io.cafienne.bounded.cargosample
 
 import java.io.File
+import java.util.UUID
 
 import akka.actor.ActorSystem
 import akka.event.{Logging, LoggingAdapter}
@@ -28,7 +29,8 @@ object Boot extends App with Configured {
   implicit val http         = Http()
   implicit val buildInfo = io.cafienne.bounded
     .BuildInfo(io.cafienne.bounded.cargosample.BuildInfo.name, io.cafienne.bounded.cargosample.BuildInfo.version)
-  implicit val runtimeInfo = RuntimeInfo("changeme") //TODO change this
+  //Ensure that this running process in uniquely identifiable.
+  implicit val runtimeInfo = RuntimeInfo(UUID.randomUUID().toString)
 
   import system.dispatcher
   import scala.concurrent.duration._
