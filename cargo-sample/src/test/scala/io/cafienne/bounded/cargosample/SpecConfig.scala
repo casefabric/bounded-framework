@@ -109,7 +109,7 @@ object SpecConfig {
       |       publish-confirmations = on
       |       publish-plugin-commands = on
       |       journal {
-      |          plugin = "akka.persistence.journal.inmem"
+      |          plugin = "inmemory-journal"
       |       }
       |      }
       |      test {

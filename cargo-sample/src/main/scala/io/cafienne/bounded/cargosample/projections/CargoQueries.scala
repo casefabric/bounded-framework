@@ -11,6 +11,6 @@ import scala.concurrent.Future
 trait CargoQueries {
   import QueriesJsonProtocol._
 
-  def getCargo(cargoId: CargoId): Future[Option[CargoViewItem]]
+  def getCargo(cargoId: CargoId): Option[CargoViewItem]
 
 }

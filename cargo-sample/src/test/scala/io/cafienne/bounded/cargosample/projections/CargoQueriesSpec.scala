@@ -73,9 +73,9 @@ class CargoQueriesSpec extends WordSpec with Matchers with ScalaFutures with Bef
         assert(replayResult.offset == Some(Sequence(1L)))
       }
 
-      whenReady(cargoQueries.getCargo(cargoId1)) { cargo =>
-        cargo should be(Some(CargoViewItem(cargoId1, "Amsterdam", "New York", expectedDeliveryTime)))
-      }
+      cargoQueries.getCargo(cargoId1) should be(
+        Some(CargoViewItem(cargoId1, "Amsterdam", "New York", expectedDeliveryTime))
+      )
     }
     "add and retrieve an update on valid cargo based on new event after replay" in {
       val evt1    = CargoPlanned(MetaData.fromCommand(metaData), cargoId1, trackingId, routeSpecification)
@@ -92,10 +92,9 @@ class CargoQueriesSpec extends WordSpec with Matchers with ScalaFutures with Bef
         routeSpecification.copy(destination = Location("Oslo"))
       )
       fixture.addEvent(evt2)
-      whenReady(cargoQueries.getCargo(cargoId1)) { cargo =>
-        cargo should be(Some(CargoViewItem(cargoId1, "Amsterdam", "Oslo", expectedDeliveryTime)))
-      }
-
+      cargoQueries.getCargo(cargoId1) should be(
+        Some(CargoViewItem(cargoId1, "Amsterdam", "Oslo", expectedDeliveryTime))
+      )
     }
   }
 

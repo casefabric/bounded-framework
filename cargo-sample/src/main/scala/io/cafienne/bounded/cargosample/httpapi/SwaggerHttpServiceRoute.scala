@@ -4,7 +4,7 @@
 
 package io.cafienne.bounded.cargosample.httpapi
 
-import akka.actor._
+import akka.actor.ActorSystem
 import akka.stream.ActorMaterializer
 import com.github.swagger.akka._
 import com.github.swagger.akka.model.Info

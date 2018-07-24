@@ -71,24 +71,9 @@ class CargoRoute(commandGateway: CommandGateway, cargoQueries: CargoQueries)(imp
     get {
       path("cargo" / PathMatchers.JavaUUID) { id =>
         val cargoId = CargoId(id)
-        onComplete(cargoQueries.getCargo(cargoId)) {
-          case Success(cargoResponse) if cargoResponse.isDefined =>
-            complete(StatusCodes.OK -> cargoResponse)
-          case Success(cargoResponse) =>
-            complete(StatusCodes.NotFound -> ErrorResponse(s"Cargo with id $cargoId is not found"))
-          case Failure(err) => {
-            err match {
-              case ex: Throwable =>
-                complete(
-                  StatusCodes.InternalServerError -> ErrorResponse(
-                    ex.getMessage + Option(ex.getCause)
-                      .map(t => s" due to ${t.getMessage}")
-                      .getOrElse("")
-                  )
-                )
-            }
-          }
-          case _ => complete(StatusCodes.NoContent)
+        cargoQueries.getCargo(cargoId) match {
+          case Some(cargoResponse) => complete(StatusCodes.OK       -> cargoResponse)
+          case None                => complete(StatusCodes.NotFound -> ErrorResponse(s"Cargo with id $cargoId is not found"))
         }
       }
     }
