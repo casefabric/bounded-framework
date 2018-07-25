@@ -62,7 +62,7 @@ lazy val boundedRoot = (project in file("."))
   .settings(publishArtifact := false)
   .enablePlugins(AutomateHeaderPlugin)
   //.settings(releaseSettings)
-  .aggregate(boundedCore, boundedAkkaHttp, boundedTest, cargoSample)
+  .aggregate(boundedCore, boundedAkkaHttp, boundedTest)
 
 val boundedCore = (project in file("bounded-core"))
   .enablePlugins(ReleasePlugin, AutomateHeaderPlugin)
@@ -87,17 +87,3 @@ val boundedTest = (project in file("bounded-test"))
     name := "bounded-test",
     libraryDependencies ++= Dependencies.testDeps)
 
-val cargoSample = (project in file("cargo-sample"))
-  .dependsOn(boundedCore, boundedAkkaHttp, boundedTest)
-  .enablePlugins(ReleasePlugin, AutomateHeaderPlugin)
-  .enablePlugins(BuildInfoPlugin)
-  .settings(
-    buildInfoKeys := Seq[BuildInfoKey](name, version, scalaVersion, sbtVersion),
-    buildInfoPackage := "io.cafienne.bounded.cargosample",
-    buildInfoOptions += BuildInfoOption.BuildTime,
-    buildInfoOptions += BuildInfoOption.ToMap
-  )
-  .settings(basicSettings: _*)
-  .settings(
-    name := "cargo-sample",
-    libraryDependencies ++= Dependencies.akkaHttpDeps ++ Dependencies.testDeps ++ Dependencies.persistenceLevelDBDeps)
