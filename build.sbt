@@ -1,7 +1,7 @@
 
 lazy val basicSettings = {
-  val currentScalaVersion = "2.12.3"
-  val scala211Version     = "2.11.11"
+  val currentScalaVersion = "2.12.6"
+  val scala211Version     = "2.11.12"
 
   Seq(
     organization := "io.cafienne.bounded",

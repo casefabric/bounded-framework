@@ -15,3 +15,11 @@ The setup as written by [Leonard Ehrenfried](https://leonard.io/blog/2017/01/an-
 
 Release command = sbt +publishSigned 
 This will release for 2.12. Via oss.sonatype.org you need to 'Close' the uploaded packages and thereafter 'Release' them.
+
+# Release notes
+
+# 0.1.1 
+Improvements for TestableAggregateRoot. When a command cannot be handled a CommandHandlingException is thrown. 
+When a command should not be handled by this aggregate root an IllegalCommandException is thrown
+
+

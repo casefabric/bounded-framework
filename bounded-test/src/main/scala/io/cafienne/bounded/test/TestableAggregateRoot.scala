@@ -6,8 +6,9 @@ package io.cafienne.bounded.test
 
 import java.util.concurrent.atomic.AtomicInteger
 
+import io.cafienne.bounded.test.TestableAggregateRoot.{CommandHandlingException, IllegalCommandException}
+
 import scala.reflect.ClassTag
-//import scala.reflect.runtime.universe
 import akka.actor._
 import akka.pattern.ask
 import akka.testkit.TestProbe
@@ -37,6 +38,9 @@ import scala.concurrent.duration.Duration
   * }}}
   */
 object TestableAggregateRoot {
+
+  case class CommandHandlingException(msg: String) extends Exception(msg)
+  case class IllegalCommandException(msg: String)  extends Exception(msg)
 
   /** Construct a test for a specific aggregate root that has a specific initial state
     *
@@ -90,37 +94,27 @@ class TestableAggregateRoot[A <: AggregateRootActor[B], B <: AggregateState[B]: 
   ctag: reflect.ClassTag[A]
 ) {
 
+  implicit val duration: Duration              = timeout.duration
+  private var handledEvents: List[DomainEvent] = List.empty
+
   import TestableAggregateRoot.testId
   final val arTestId = testId(id)
 
-  private val storeEventsActor =
-    system.actorOf(Props(classOf[CreateEventsInStoreActor], arTestId), "create-events-actor")
-  private var handledEvents: List[DomainEvent] = List.empty
+  if (evt != null && evt.nonEmpty) storeEvents(evt)
+  // Start the Aggregate Root and replay to initial state
+  private val aggregateRootActor: ActorRef = system.actorOf(creator.props(arTestId), s"test-aggregate-$arTestId")
 
-  implicit val duration: Duration = timeout.duration
+  private def storeEvents(evt: Seq[DomainEvent]): Unit = {
+    val storeEventsActor = system.actorOf(Props(classOf[CreateEventsInStoreActor], arTestId), "create-events-actor")
+    val testProbe        = TestProbe()
 
-  private val testProbe = TestProbe()
-  testProbe watch storeEventsActor
-
-  evt foreach { event =>
-    testProbe.send(storeEventsActor, event)
-    testProbe.expectMsgAllConformingOf(classOf[DomainEvent])
-  }
-  storeEventsActor ! PoisonPill
-  testProbe.expectTerminated(storeEventsActor)
-
-  private var aggregateRootActor: Option[ActorRef] = None
-
-//  private def aggregateRootCreator(): AggregateRootCreator = {
-//    val runtimeMirror = universe.runtimeMirror(getClass.getClassLoader)
-//    val module        = runtimeMirror.staticModule(ctag.runtimeClass.getCanonicalName)
-//    val obj           = runtimeMirror.reflectModule(module)
-//    obj.instance.asInstanceOf[AggregateRootCreator]
-//  }
-
-  private def createActor(id: AggregateRootId) = {
-    handledEvents = List.empty
-    system.actorOf(creator.props(arTestId), s"test-aggregate-$arTestId")
+    testProbe watch storeEventsActor
+    evt foreach { event =>
+      testProbe.send(storeEventsActor, event)
+      testProbe.expectMsgAllConformingOf(classOf[DomainEvent])
+    }
+    storeEventsActor ! PoisonPill
+    testProbe.expectTerminated(storeEventsActor)
   }
 
   /**
@@ -131,21 +125,23 @@ class TestableAggregateRoot[A <: AggregateRootActor[B], B <: AggregateState[B]: 
     * @return This initialized TestableAggregateRoot that processed the command.
     */
   def when(command: DomainCommand): TestableAggregateRoot[A, B] = {
-    if (command.aggregateRootId != id)
-      throw new IllegalArgumentException(
+    if (command.aggregateRootId != id) {
+      throw IllegalCommandException(
         s"Command for Aggregate Root ${command.aggregateRootId} cannot be handled by this aggregate root with id $id"
       )
-    aggregateRootActor = aggregateRootActor.fold(Some(createActor(arTestId)))(r => Some(r))
-    val aggregateRootProbe = TestProbe()
-    aggregateRootProbe watch aggregateRootActor.get
+    }
 
-    aggregateRootProbe.send(aggregateRootActor.get, command)
+    val aggregateRootProbe = TestProbe()
+    aggregateRootProbe watch aggregateRootActor
+    aggregateRootProbe.send(aggregateRootActor, command)
 
     val events =
       aggregateRootProbe
-        .expectMsgPF[Seq[DomainEvent]](duration, "reply with events") {
-          case Ok(events) => events
+        .expectMsgPF[Any](duration, "reply with events") {
+          case Ko(x)                                                                 => throw CommandHandlingException(s"Command Handling failed with Ko $x")
+          case Ok(events: Seq[DomainEvent]) if events.isInstanceOf[Seq[DomainEvent]] => events.toList
         }
+        .asInstanceOf[List[DomainEvent]]
 
     handledEvents ++= events
     this
@@ -158,10 +154,7 @@ class TestableAggregateRoot[A <: AggregateRootActor[B], B <: AggregateState[B]: 
     *
     * @return Future with the AggregateState as defined for this Aggregate Root.
     */
-  def currentState: Future[Option[B]] =
-    aggregateRootActor.fold(Future.failed[Option[B]](new IllegalStateException("")))(
-      actor => (actor ? GetState).mapTo[Option[B]]
-    )
+  def currentState: Future[Option[B]] = (aggregateRootActor ? GetState).mapTo[Option[B]]
 
   /**
     * Give the events that are created by the command that was given to the aggregate root by when.
