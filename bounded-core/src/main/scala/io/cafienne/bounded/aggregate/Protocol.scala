@@ -19,11 +19,11 @@ trait AggregateRootId extends Id
   * @param timestamp the moment the event was created
   * @param userContext contains an assumed known user, events generated via an HTTP API will most of the time be authenticated
   */
-case class CommandMetaData(
-  timestamp: ZonedDateTime,
-  userContext: Option[UserContext],
-  commandId: UUID = UUID.randomUUID()
-)
+trait CommandMetaData {
+  def timestamp: ZonedDateTime
+  def userContext: Option[UserContext]
+  def commandId: UUID = UUID.randomUUID()
+}
 
 trait DomainCommand {
 
@@ -40,24 +40,12 @@ trait DomainCommand {
   * @param buildInfo contains the build information of the application. The Version is used to ensure version specific routing of messages.
   * @param runTimeInfo contains information on the runtime the event is generated and stored
   */
-case class MetaData(
-  timestamp: ZonedDateTime,
-  userContext: Option[UserContext],
-  causedByCommand: Option[UUID],
-  buildInfo: BuildInfo,
-  runTimeInfo: RuntimeInfo
-)
-
-object MetaData {
-  def fromCommand(metadata: CommandMetaData)(implicit buildInfo: BuildInfo, runtimeInfo: RuntimeInfo): MetaData = {
-    MetaData(
-      metadata.timestamp,
-      metadata.userContext,
-      Some(metadata.commandId),
-      buildInfo,
-      runtimeInfo
-    )
-  }
+trait MetaData {
+  def timestamp: ZonedDateTime
+  def userContext: Option[UserContext]
+  def causedByCommand: Option[UUID]
+  def buildInfo: BuildInfo
+  def runTimeInfo: RuntimeInfo
 }
 
 trait DomainEvent extends Persistable {

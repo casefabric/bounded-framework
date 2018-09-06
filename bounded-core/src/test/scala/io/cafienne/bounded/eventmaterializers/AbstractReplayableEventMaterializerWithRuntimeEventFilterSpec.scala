@@ -5,6 +5,7 @@
 package io.cafienne.bounded.eventmaterializers
 
 import java.time.ZonedDateTime
+import java.util.UUID
 
 import akka.Done
 import akka.actor.{ActorSystem, PoisonPill, Props}
@@ -23,7 +24,15 @@ import org.slf4j.LoggerFactory
 import scala.concurrent.Future
 import scala.concurrent.duration._
 
-case class TestedEvent(metaData: MetaData, text: String) extends DomainEvent {
+case class TestMetaData(
+  timestamp: ZonedDateTime,
+  userContext: Option[UserContext],
+  causedByCommand: Option[UUID],
+  buildInfo: BuildInfo,
+  runTimeInfo: RuntimeInfo
+) extends MetaData
+
+case class TestedEvent(metaData: TestMetaData, text: String) extends DomainEvent {
   override def id: AggregateRootId = new AggregateRootId {
     override def idAsString: String = "testaggregate"
   }
@@ -52,7 +61,7 @@ class AbstractReplayableEventMaterializerWithRuntimeEventFilterSpec
   val previousBuild = buildInfo.copy(version = "0.9")
   val futureBuild   = buildInfo.copy(version = "1.1")
 
-  val currentMeta = MetaData(ZonedDateTime.parse("2018-01-01T17:43:00+01:00"), None, None, currentBuild, currentRuntime)
+  val currentMeta = TestMetaData(ZonedDateTime.parse("2018-01-01T17:43:00+01:00"), None, None, currentBuild, currentRuntime)
 
   val testSet = Seq(
     TestedEvent(currentMeta, "current-current"),
