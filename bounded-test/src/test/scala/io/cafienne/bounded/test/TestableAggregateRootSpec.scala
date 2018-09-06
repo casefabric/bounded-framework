@@ -11,7 +11,6 @@ import akka.event.{Logging, LoggingAdapter}
 import akka.testkit.TestKit
 import akka.util.Timeout
 import io.cafienne.bounded.{BuildInfo, RuntimeInfo}
-import io.cafienne.bounded.aggregate.{CommandMetaData, MetaData}
 import io.cafienne.bounded.test.TestableAggregateRoot.{CommandHandlingException, IllegalCommandException}
 import io.cafienne.bounded.test.DomainProtocol._
 import io.cafienne.bounded.test.TestAggregateRoot.TestAggregateRootState
@@ -31,7 +30,7 @@ class TestableAggregateRootSpec extends AsyncWordSpec with Matchers with ScalaFu
 
   val testAggregateRootCreator = new TestAggregateRootCreator(system)
 
-  val currentMeta = MetaData(ZonedDateTime.parse("2018-01-01T17:43:00+01:00"), None, None, buildInfo, runtimeInfo)
+  val currentMeta = TestMetaData(ZonedDateTime.parse("2018-01-01T17:43:00+01:00"), None, None, buildInfo, runtimeInfo)
 
   "The testable aggregate root" must {
 
@@ -65,7 +64,7 @@ class TestableAggregateRootSpec extends AsyncWordSpec with Matchers with ScalaFu
 
     "handle the command to OK in when" in {
       val testAggregateRootId1 = TestAggregateRootId("3")
-      val commandMetaData      = CommandMetaData(currentMeta.timestamp, None)
+      val commandMetaData      = TestCommandMetaData(currentMeta.timestamp, None)
       val updateStateCommand   = UpdateState(commandMetaData, testAggregateRootId1, "updated")
       val targetState          = TestAggregateRootState("updated")
 
@@ -77,7 +76,7 @@ class TestableAggregateRootSpec extends AsyncWordSpec with Matchers with ScalaFu
         )
         .when(updateStateCommand)
 
-      ar.events should contain(StateUpdated(MetaData.fromCommand(commandMetaData), testAggregateRootId1, "updated"))
+      ar.events should contain(StateUpdated(TestMetaData.fromCommand(commandMetaData), testAggregateRootId1, "updated"))
 
       ar.currentState map { state =>
         assert(state.isDefined, s"There is no defined state but expected $targetState")
@@ -87,8 +86,8 @@ class TestableAggregateRootSpec extends AsyncWordSpec with Matchers with ScalaFu
 
     "handle the CommandHandlingException to KO in when" in {
       val testAggregateRootId1 = TestAggregateRootId("3")
-      val commandMetaData      = CommandMetaData(currentMeta.timestamp, None)
-      val updateStateCommand   = UpdateState(commandMetaData, testAggregateRootId1, "updated")
+      val metaData             = TestCommandMetaData(currentMeta.timestamp, None)
+      val updateStateCommand   = UpdateState(metaData, testAggregateRootId1, "updated")
 
       an[CommandHandlingException] should be thrownBy {
         TestableAggregateRoot
@@ -104,7 +103,7 @@ class TestableAggregateRootSpec extends AsyncWordSpec with Matchers with ScalaFu
     "handle the IllegalCommandException to KO in when" in {
       val testAggregateRootId1               = TestAggregateRootId("4")
       val testAggregateRootIdWrongForCommand = TestAggregateRootId("5")
-      val commandMetaData                    = CommandMetaData(currentMeta.timestamp, None)
+      val commandMetaData                    = TestCommandMetaData(currentMeta.timestamp, None)
       val updateStateCommand                 = UpdateState(commandMetaData, testAggregateRootIdWrongForCommand, "updated")
 
       an[IllegalCommandException] should be thrownBy {

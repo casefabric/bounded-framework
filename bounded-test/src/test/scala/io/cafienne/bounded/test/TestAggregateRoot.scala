@@ -41,10 +41,12 @@ class TestAggregateRoot(aggregateRootId: AggregateRootId, buildInfo: BuildInfo, 
   override def handleCommand(command: DomainCommand, aggregateState: Option[TestAggregateRootState]): Reply = {
     command match {
       case CreateInitialState(metaData, aggregateRootId, state) =>
-        Ok(Seq[DomainEvent](InitialStateCreated(MetaData.fromCommand(metaData), aggregateRootId, state)))
+        val testMetaData = metaData.asInstanceOf[TestCommandMetaData]
+        Ok(Seq[DomainEvent](InitialStateCreated(TestMetaData.fromCommand(testMetaData), aggregateRootId, state)))
       case UpdateState(metaData, aggregateRootId, state) =>
+        val testMetaData = metaData.asInstanceOf[TestCommandMetaData]
         if (aggregateState.isDefined && aggregateState.get.state.equals("new")) {
-          Ok(Seq(StateUpdated(MetaData.fromCommand(metaData), aggregateRootId, state)))
+          Ok(Seq(StateUpdated(TestMetaData.fromCommand(testMetaData), aggregateRootId, state)))
         } else {
           Ko(InvalidState(s"The current state $aggregateState does not allow an update to $state"))
         }
