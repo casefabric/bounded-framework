@@ -83,8 +83,9 @@ abstract class AbstractEventMaterializer(
   /**
     * Publish an event on the AKKA eventbus after the event is processed.
     */
-  val isPublishRequired: Boolean =
-    Option(actorSystem.settings.config.getBoolean("bounded.eventmaterializers.publish")).getOrElse(false)
+  val isPublishRequired: Boolean = (actorSystem.settings.config
+    .hasPath("bounded.eventmaterializers.publish") && actorSystem.settings.config
+    .getBoolean("bounded.eventmaterializers.publish"))
 
   /**
     * Register listener for events. Should be registered *after* replay is finished
