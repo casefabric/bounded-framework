@@ -5,7 +5,7 @@
 package io.cafienne.bounded.eventmaterializers.offsetstores
 
 import java.io.File
-import java.nio.ByteBuffer
+import java.nio.{Buffer, ByteBuffer}
 import java.nio.ByteBuffer.allocateDirect
 import java.nio.charset.StandardCharsets.UTF_8
 import java.util.UUID
@@ -33,10 +33,10 @@ private class LmdbOffsetStore(lmdbConfig: LmdbConfig) extends OffsetStore {
     val txn = env.txnWrite()
     try {
       val keyByteBuffer = allocateDirect(100)
-      keyByteBuffer.put(viewIdentifier.getBytes(UTF_8)).flip
+      keyByteBuffer.put(viewIdentifier.getBytes(UTF_8)).asInstanceOf[Buffer].flip
 
       val valueByteBuffer = allocateDirect(300)
-      valueByteBuffer.put(offset2String(offset).getBytes(UTF_8)).flip()
+      valueByteBuffer.put(offset2String(offset).getBytes(UTF_8)).asInstanceOf[Buffer].flip()
       dbi.put(txn, keyByteBuffer, valueByteBuffer)
       txn.commit()
     } finally {
@@ -49,7 +49,7 @@ private class LmdbOffsetStore(lmdbConfig: LmdbConfig) extends OffsetStore {
     val txn = env.txnRead()
     try {
       val keyByteBuffer = allocateDirect(100)
-      keyByteBuffer.put(viewIdentifier.getBytes(UTF_8)).flip
+      keyByteBuffer.put(viewIdentifier.getBytes(UTF_8)).asInstanceOf[Buffer].flip
       val found = dbi.get(txn, keyByteBuffer)
       if (found != null) {
         val fetchedVal  = txn.`val`()
