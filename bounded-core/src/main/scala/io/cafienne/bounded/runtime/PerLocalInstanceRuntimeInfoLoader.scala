@@ -21,7 +21,7 @@ import scala.io.Source
   *   val filename             = system.settings.config.getString("application.runtimeinfo.path")
   *   implicit val runtimeInfo = RuntimeInfoLoader(new File(filename))
   * </pre></blockquote></p>
- */
+  */
 object PerLocalInstanceRuntimeInfoLoader {
 
   private def newId = UUID.randomUUID().toString.replaceAll("-", "")
