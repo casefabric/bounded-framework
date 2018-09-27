@@ -19,7 +19,7 @@ import scala.io.Source
   * <p>Sample implementation:
   * <blockquote><pre>
   *   val filename             = system.settings.config.getString("application.runtimeinfo.path")
-  *   implicit val runtimeInfo = RuntimeInfoLoader(new File(filename))
+  *   implicit val runtimeInfo = PerLocalInstanceRuntimeInfoLoader(new File(filename))
   * </pre></blockquote></p>
   */
 object PerLocalInstanceRuntimeInfoLoader {
