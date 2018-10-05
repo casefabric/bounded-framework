@@ -13,7 +13,9 @@ import io.cafienne.bounded._
 import io.cafienne.bounded.eventmaterializers.{Compatibility, RuntimeCompatibility}
 import spray.json._
 
-object ProtocolJsonProtocol extends DefaultJsonProtocol {
+object ProtocolJsonProtocol {
+
+  import spray.json.DefaultJsonProtocol._
 
   implicit val BuildInfoJsonFormat            = jsonFormat2(BuildInfo)
   implicit val RuntimeInfoJsonFormat          = jsonFormat1(RuntimeInfo)

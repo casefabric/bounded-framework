@@ -16,7 +16,6 @@ import io.cafienne.bounded.akka.persistence.ReadJournalProvider
 import io.cafienne.bounded.config.Configured
 import com.typesafe.scalalogging.Logger
 import io.cafienne.bounded.aggregate.DomainEvent
-import io.cafienne.bounded._
 import io.cafienne.bounded.eventmaterializers.offsetstores.OffsetStore
 
 import scala.concurrent.{Await, Future}
