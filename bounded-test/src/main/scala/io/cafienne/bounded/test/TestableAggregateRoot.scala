@@ -6,7 +6,7 @@ package io.cafienne.bounded.test
 
 import java.util.concurrent.atomic.AtomicInteger
 
-import io.cafienne.bounded.test.TestableAggregateRoot.{CommandHandlingException, IllegalCommandException}
+import io.cafienne.bounded.test.TestableAggregateRoot._
 
 import scala.reflect.ClassTag
 import akka.actor._
@@ -39,8 +39,16 @@ import scala.concurrent.duration.Duration
   */
 object TestableAggregateRoot {
 
-  case class CommandHandlingException(msg: String) extends Exception(msg)
-  case class IllegalCommandException(msg: String)  extends Exception(msg)
+  case class CommandHandlingFailed(failure: HandlingFailure)
+      extends Exception(s"Command handling failed with [$failure]")
+
+  case class MisdirectedCommand(expectedId: AggregateRootId, command: DomainCommand)
+      extends Exception(s"Expected command [$command] to target [$expectedId], not [${command.aggregateRootId}]")
+
+  case class UnexpectedCommandHandlingSuccess(command: DomainCommand)
+      extends Exception(s"Expected handling of command [$command] to fail")
+
+  case object NoCommandsIssued extends Exception("Expected one or more commands, but got none")
 
   /** Construct a test for a specific aggregate root that has a specific initial state
     *
@@ -97,6 +105,9 @@ class TestableAggregateRoot[A <: AggregateRootActor[B], B <: AggregateState[B]: 
   implicit val duration: Duration              = timeout.duration
   private var handledEvents: List[DomainEvent] = List.empty
 
+  private var lastFailure: Option[HandlingFailure] = Option.empty
+  private var lastCommand: Option[DomainCommand]   = Option.empty
+
   import TestableAggregateRoot.testId
   final val arTestId = testId(id)
 
@@ -115,6 +126,7 @@ class TestableAggregateRoot[A <: AggregateRootActor[B], B <: AggregateState[B]: 
     }
     storeEventsActor ! PoisonPill
     testProbe.expectTerminated(storeEventsActor)
+    ()
   }
 
   /**
@@ -125,25 +137,23 @@ class TestableAggregateRoot[A <: AggregateRootActor[B], B <: AggregateState[B]: 
     * @return This initialized TestableAggregateRoot that processed the command.
     */
   def when(command: DomainCommand): TestableAggregateRoot[A, B] = {
-    if (command.aggregateRootId != id) {
-      throw IllegalCommandException(
-        s"Command for Aggregate Root ${command.aggregateRootId} cannot be handled by this aggregate root with id $id"
-      )
-    }
+    if (command.aggregateRootId != id)
+      throw MisdirectedCommand(id, command)
 
-    val aggregateRootProbe = TestProbe()
-    aggregateRootProbe watch aggregateRootActor
-    aggregateRootProbe.send(aggregateRootActor, command)
+    val mediator = TestProbe()
+    mediator watch aggregateRootActor
+    mediator.send(aggregateRootActor, command)
 
-    val events =
-      aggregateRootProbe
-        .expectMsgPF[Any](duration, "reply with events") {
-          case Ko(x)                                                                 => throw CommandHandlingException(s"Command Handling failed with Ko $x")
-          case Ok(events: Seq[DomainEvent]) if events.isInstanceOf[Seq[DomainEvent]] => events.toList
-        }
-        .asInstanceOf[List[DomainEvent]]
+    lastCommand = Some(command)
 
-    handledEvents ++= events
+    mediator
+      .expectMsgPF(duration, s"reply to command [$command]") {
+        case Ko(x) =>
+          lastFailure = Some(x)
+        case Ok(events) =>
+          handledEvents ++= events.toList
+      }
+
     this
   }
 
@@ -156,13 +166,16 @@ class TestableAggregateRoot[A <: AggregateRootActor[B], B <: AggregateState[B]: 
     */
   def currentState: Future[Option[B]] = (aggregateRootActor ? GetState).mapTo[Option[B]]
 
-  /**
-    * Give the events that are created by the command that was given to the aggregate root by when.
-    * @return List of DomainEvents that is created by the command.
+  private def assumingCommandIssued[T](thunk: DomainCommand => T): T =
+    lastCommand.fold(throw NoCommandsIssued)(thunk)
+
+  /** Events emitted by the aggregate root in reaction to command(s)
     */
-  def events: List[DomainEvent] = {
-    handledEvents
-  }
+  def events: List[DomainEvent] = assumingCommandIssued(_ => handledEvents)
+
+  /** Last known command handling failure */
+  def failure: HandlingFailure =
+    assumingCommandIssued(c => lastFailure.getOrElse(throw UnexpectedCommandHandlingSuccess(c)))
 
   override def toString: String = {
     s"Aggregate Root ${ctag.runtimeClass.getSimpleName} ${id.idAsString}"

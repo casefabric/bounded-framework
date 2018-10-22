@@ -11,7 +11,7 @@ import akka.event.{Logging, LoggingAdapter}
 import akka.testkit.TestKit
 import akka.util.Timeout
 import io.cafienne.bounded.{BuildInfo, RuntimeInfo}
-import io.cafienne.bounded.test.TestableAggregateRoot.{CommandHandlingException, IllegalCommandException}
+import io.cafienne.bounded.test.TestableAggregateRoot._
 import io.cafienne.bounded.test.DomainProtocol._
 import io.cafienne.bounded.test.TestAggregateRoot.TestAggregateRootState
 import org.scalatest.{AsyncWordSpec, BeforeAndAfterAll, Matchers}
@@ -31,6 +31,7 @@ class TestableAggregateRootSpec extends AsyncWordSpec with Matchers with ScalaFu
   val testAggregateRootCreator = new TestAggregateRootCreator(system)
 
   val currentMeta = TestMetaData(ZonedDateTime.parse("2018-01-01T17:43:00+01:00"), None, None, buildInfo, runtimeInfo)
+  val metaData    = TestCommandMetaData(currentMeta.timestamp, None)
 
   "The testable aggregate root" must {
 
@@ -84,39 +85,73 @@ class TestableAggregateRootSpec extends AsyncWordSpec with Matchers with ScalaFu
       }
     }
 
-    "handle the CommandHandlingException to KO in when" in {
+    "provide command handling failure for assertions" in {
       val testAggregateRootId1 = TestAggregateRootId("3")
-      val metaData             = TestCommandMetaData(currentMeta.timestamp, None)
       val updateStateCommand   = UpdateState(metaData, testAggregateRootId1, "updated")
 
-      an[CommandHandlingException] should be thrownBy {
+      TestableAggregateRoot
+        .given[TestAggregateRoot, TestAggregateRootState](
+          testAggregateRootCreator,
+          testAggregateRootId1,
+          InitialStateCreated(currentMeta, testAggregateRootId1, "not_new")
+        )
+        .when(updateStateCommand)
+        .failure should be(StateTransitionForbidden(Some("not_new"), "updated"))
+    }
+
+    "prevent handling of commands that target another aggregate" in {
+      val aggregateRootId = TestAggregateRootId("4")
+      val wrongId         = TestAggregateRootId("5")
+
+      an[MisdirectedCommand] should be thrownBy {
         TestableAggregateRoot
-          .given[TestAggregateRoot, TestAggregateRootState](
-            testAggregateRootCreator,
-            testAggregateRootId1,
-            InitialStateCreated(currentMeta, testAggregateRootId1, "wronginitial")
-          )
-          .when(updateStateCommand)
+          .given[TestAggregateRoot, TestAggregateRootState](testAggregateRootCreator, aggregateRootId)
+          .when(UpdateState(metaData, wrongId, ""))
       }
     }
 
-    "handle the IllegalCommandException to KO in when" in {
-      val testAggregateRootId1               = TestAggregateRootId("4")
-      val testAggregateRootIdWrongForCommand = TestAggregateRootId("5")
-      val commandMetaData                    = TestCommandMetaData(currentMeta.timestamp, None)
-      val updateStateCommand                 = UpdateState(commandMetaData, testAggregateRootIdWrongForCommand, "updated")
+    "signal that handling was successful despite expected failure" in {
+      val aggregateRootId = TestAggregateRootId("3")
 
-      an[IllegalCommandException] should be thrownBy {
+      an[UnexpectedCommandHandlingSuccess] should be thrownBy {
         TestableAggregateRoot
           .given[TestAggregateRoot, TestAggregateRootState](
             testAggregateRootCreator,
-            testAggregateRootId1,
-            InitialStateCreated(currentMeta, testAggregateRootId1, "new")
+            aggregateRootId,
+            InitialStateCreated(currentMeta, aggregateRootId, "new")
           )
-          .when(updateStateCommand)
+          .when(UpdateState(metaData, aggregateRootId, "updated"))
+          .failure
       }
     }
 
+    "tell that no point expecting failure when no commands were issued" in {
+      val aggregateRootId = TestAggregateRootId("3")
+
+      an[NoCommandsIssued.type] should be thrownBy {
+        TestableAggregateRoot
+          .given[TestAggregateRoot, TestAggregateRootState](
+            testAggregateRootCreator,
+            aggregateRootId,
+            InitialStateCreated(currentMeta, aggregateRootId, "new")
+          )
+          .failure
+      }
+    }
+
+    "tell that no point expecting events when no commands were issued" in {
+      val aggregateRootId = TestAggregateRootId("3")
+
+      an[NoCommandsIssued.type] should be thrownBy {
+        TestableAggregateRoot
+          .given[TestAggregateRoot, TestAggregateRootState](
+            testAggregateRootCreator,
+            aggregateRootId,
+            InitialStateCreated(currentMeta, aggregateRootId, "new")
+          )
+          .events
+      }
+    }
   }
 
   override protected def afterAll(): Unit = {

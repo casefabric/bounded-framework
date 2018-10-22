@@ -25,8 +25,8 @@ object DomainProtocol {
       extends DomainCommand
   case class StateUpdated(metaData: MetaData, id: AggregateRootId, state: String) extends DomainEvent
 
-  case class InvalidCommand(msg: String) extends HandlingFailure
-  case class InvalidState(msg: String)   extends HandlingFailure
+  case class InvalidCommand(msg: String)                                extends HandlingFailure
+  case class StateTransitionForbidden(from: Option[String], to: String) extends HandlingFailure
 }
 
 class TestAggregateRoot(aggregateRootId: AggregateRootId, buildInfo: BuildInfo, runtimeInfo: RuntimeInfo)
@@ -48,7 +48,7 @@ class TestAggregateRoot(aggregateRootId: AggregateRootId, buildInfo: BuildInfo, 
         if (aggregateState.isDefined && aggregateState.get.state.equals("new")) {
           Ok(Seq(StateUpdated(TestMetaData.fromCommand(testMetaData), aggregateRootId, state)))
         } else {
-          Ko(InvalidState(s"The current state $aggregateState does not allow an update to $state"))
+          Ko(StateTransitionForbidden(aggregateState.map(_.state), state))
         }
       case other => Ko(new UnexpectedCommand(other))
     }
