@@ -24,3 +24,5 @@ local.conf
 tags
 journal
 journal/*
+.bloop
+.metals

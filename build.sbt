@@ -1,14 +1,15 @@
 
 lazy val basicSettings = {
-  val currentScalaVersion = "2.12.6"
-  val scala211Version     = "2.11.12"
+  val scala213 = "2.13.0"
+  val scala212 = "2.12.8"
+  val supportedScalaVersions = List(scala213, scala212)
 
   Seq(
     organization := "io.cafienne.bounded",
     description := "Scala and Akka based Domain Driven Design Framework",
-    scalaVersion := currentScalaVersion,
-    crossScalaVersions := Seq(currentScalaVersion, scala211Version),
-    //releaseCrossBuild := true,
+    scalaVersion := scala212,
+    crossScalaVersions := supportedScalaVersions,
+    releaseCrossBuild := true,
     scalacOptions := Seq(
       "-encoding", "UTF-8",
       "-target:jvm-1.8",
@@ -16,10 +17,10 @@ lazy val basicSettings = {
       "-feature", // warning and location for usages of features that should be imported explicitly
       "-unchecked", // additional warnings where generated code depends on assumptions
       "-Xlint", // recommended additional warnings
-      "-Ywarn-adapted-args", // Warn if an argument list is modified to match the receiver
       "-Ywarn-value-discard", // Warn when non-Unit expression results are unused
-      "-Ywarn-inaccessible",
-      "-Ywarn-dead-code"
+      "-Ywarn-dead-code",
+      "-Ywarn-unused",
+      "-Ywarn-unused-import"
     ),
     scalastyleConfig := baseDirectory.value / "project/scalastyle-config.xml",
     scalafmtConfig := Some((baseDirectory in ThisBuild).value / "project/.scalafmt.conf"),
@@ -41,7 +42,7 @@ lazy val basicSettings = {
     developers := List(Developer(
       "olger",
       "Olger Warnier",
-      "olger.warnier@spronq.com",
+      "olger@spectare.nl",
       url("https://github.com/olger"))
     ),
     // Add sonatype repository settings
@@ -59,7 +60,9 @@ lazy val basicSettings = {
 
 lazy val boundedRoot = (project in file("."))
   .settings(basicSettings: _*)
-  .settings(publishArtifact := false)
+  .settings(publishArtifact := false,
+            publish / skip := true,
+            crossScalaVersions := Nil)
   .enablePlugins(AutomateHeaderPlugin)
   //.settings(releaseSettings)
   .aggregate(boundedCore, boundedAkkaHttp, boundedTest)
@@ -69,7 +72,7 @@ val boundedCore = (project in file("bounded-core"))
   .settings(basicSettings: _*)
   .settings(
     name := "bounded-core",
-    libraryDependencies ++= Dependencies.baseDeps ++ Dependencies.persistanceLmdbDBDeps ++ Dependencies.testDeps)
+    libraryDependencies ++= Dependencies.baseDeps ++ Dependencies.persistanceLmdbDBDeps ++ Dependencies.persistenceCassandraDeps ++ Dependencies.testDeps)
 
 val boundedAkkaHttp = (project in file("bounded-akka-http"))
   .dependsOn(boundedCore)
