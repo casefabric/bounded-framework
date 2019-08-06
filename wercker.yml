@@ -1,4 +1,4 @@
-box: hseeberger/scala-sbt
+box: cafienne/scala-sbt:11u1_2.12.7_1.26 
 build:
   steps:
     - script:
