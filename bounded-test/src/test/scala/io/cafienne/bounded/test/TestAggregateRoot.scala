@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016-2018 Cafienne B.V. <https://www.cafienne.io/bounded>
+ * Copyright (C) 2016-2019 Cafienne B.V. <https://www.cafienne.io/bounded>
  */
 
 package io.cafienne.bounded.test
@@ -24,6 +24,10 @@ object DomainProtocol {
   case class UpdateState(metaData: CommandMetaData, aggregateRootId: AggregateRootId, state: String)
       extends DomainCommand
   case class StateUpdated(metaData: MetaData, id: AggregateRootId, state: String) extends DomainEvent
+
+  //This can be sent but is not handled so gives a Ko(UnExpectedCommand)
+  case class CommandWithoutHandler(metaData: CommandMetaData, aggregateRootId: AggregateRootId, msg: String)
+      extends DomainCommand
 
   case class InvalidCommand(msg: String)                                extends HandlingFailure
   case class StateTransitionForbidden(from: Option[String], to: String) extends HandlingFailure

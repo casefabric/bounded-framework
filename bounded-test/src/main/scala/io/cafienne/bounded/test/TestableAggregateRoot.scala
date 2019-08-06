@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016-2018 Cafienne B.V. <https://www.cafienne.io/bounded>
+ * Copyright (C) 2016-2019 Cafienne B.V. <https://www.cafienne.io/bounded>
  */
 
 package io.cafienne.bounded.test
@@ -171,7 +171,14 @@ class TestableAggregateRoot[A <: AggregateRootActor[B], B <: AggregateState[B]: 
 
   /** Events emitted by the aggregate root in reaction to command(s)
     */
-  def events: List[DomainEvent] = assumingCommandIssued(_ => handledEvents)
+  def events: List[DomainEvent] =
+    assumingCommandIssued(_ => {
+      if (handledEvents.isEmpty) {
+        lastFailure.fold(handledEvents)(failure => throw CommandHandlingFailed(failure))
+      } else {
+        handledEvents
+      }
+    })
 
   /** Last known command handling failure */
   def failure: HandlingFailure =

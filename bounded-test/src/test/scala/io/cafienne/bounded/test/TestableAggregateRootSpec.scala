@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016-2018 Cafienne B.V. <https://www.cafienne.io/bounded>
+ * Copyright (C) 2016-2019 Cafienne B.V. <https://www.cafienne.io/bounded>
  */
 
 package io.cafienne.bounded.test
@@ -152,6 +152,24 @@ class TestableAggregateRootSpec extends AsyncWordSpec with Matchers with ScalaFu
           .events
       }
     }
+
+    "give a clear failure when a command is processed that has no handler" in {
+      val aggregateRootId = TestAggregateRootId("4")
+
+      an[CommandHandlingFailed] should be thrownBy {
+        val ar = TestableAggregateRoot
+          .given[TestAggregateRoot, TestAggregateRootState](
+            testAggregateRootCreator,
+            aggregateRootId,
+            InitialStateCreated(currentMeta, aggregateRootId, "new")
+          )
+          .when(CommandWithoutHandler(metaData, aggregateRootId, "this one fails"))
+
+        ar.events should be("throwing an CommandHandlingFailed")
+      }
+
+    }
+
   }
 
   override protected def afterAll(): Unit = {
