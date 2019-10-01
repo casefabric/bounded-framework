@@ -18,7 +18,7 @@ This will release for 2.12. Via oss.sonatype.org you need to 'Close' the uploade
 
 # Release notes
 
-# 0.1.6 [pending release]
+# 0.1.6
 
 In Aggregate Root tests no need to match for patterns in messages of exceptions on various command handling failures 
 due to introduction of types representing different error scenarios. 

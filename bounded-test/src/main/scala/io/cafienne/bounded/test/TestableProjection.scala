@@ -23,7 +23,7 @@ import scala.concurrent.{ExecutionContext, Future}
 
 object TestableProjection {
 
-  def given(evt: Seq[DomainEvent])(implicit system: ActorSystem, timeout: Timeout): TestableProjection = {
+  def given(evt: Seq[DomainEvent])(implicit system: ActorSystem, timeout: Timeout = 2.seconds): TestableProjection = {
     //Cleanup the store before this test is ran.
     val tp = TestProbe()
     tp.send(StorageExtension(system).journalStorage, InMemoryJournalStorage.ClearJournal)
@@ -95,7 +95,7 @@ class TestableProjection private (system: ActorSystem, timeout: Timeout) {
 
   private def waitTillLastEventIsProcessed(evt: Seq[DomainEvent]) = {
     if (materializerId.isDefined) {
-      eventStreamListener.fishForSpecificMessage(2.seconds, "wait till last event is processed") {
+      eventStreamListener.fishForSpecificMessage(timeout.duration, "wait till last event is processed") {
         case e: EventProcessed if materializerId.get == e.materializerId && evt.last == e.evt => ()
       }
     }

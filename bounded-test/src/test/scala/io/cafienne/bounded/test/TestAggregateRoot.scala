@@ -60,7 +60,7 @@ class TestAggregateRoot(aggregateRootId: AggregateRootId, buildInfo: BuildInfo, 
 
   override def newState(evt: DomainEvent): Option[TestAggregateRootState] = {
     evt match {
-      case InitialStateCreated(metaData, id, state) => Some(TestAggregateRootState(state))
+      case InitialStateCreated(metaData @ _, id @ _, state) => Some(TestAggregateRootState(state))
       case _ =>
         log.error("Event {} is not valid to create a new TestAggregateRootState")
         throw new IllegalArgumentException(s"Event $evt is not valid to create a new TestAggregateRootState")

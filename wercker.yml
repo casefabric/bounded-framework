@@ -4,6 +4,7 @@ build:
     - script:
         name: get code / compile / stage for docker .
         code: |
+          export SBT_OPTS="-Xmx2G -XX:+UseConcMarkSweepGC -XX:+CMSClassUnloadingEnabled -XX:MaxPermSize=2G -Xss2M  -Duser.timezone=GMT"
           cd /pipeline/source
           sbt clean coverage test coverageReport
 

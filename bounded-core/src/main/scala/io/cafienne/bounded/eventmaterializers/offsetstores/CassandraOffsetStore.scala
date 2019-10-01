@@ -33,7 +33,7 @@ class CassandraOffsetStore(readJournal: CassandraReadJournal, createTableTimeout
         offset2type(offset),
         offset2String(offset)
       )
-      .map(s => {})
+      .map(_ => {})
   }
 
   override def getOffset(viewIdentifier: String): Future[Offset] = {

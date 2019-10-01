@@ -26,7 +26,7 @@ trait AkkaHttpParameterOffsetConverters extends Configured {
           case "cassandra-journal" =>
             Offset.timeBasedUUID(UUID.fromString(string))
           case "inmemory-journal" => Sequence.apply(string.toLong)
-          case other =>
+          case other @ _ =>
             throw new IllegalArgumentException(
               s"value $string cannot be transformed to an offset for journal $configuredJournal"
             )
