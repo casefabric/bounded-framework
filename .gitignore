@@ -26,3 +26,4 @@ journal
 journal/*
 .bloop
 .metals
+process.yml
