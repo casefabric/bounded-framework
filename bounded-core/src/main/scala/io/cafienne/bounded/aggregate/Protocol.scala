@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016-2019 Cafienne B.V. <https://www.cafienne.io/bounded>
+ * Copyright (C) 2016-2020 Cafienne B.V. <https://www.cafienne.io/bounded>
  */
 
 package io.cafienne.bounded.aggregate
@@ -7,12 +7,12 @@ package io.cafienne.bounded.aggregate
 import java.time.ZonedDateTime
 import java.util.UUID
 
+import akka.actor.typed.ActorRef
+import akka.persistence.typed.PersistenceId
 import io.cafienne.bounded.{BuildInfo, Id, RuntimeInfo, UserContext}
 
 import scala.collection.immutable.Seq
 import stamina.Persistable
-
-trait AggregateRootId extends Id
 
 /**
   * Metadata of the event contains data that is used within the framework and may be used by the application
@@ -27,9 +27,13 @@ trait CommandMetaData {
 
 trait DomainCommand {
 
-  def aggregateRootId: AggregateRootId
+  def aggregateRootId: String
 
   def metaData: CommandMetaData
+}
+
+trait ReplyTo {
+  var replyTo: ActorRef[_]
 }
 
 /**
@@ -48,17 +52,20 @@ trait MetaData {
   def runTimeInfo: RuntimeInfo
 }
 
-trait DomainEvent extends Persistable {
-
-  def id: AggregateRootId
-
+trait WithMetaData {
   def metaData: MetaData
+}
+
+trait DomainEvent extends Persistable with WithMetaData {
+
+  def id: String
+
 }
 
 trait HandlingFailure
 
-class AggregateNotInitialized(id: AggregateRootId) extends HandlingFailure
-class UnexpectedCommand(command: DomainCommand)    extends HandlingFailure
+class AggregateNotInitialized(id: PersistenceId) extends HandlingFailure
+class UnexpectedCommand(command: DomainCommand)  extends HandlingFailure
 
 sealed trait Reply
 

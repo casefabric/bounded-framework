@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016-2019 Cafienne B.V. <https://www.cafienne.io/bounded>
+ * Copyright (C) 2016-2020 Cafienne B.V. <https://www.cafienne.io/bounded>
  */
 
 package io.cafienne.bounded.test
@@ -8,18 +8,21 @@ import java.time.ZonedDateTime
 
 import akka.actor.ActorSystem
 import akka.event.{Logging, LoggingAdapter}
+import akka.persistence.typed.PersistenceId
 import akka.testkit.TestKit
 import akka.util.Timeout
 import io.cafienne.bounded.{BuildInfo, RuntimeInfo}
 import io.cafienne.bounded.test.TestableAggregateRoot._
 import io.cafienne.bounded.test.DomainProtocol._
 import io.cafienne.bounded.test.TestAggregateRoot.TestAggregateRootState
-import org.scalatest.{AsyncWordSpec, BeforeAndAfterAll, Matchers}
+import org.scalatest.BeforeAndAfterAll
 import org.scalatest.concurrent.ScalaFutures
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.wordspec.AsyncWordSpecLike
 
 import scala.concurrent.duration._
 
-class TestableAggregateRootSpec extends AsyncWordSpec with Matchers with ScalaFutures with BeforeAndAfterAll {
+class TestableAggregateRootSpec extends AsyncWordSpecLike with Matchers with ScalaFutures with BeforeAndAfterAll {
 
   //Setup required supporting classes
   implicit val timeout                = Timeout(10.seconds)
@@ -36,25 +39,27 @@ class TestableAggregateRootSpec extends AsyncWordSpec with Matchers with ScalaFu
   "The testable aggregate root" must {
 
     "create without state in given" in {
-      val testAggregateRootId1 = TestAggregateRootId("1")
+      val testAggregateRootId1 = "1"
 
       val ar = TestableAggregateRoot
         .given[TestAggregateRoot, TestAggregateRootState](testAggregateRootCreator, testAggregateRootId1)
 
-      ar.currentState map { state =>
-        assert(state.isEmpty)
-      }
+      ar.currentState map { state => assert(state.isEmpty) }
     }
 
     "create initial state in given" in {
-      val testAggregateRootId1 = TestAggregateRootId("2")
+      val testAggregateRootId1 = "2"
       val targetState          = TestAggregateRootState("new")
 
       val ar = TestableAggregateRoot
         .given[TestAggregateRoot, TestAggregateRootState](
           testAggregateRootCreator,
           testAggregateRootId1,
-          InitialStateCreated(currentMeta, testAggregateRootId1, "new")
+          InitialStateCreated(
+            currentMeta,
+            testAggregateRootId1,
+            "new"
+          )
         )
 
       ar.currentState map { state =>
@@ -64,7 +69,7 @@ class TestableAggregateRootSpec extends AsyncWordSpec with Matchers with ScalaFu
     }
 
     "handle the command to OK in when" in {
-      val testAggregateRootId1 = TestAggregateRootId("3")
+      val testAggregateRootId1 = "3"
       val commandMetaData      = TestCommandMetaData(currentMeta.timestamp, None)
       val updateStateCommand   = UpdateState(commandMetaData, testAggregateRootId1, "updated")
       val targetState          = TestAggregateRootState("updated")
@@ -73,11 +78,21 @@ class TestableAggregateRootSpec extends AsyncWordSpec with Matchers with ScalaFu
         .given[TestAggregateRoot, TestAggregateRootState](
           testAggregateRootCreator,
           testAggregateRootId1,
-          InitialStateCreated(currentMeta, testAggregateRootId1, "new")
+          InitialStateCreated(
+            currentMeta,
+            testAggregateRootId1,
+            "new"
+          )
         )
         .when(updateStateCommand)
 
-      ar.events should contain(StateUpdated(TestMetaData.fromCommand(commandMetaData), testAggregateRootId1, "updated"))
+      ar.events should contain(
+        StateUpdated(
+          TestMetaData.fromCommand(commandMetaData),
+          testAggregateRootId1,
+          "updated"
+        )
+      )
 
       ar.currentState map { state =>
         assert(state.isDefined, s"There is no defined state but expected $targetState")
@@ -86,22 +101,26 @@ class TestableAggregateRootSpec extends AsyncWordSpec with Matchers with ScalaFu
     }
 
     "provide command handling failure for assertions" in {
-      val testAggregateRootId1 = TestAggregateRootId("3")
+      val testAggregateRootId1 = "3"
       val updateStateCommand   = UpdateState(metaData, testAggregateRootId1, "updated")
 
       TestableAggregateRoot
         .given[TestAggregateRoot, TestAggregateRootState](
           testAggregateRootCreator,
           testAggregateRootId1,
-          InitialStateCreated(currentMeta, testAggregateRootId1, "not_new")
+          InitialStateCreated(
+            currentMeta,
+            testAggregateRootId1,
+            "not_new"
+          )
         )
         .when(updateStateCommand)
         .failure should be(StateTransitionForbidden(Some("not_new"), "updated"))
     }
 
     "prevent handling of commands that target another aggregate" in {
-      val aggregateRootId = TestAggregateRootId("4")
-      val wrongId         = TestAggregateRootId("5")
+      val aggregateRootId = "4"
+      val wrongId         = "5"
 
       an[MisdirectedCommand] should be thrownBy {
         TestableAggregateRoot
@@ -111,7 +130,7 @@ class TestableAggregateRootSpec extends AsyncWordSpec with Matchers with ScalaFu
     }
 
     "signal that handling was successful despite expected failure" in {
-      val aggregateRootId = TestAggregateRootId("3")
+      val aggregateRootId = "3"
 
       an[UnexpectedCommandHandlingSuccess] should be thrownBy {
         TestableAggregateRoot
@@ -126,7 +145,7 @@ class TestableAggregateRootSpec extends AsyncWordSpec with Matchers with ScalaFu
     }
 
     "tell that no point expecting failure when no commands were issued" in {
-      val aggregateRootId = TestAggregateRootId("3")
+      val aggregateRootId = "3"
 
       an[NoCommandsIssued.type] should be thrownBy {
         TestableAggregateRoot
@@ -140,7 +159,7 @@ class TestableAggregateRootSpec extends AsyncWordSpec with Matchers with ScalaFu
     }
 
     "tell that no point expecting events when no commands were issued" in {
-      val aggregateRootId = TestAggregateRootId("3")
+      val aggregateRootId = "3"
 
       an[NoCommandsIssued.type] should be thrownBy {
         TestableAggregateRoot
@@ -154,7 +173,7 @@ class TestableAggregateRootSpec extends AsyncWordSpec with Matchers with ScalaFu
     }
 
     "give a clear failure when a command is processed that has no handler" in {
-      val aggregateRootId = TestAggregateRootId("4")
+      val aggregateRootId = "4"
 
       an[CommandHandlingFailed] should be thrownBy {
         val ar = TestableAggregateRoot

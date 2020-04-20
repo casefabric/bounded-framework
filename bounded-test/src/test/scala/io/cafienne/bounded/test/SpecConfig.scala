@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016-2019 Cafienne B.V. <https://www.cafienne.io/bounded>
+ * Copyright (C) 2016-2020 Cafienne B.V. <https://www.cafienne.io/bounded>
  */
 
 package io.cafienne.bounded.test
@@ -23,6 +23,9 @@ object SpecConfig {
       |        stdout-loglevel = "DEBUG"
       |        loggers = ["akka.testkit.TestEventListener"]
       |        actor {
+      |          serialize-messages = off
+      |          serialize-creators = off
+      |          allow-java-serialization = on
       |          default-dispatcher {
       |            executor = "fork-join-executor"
       |            fork-join-executor {
@@ -31,8 +34,8 @@ object SpecConfig {
       |              parallelism-max = 8
       |            }
       |          }
-      |          serialize-creators = off
-      |          serialize-messages = off
+      |          //serialize-creators = off
+      |          //serialize-messages = off
       |        }
       |      persistence {
       |       publish-confirmations = on

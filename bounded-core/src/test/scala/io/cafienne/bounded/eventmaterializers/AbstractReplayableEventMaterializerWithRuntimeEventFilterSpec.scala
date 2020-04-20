@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016-2019 Cafienne B.V. <https://www.cafienne.io/bounded>
+ * Copyright (C) 2016-2020 Cafienne B.V. <https://www.cafienne.io/bounded>
  */
 
 package io.cafienne.bounded.eventmaterializers
@@ -14,11 +14,13 @@ import akka.persistence.query.Sequence
 import akka.testkit.{TestKit, TestProbe}
 import akka.util.Timeout
 import com.typesafe.scalalogging.Logger
-import io.cafienne.bounded.aggregate.{AggregateRootId, DomainEvent, MetaData}
+import io.cafienne.bounded.aggregate.{DomainEvent, MetaData}
 import io.cafienne.bounded._
-import org.scalatest.{BeforeAndAfterAll, Matchers, WordSpec}
+import org.scalatest.BeforeAndAfterAll
 import org.scalatest.concurrent.ScalaFutures
+import org.scalatest.matchers.should.Matchers
 import org.scalatest.time.{Millis, Seconds, Span}
+import org.scalatest.wordspec.AnyWordSpec
 import org.slf4j.LoggerFactory
 
 import scala.concurrent.Future
@@ -33,13 +35,11 @@ case class TestMetaData(
 ) extends MetaData
 
 case class TestedEvent(metaData: TestMetaData, text: String) extends DomainEvent {
-  override def id: AggregateRootId = new AggregateRootId {
-    override def idAsString: String = "testaggregate"
-  }
+  def id: String = "entityId"
 }
 
 class AbstractReplayableEventMaterializerWithRuntimeEventFilterSpec
-    extends WordSpec
+    extends AnyWordSpec
     with Matchers
     with ScalaFutures
     with BeforeAndAfterAll {

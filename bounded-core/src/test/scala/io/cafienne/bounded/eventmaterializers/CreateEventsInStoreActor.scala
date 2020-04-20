@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016-2019 Cafienne B.V. <https://www.cafienne.io/bounded>
+ * Copyright (C) 2016-2020 Cafienne B.V. <https://www.cafienne.io/bounded>
  */
 
 package io.cafienne.bounded.eventmaterializers
@@ -7,10 +7,10 @@ package io.cafienne.bounded.eventmaterializers
 import akka.actor.{ActorContext, ActorRef}
 import akka.persistence.PersistentActor
 import akka.persistence.journal.Tagged
-import io.cafienne.bounded.aggregate.{AggregateRootId, DomainEvent}
+import io.cafienne.bounded.aggregate.DomainEvent
 
-class CreateEventsInStoreActor(aggregateId: AggregateRootId) extends PersistentActor {
-  override def persistenceId: String = aggregateId.idAsString
+class CreateEventsInStoreActor(aggregateId: String) extends PersistentActor {
+  override def persistenceId: String = aggregateId
 
   override def receiveRecover: Receive = {
     case other =>

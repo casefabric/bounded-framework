@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016-2019 Cafienne B.V. <https://www.cafienne.io/bounded>
+ * Copyright (C) 2016-2020 Cafienne B.V. <https://www.cafienne.io/bounded>
  */
 
 package io.cafienne.bounded.aggregate
@@ -9,7 +9,7 @@ import akka.persistence.{PersistentActor, RecoveryCompleted, SnapshotOffer}
 import io.cafienne.bounded.aggregate.AggregateRootActor.GetState
 
 trait AggregateRootCreator {
-  def props(idToCreate: AggregateRootId): Props
+  def props(idToCreate: String): Props
 }
 
 trait AggregateState[A <: AggregateState[A]] {
@@ -32,7 +32,7 @@ trait AggregateRootActor[A <: AggregateState[A]]
     * When extending the AggregateRootActor you must return the unique id of the aggregate root.
     * @return AggregateRootId
     */
-  def aggregateId: AggregateRootId
+  def aggregateId: String
 
   /**
     * When extending the AggregateRootActor you MUST implement the handleCommand method.
@@ -52,7 +52,7 @@ trait AggregateRootActor[A <: AggregateState[A]]
     internalState = internalState.fold(newState(evt))(_ update evt)
   }
 
-  override def persistenceId: String = aggregateId.idAsString
+  override def persistenceId: String = aggregateId
 
   val snapShotInterval: Option[Int] = None
 

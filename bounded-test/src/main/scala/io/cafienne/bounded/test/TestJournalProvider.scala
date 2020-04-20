@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016-2019 Cafienne B.V. <https://www.cafienne.io/bounded>
+ * Copyright (C) 2016-2020 Cafienne B.V. <https://www.cafienne.io/bounded>
  */
 
 package io.cafienne.bounded.test
@@ -42,7 +42,9 @@ trait TestJournalProvider {
     val start = System.currentTimeMillis()
     while (!hasEvent && ((System
              .currentTimeMillis() - start) < maxWaitTimeMillis)) {
-      Thread.sleep(20) // Needed since it takes a while before inmemory-db akka persistece plugin makes event(s) available
+      Thread.sleep(
+        20
+      ) // Needed since it takes a while before inmemory-db akka persistece plugin makes event(s) available
       val eventsStream: Source[EventEnvelope, NotUsed] = readJournal
         .currentEventsByPersistenceId(persistenceId, 0L, Long.MaxValue)
       val future = eventsStream.take(1).runWith(Sink.seq)

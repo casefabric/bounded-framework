@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016-2019 Cafienne B.V. <https://www.cafienne.io/bounded>
+ * Copyright (C) 2016-2020 Cafienne B.V. <https://www.cafienne.io/bounded>
  */
 
 package io.cafienne.bounded.test
@@ -42,7 +42,7 @@ object TestableAggregateRoot {
   case class CommandHandlingFailed(failure: HandlingFailure)
       extends Exception(s"Command handling failed with [$failure]")
 
-  case class MisdirectedCommand(expectedId: AggregateRootId, command: DomainCommand)
+  case class MisdirectedCommand(expectedId: String, command: DomainCommand)
       extends Exception(s"Expected command [$command] to target [$expectedId], not [${command.aggregateRootId}]")
 
   case class UnexpectedCommandHandlingSuccess(command: DomainCommand)
@@ -59,7 +59,7 @@ object TestableAggregateRoot {
     */
   def given[A <: AggregateRootActor[B], B <: AggregateState[B]: ClassTag](
     creator: AggregateRootCreator,
-    id: AggregateRootId,
+    id: String,
     evt: DomainEvent*
   )(implicit system: ActorSystem, timeout: Timeout, ctag: reflect.ClassTag[A]): TestableAggregateRoot[A, B] = {
     new TestableAggregateRoot[A, B](creator, id, evt)
@@ -74,7 +74,7 @@ object TestableAggregateRoot {
     */
   def given[A <: AggregateRootActor[B], B <: AggregateState[B]: ClassTag](
     creator: AggregateRootCreator,
-    id: AggregateRootId
+    id: String
   )(implicit system: ActorSystem, timeout: Timeout, ctag: reflect.ClassTag[A]): TestableAggregateRoot[A, B] = {
 
     new TestableAggregateRoot[A, B](creator, id, Seq.empty[DomainEvent])
@@ -82,19 +82,13 @@ object TestableAggregateRoot {
 
   //The tested aggregate root makes use of an additional counter in the id in order to prevent collision of parallel running tests.
   private val atomicCounter: AtomicInteger = new AtomicInteger()
-  private def testId(id: AggregateRootId): AggregateRootId =
-    TestId(id.idAsString + "-" + atomicCounter.getAndIncrement().toString)
+  private def testId(id: String): String   = id + "-" + atomicCounter.getAndIncrement().toString
 
-  private case class TestId(id: String) extends AggregateRootId {
-    override def idAsString: String = id
-
-    override def toString: String = this.idAsString
-  }
 }
 
 class TestableAggregateRoot[A <: AggregateRootActor[B], B <: AggregateState[B]: ClassTag] private (
   creator: AggregateRootCreator,
-  id: AggregateRootId,
+  id: String,
   evt: Seq[DomainEvent]
 )(
   implicit system: ActorSystem,
@@ -116,8 +110,11 @@ class TestableAggregateRoot[A <: AggregateRootActor[B], B <: AggregateState[B]: 
   private val aggregateRootActor: ActorRef = system.actorOf(creator.props(arTestId), s"test-aggregate-$arTestId")
 
   private def storeEvents(evt: Seq[DomainEvent]): Unit = {
-    val storeEventsActor = system.actorOf(Props(classOf[CreateEventsInStoreActor], arTestId), "create-events-actor")
-    val testProbe        = TestProbe()
+    val storeEventsActor = system.actorOf(
+      Props(classOf[CreateEventsInStoreActor], arTestId),
+      "create-events-actor"
+    )
+    val testProbe = TestProbe()
 
     testProbe watch storeEventsActor
     evt foreach { event =>
@@ -137,8 +134,7 @@ class TestableAggregateRoot[A <: AggregateRootActor[B], B <: AggregateState[B]: 
     * @return This initialized TestableAggregateRoot that processed the command.
     */
   def when(command: DomainCommand): TestableAggregateRoot[A, B] = {
-    if (command.aggregateRootId != id)
-      throw MisdirectedCommand(id, command)
+    if (command.aggregateRootId != id) throw MisdirectedCommand(id, command)
 
     val mediator = TestProbe()
     mediator watch aggregateRootActor
@@ -185,7 +181,7 @@ class TestableAggregateRoot[A <: AggregateRootActor[B], B <: AggregateState[B]: 
     assumingCommandIssued(c => lastFailure.getOrElse(throw UnexpectedCommandHandlingSuccess(c)))
 
   override def toString: String = {
-    s"Aggregate Root ${ctag.runtimeClass.getSimpleName} ${id.idAsString}"
+    s"Aggregate Root ${ctag.runtimeClass.getSimpleName} $id"
   }
 
 }

@@ -1,7 +1,7 @@
 
 lazy val basicSettings = {
-  val scala213 = "2.13.0"
-  val scala212 = "2.12.9"
+  val scala213 = "2.13.1"
+  val scala212 = "2.12.11"
   val supportedScalaVersions = List(scala213, scala212)
 
   Seq(
@@ -12,18 +12,18 @@ lazy val basicSettings = {
     releaseCrossBuild := true,
     scalacOptions := Seq(
       "-encoding", "UTF-8",
-      "-target:jvm-1.8",
+      //"-target:jvm-1.8",
       "-deprecation", // warning and location for usages of deprecated APIs
       "-feature", // warning and location for usages of features that should be imported explicitly
       "-unchecked", // additional warnings where generated code depends on assumptions
       "-Xlint", // recommended additional warnings
       "-Ywarn-value-discard", // Warn when non-Unit expression results are unused
       "-Ywarn-dead-code",
-      "-Ywarn-unused",
-      "-Ywarn-unused-import"
+      "-Ywarn-unused" //,
+      //"-Ywarn-unused-import"
     ),
     scalastyleConfig := baseDirectory.value / "project/scalastyle-config.xml",
-    scalafmtConfig := Some((baseDirectory in ThisBuild).value / "project/.scalafmt.conf"),
+    scalafmtConfig := (baseDirectory in ThisBuild).value / "project/.scalafmt.conf",
     scalafmtOnCompile := true,
 
     startYear := Some(2018),

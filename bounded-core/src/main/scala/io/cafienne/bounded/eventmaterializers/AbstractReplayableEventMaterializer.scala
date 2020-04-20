@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016-2019 Cafienne B.V. <https://www.cafienne.io/bounded>
+ * Copyright (C) 2016-2020 Cafienne B.V. <https://www.cafienne.io/bounded>
  */
 
 package io.cafienne.bounded.eventmaterializers
@@ -35,9 +35,7 @@ abstract class AbstractReplayableEventMaterializer(
     */
   override def replayEvents(): Future[Offset] = {
     if (withPartialReplay) {
-      getOffset(viewIdentifier) flatMap { targetOffset =>
-        doReplay(targetOffset)
-      }
+      getOffset(viewIdentifier) flatMap { targetOffset => doReplay(targetOffset) }
     } else {
       doReplay(Offset.noOffset)
     }

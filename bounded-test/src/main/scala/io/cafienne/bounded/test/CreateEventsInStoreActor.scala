@@ -1,15 +1,16 @@
 /*
- * Copyright (C) 2016-2019 Cafienne B.V. <https://www.cafienne.io/bounded>
+ * Copyright (C) 2016-2020 Cafienne B.V. <https://www.cafienne.io/bounded>
  */
 
 package io.cafienne.bounded.test
 
 import akka.actor.{ActorContext, ActorRef}
 import akka.persistence.PersistentActor
-import io.cafienne.bounded.aggregate.{DomainEvent, AggregateRootId}
+import akka.persistence.typed.PersistenceId
+import io.cafienne.bounded.aggregate.DomainEvent
 
-class CreateEventsInStoreActor(aggregateId: AggregateRootId) extends PersistentActor {
-  override def persistenceId: String = aggregateId.idAsString
+class CreateEventsInStoreActor(aggregateId: String) extends PersistentActor {
+  override def persistenceId: String = aggregateId
 
   override def receiveRecover: Receive = {
     case other =>
@@ -17,15 +18,13 @@ class CreateEventsInStoreActor(aggregateId: AggregateRootId) extends PersistentA
   }
 
   override def receiveCommand: Receive = {
-    case evt: DomainEvent => storeAndReply(sender(), evt)
-    case other            => context.system.log.error(s"cannot handle command $other")
-  }
-
-  private def storeAndReply(replyTo: ActorRef, evt: Any)(implicit context: ActorContext): Unit = {
-    persist(evt) { e =>
-      context.system.log.debug(s"persisted $e")
-      replyTo ! e
+    case evt: DomainEvent => {
+      persist(evt) { e =>
+        context.system.log.debug(s"persisted $e")
+        sender() ! e
+      }
     }
+    case other => context.system.log.error(s"cannot handle command $other")
   }
 
 }

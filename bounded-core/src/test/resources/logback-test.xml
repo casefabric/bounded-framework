@@ -1,4 +1,35 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!--<configuration>-->
+
+<!--    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">-->
+<!--        <filter class="ch.qos.logback.classic.filter.ThresholdFilter">-->
+<!--            <level>INFO</level>-->
+<!--        </filter>-->
+<!--        <encoder>-->
+<!--            <pattern>[%date{ISO8601}] [%level] [%logger] [%marker] [%thread] - %msg {%mdc}%n</pattern>-->
+<!--        </encoder>-->
+<!--    </appender>-->
+
+<!--    &lt;!&ndash;-->
+<!--    Logging from tests are silenced by this appender. When there is a test failure-->
+<!--    the captured logging events are flushed to the appenders defined for the-->
+<!--    akka.actor.testkit.typed.internal.CapturingAppenderDelegate logger.-->
+<!--    &ndash;&gt;-->
+<!--    <appender name="CapturingAppender" class="akka.actor.testkit.typed.internal.CapturingAppender" />-->
+
+<!--    &lt;!&ndash;-->
+<!--    The appenders defined for this CapturingAppenderDelegate logger are used-->
+<!--    when there is a test failure and all logging events from the test are-->
+<!--    flushed to these appenders.-->
+<!--    &ndash;&gt;-->
+<!--    <logger name="akka.actor.testkit.typed.internal.CapturingAppenderDelegate" >-->
+<!--        <appender-ref ref="STDOUT"/>-->
+<!--    </logger>-->
+
+<!--    <root level="DEBUG">-->
+<!--        <appender-ref ref="CapturingAppender"/>-->
+<!--    </root>-->
+<!--</configuration>-->
 <configuration>
 
     <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
@@ -7,8 +38,7 @@
       </encoder>
     </appender>
 
-    <logger name="akka" level="ERROR" />
-    <logger name="org.elasticsearch" level="ERROR" />
+    <logger name="akka" level="DEBUG" />
     <root level="DEBUG">
         <appender-ref ref="STDOUT"/>
     </root>
