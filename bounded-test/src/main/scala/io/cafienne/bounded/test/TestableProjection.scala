@@ -22,7 +22,10 @@ import scala.concurrent.{ExecutionContext, Future}
 
 object TestableProjection {
 
-  def given(evt: Seq[DomainEvent])(implicit system: ActorSystem, timeout: Timeout = 2.seconds): TestableProjection = {
+  def given(
+    evt: Seq[DomainEvent],
+    tags: Set[String] = Set.empty
+  )(implicit system: ActorSystem, timeout: Timeout = 2.seconds): TestableProjection = {
     //Cleanup the store before this test is ran.
     val tp = TestProbe()
     tp.send(StorageExtension(system).journalStorage, InMemoryJournalStorage.ClearJournal)
@@ -30,7 +33,7 @@ object TestableProjection {
     tp.send(StorageExtension(system).snapshotStorage, InMemorySnapshotStorage.ClearSnapshots)
     tp.expectMsg(akka.actor.Status.Success(""))
 
-    val testedProjection = new TestableProjection(system, timeout)
+    val testedProjection = new TestableProjection(system, timeout, tags)
     OffsetStoreProvider.getInMemoryStore().clear()
     testedProjection.storeEvents(evt)
     testedProjection
@@ -38,7 +41,7 @@ object TestableProjection {
 
 }
 
-class TestableProjection private (system: ActorSystem, timeout: Timeout) {
+class TestableProjection private (system: ActorSystem, timeout: Timeout, tags: Set[String]) {
 
   private var eventMaterializers: Option[EventMaterializers] = _
   private implicit val executionContext: ExecutionContext    = system.dispatcher
@@ -73,7 +76,8 @@ class TestableProjection private (system: ActorSystem, timeout: Timeout) {
 
   // Blocking way to store events.
   private def storeEvents(evt: Seq[DomainEvent]): Unit = {
-    val storeEventsActor = system.actorOf(Props(classOf[CreateEventsInStoreActor], evt.head.id), "create-events-actor")
+    val storeEventsActor =
+      system.actorOf(Props(classOf[CreateEventsInStoreActor], evt.head.id, tags), "create-events-actor")
 
     val testProbe = TestProbe()
     testProbe watch storeEventsActor
@@ -95,7 +99,8 @@ class TestableProjection private (system: ActorSystem, timeout: Timeout) {
   private def waitTillLastEventIsProcessed(evt: Seq[DomainEvent]) = {
     if (materializerId.isDefined) {
       eventStreamListener.fishForSpecificMessage(timeout.duration, "wait till last event is processed") {
-        case e: EventProcessed if materializerId.get == e.materializerId && evt.last == e.evt => ()
+        case e: EventProcessed if materializerId.get == e.materializerId && evt.last == e.evt =>
+          system.log.debug("catch " + e)
       }
     }
   }

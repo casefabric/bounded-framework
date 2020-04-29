@@ -4,7 +4,7 @@
 
 package io.cafienne.bounded.aggregate
 
-import java.time.ZonedDateTime
+import java.time.{OffsetDateTime, ZonedDateTime}
 
 import akka.actor.testkit.typed.javadsl.LoggingTestKit
 import akka.actor.testkit.typed.scaladsl.{LogCapturing, ManualTime, ScalaTestWithActorTestKit}
@@ -51,12 +51,12 @@ class TypedCommandGatewaySpec extends ScalaTestWithActorTestKit(s"""
   implicit val buildInfo      = BuildInfo("spec", "1.0")
   implicit val runtimeInfo    = RuntimeInfo("current")
 
-  val commandMetaData     = AggregateCommandMetaData(ZonedDateTime.now(), None)
+  val commandMetaData     = AggregateCommandMetaData(OffsetDateTime.now(), None)
   val creator             = new SimpleAggregateManager()
   val typedCommandGateway = new DefaultTypedCommandGateway[SimpleAggregateCommand](system, creator)
 
   "Command Gateway" should "send Create command" in {
-    val commandMetaData = AggregateCommandMetaData(ZonedDateTime.now(), None)
+    val commandMetaData = AggregateCommandMetaData(OffsetDateTime.now(), None)
     val aggregateId     = "test0"
     val probe           = testKit.createTestProbe[Response]()
     whenReady(typedCommandGateway.tell(Create(aggregateId, commandMetaData, probe.ref))) { answer =>
@@ -68,7 +68,7 @@ class TypedCommandGatewaySpec extends ScalaTestWithActorTestKit(s"""
   }
 
   "Command Gateway" should "work with send and ask" in {
-    val commandMetaData = AggregateCommandMetaData(ZonedDateTime.now(), None)
+    val commandMetaData = AggregateCommandMetaData(OffsetDateTime.now(), None)
     val aggregateId     = "testask"
     whenReady(typedCommandGateway.ask(aggregateId, ref => Create(aggregateId, commandMetaData, ref))) {
       answer: Response => answer shouldEqual (OK)
@@ -76,7 +76,7 @@ class TypedCommandGatewaySpec extends ScalaTestWithActorTestKit(s"""
   }
 
   "Command Gateway" should "handle second message via actor in the Map" in {
-    val commandMetaData = AggregateCommandMetaData(ZonedDateTime.now(), None)
+    val commandMetaData = AggregateCommandMetaData(OffsetDateTime.now(), None)
     val aggregateId     = "test0"
     val probe           = testKit.createTestProbe[Response]()
     whenReady(typedCommandGateway.tell(AddItem(aggregateId, commandMetaData, "new item 1", probe.ref))) { answer =>
@@ -87,7 +87,7 @@ class TypedCommandGatewaySpec extends ScalaTestWithActorTestKit(s"""
   }
 
   "Command Gateway" should "recover after stop message and add to the map" in {
-    val commandMetaData = AggregateCommandMetaData(ZonedDateTime.now(), None)
+    val commandMetaData = AggregateCommandMetaData(OffsetDateTime.now(), None)
     val aggregateId     = "test0"
     val probe           = testKit.createTestProbe[Response]()
     whenReady(typedCommandGateway.tell(Stop(aggregateId, commandMetaData, probe.ref))) { answer =>
@@ -103,7 +103,7 @@ class TypedCommandGatewaySpec extends ScalaTestWithActorTestKit(s"""
   }
 
   "Command Gateway" should "recover after the aggregate stopped itself" in {
-    val commandMetaData = AggregateCommandMetaData(ZonedDateTime.now(), None)
+    val commandMetaData = AggregateCommandMetaData(OffsetDateTime.now(), None)
     val aggregateId     = "test0"
     val probe           = testKit.createTestProbe[Response]()
     whenReady(typedCommandGateway.tell(StopAfter(aggregateId, commandMetaData, 3, probe.ref))) { answer =>

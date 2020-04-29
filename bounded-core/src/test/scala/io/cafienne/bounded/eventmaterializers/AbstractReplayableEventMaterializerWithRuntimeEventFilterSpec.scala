@@ -4,7 +4,7 @@
 
 package io.cafienne.bounded.eventmaterializers
 
-import java.time.ZonedDateTime
+import java.time.{OffsetDateTime, ZonedDateTime}
 import java.util.UUID
 
 import akka.Done
@@ -27,7 +27,7 @@ import scala.concurrent.Future
 import scala.concurrent.duration._
 
 case class TestMetaData(
-  timestamp: ZonedDateTime,
+  timestamp: OffsetDateTime,
   userContext: Option[UserContext],
   causedByCommand: Option[UUID],
   buildInfo: BuildInfo,
@@ -62,7 +62,7 @@ class AbstractReplayableEventMaterializerWithRuntimeEventFilterSpec
   val futureBuild   = buildInfo.copy(version = "1.1")
 
   val currentMeta =
-    TestMetaData(ZonedDateTime.parse("2018-01-01T17:43:00+01:00"), None, None, currentBuild, currentRuntime)
+    TestMetaData(OffsetDateTime.parse("2018-01-01T17:43:00+01:00"), None, None, currentBuild, currentRuntime)
 
   val testSet = Seq(
     TestedEvent(currentMeta, "current-current"),

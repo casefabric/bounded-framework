@@ -4,7 +4,7 @@
 
 package io.cafienne.bounded.test
 
-import java.time.ZonedDateTime
+import java.time.{OffsetDateTime, ZonedDateTime}
 
 import akka.actor.ActorSystem
 import akka.event.{Logging, LoggingAdapter}
@@ -33,7 +33,7 @@ class TestableAggregateRootSpec extends AsyncWordSpecLike with Matchers with Sca
 
   val testAggregateRootCreator = new TestAggregateRootCreator(system)
 
-  val currentMeta = TestMetaData(ZonedDateTime.parse("2018-01-01T17:43:00+01:00"), None, None, buildInfo, runtimeInfo)
+  val currentMeta = TestMetaData(OffsetDateTime.parse("2018-01-01T17:43:00+01:00"), None, None, buildInfo, runtimeInfo)
   val metaData    = TestCommandMetaData(currentMeta.timestamp, None)
 
   "The testable aggregate root" must {

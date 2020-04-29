@@ -111,7 +111,7 @@ class TestableAggregateRoot[A <: AggregateRootActor[B], B <: AggregateState[B]: 
 
   private def storeEvents(evt: Seq[DomainEvent]): Unit = {
     val storeEventsActor = system.actorOf(
-      Props(classOf[CreateEventsInStoreActor], arTestId),
+      Props(classOf[CreateEventsInStoreActor], arTestId, Set.empty),
       "create-events-actor"
     )
     val testProbe = TestProbe()

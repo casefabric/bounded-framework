@@ -4,7 +4,7 @@
 
 package io.cafienne.bounded.aggregate
 
-import java.time.ZonedDateTime
+import java.time.{OffsetDateTime, ZonedDateTime}
 
 import akka.actor.testkit.typed.scaladsl.{ActorTestKit, ScalaTestWithActorTestKit}
 import akka.cluster.sharding.typed.scaladsl.{ClusterSharding, Entity}
@@ -38,17 +38,17 @@ class TypedClusteredSpec extends ScalaTestWithActorTestKit(s"""
 
   behavior of "Typed Cluster"
 
-  val commandMetaData = AggregateCommandMetaData(ZonedDateTime.now(), None)
+  val commandMetaData = AggregateCommandMetaData(OffsetDateTime.now(), None)
 
   val creator = new SimpleAggregateManager()
-//  val sharding = ClusterSharding(system)
+//  val sharding = ClusterSharding(system)test
 //
 //  sharding.init(
 //    Entity(creator.entityTypeKey)(createBehavior = entityContext => creator.behavior(entityContext.entityId))
 //  )
 
   "ShardedCluster" should "Create a basic non-clustered aggregate and send command" in {
-    val commandMetaData = AggregateCommandMetaData(ZonedDateTime.now(), None)
+    val commandMetaData = AggregateCommandMetaData(OffsetDateTime.now(), None)
 
     val aggregateId = "test0"
     val creator     = new SimpleAggregateManager()

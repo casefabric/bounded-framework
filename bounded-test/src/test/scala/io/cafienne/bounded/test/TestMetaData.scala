@@ -4,20 +4,20 @@
 
 package io.cafienne.bounded.test
 
-import java.time.ZonedDateTime
+import java.time.{OffsetDateTime, ZonedDateTime}
 import java.util.UUID
 
 import io.cafienne.bounded.aggregate.{CommandMetaData, MetaData}
 import io.cafienne.bounded.{BuildInfo, RuntimeInfo, UserContext}
 
 case class TestCommandMetaData(
-  timestamp: ZonedDateTime,
+  timestamp: OffsetDateTime,
   val userContext: Option[UserContext],
   override val commandId: UUID = UUID.randomUUID()
 ) extends CommandMetaData
 
 case class TestMetaData(
-  timestamp: ZonedDateTime,
+  timestamp: OffsetDateTime,
   userContext: Option[UserContext],
   causedByCommand: Option[UUID],
   buildInfo: BuildInfo,

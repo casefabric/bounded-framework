@@ -4,7 +4,7 @@
 
 package io.cafienne.bounded.aggregate
 
-import java.time.ZonedDateTime
+import java.time.OffsetDateTime
 import java.util.UUID
 
 import akka.actor.typed.ActorRef
@@ -20,7 +20,7 @@ import stamina.Persistable
   * @param userContext contains an assumed known user, events generated via an HTTP API will most of the time be authenticated
   */
 trait CommandMetaData {
-  def timestamp: ZonedDateTime
+  def timestamp: OffsetDateTime
   def userContext: Option[UserContext]
   def commandId: UUID = UUID.randomUUID()
 }
@@ -45,7 +45,7 @@ trait ReplyTo {
   * @param runTimeInfo contains information on the runtime the event is generated and stored
   */
 trait MetaData {
-  def timestamp: ZonedDateTime
+  def timestamp: OffsetDateTime
   def userContext: Option[UserContext]
   def causedByCommand: Option[UUID]
   def buildInfo: BuildInfo

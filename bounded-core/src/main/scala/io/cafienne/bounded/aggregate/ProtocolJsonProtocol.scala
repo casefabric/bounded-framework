@@ -4,7 +4,7 @@
 
 package io.cafienne.bounded.aggregate
 
-import java.time.ZonedDateTime
+import java.time.OffsetDateTime
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 import java.util.UUID
@@ -33,18 +33,17 @@ object ProtocolJsonProtocol {
       }
     }
 
-  implicit object ZonedDateTimeJsonFormat extends RootJsonFormat[ZonedDateTime] {
+  implicit object OffsetDateTimeJsonFormat extends RootJsonFormat[OffsetDateTime] {
 
-    def write(dt: ZonedDateTime): JsValue =
+    def write(dt: OffsetDateTime): JsValue =
       JsString(
         dt.truncatedTo(ChronoUnit.SECONDS)
-          .toOffsetDateTime
           .format(DateTimeFormatter.ISO_DATE_TIME)
       )
 
-    def read(value: JsValue): ZonedDateTime = value match {
+    def read(value: JsValue): OffsetDateTime = value match {
       case JsString(v) =>
-        ZonedDateTime.parse(v, DateTimeFormatter.ISO_DATE_TIME)
+        OffsetDateTime.parse(v, DateTimeFormatter.ISO_DATE_TIME)
       case _ =>
         deserializationError(s"value $value not conform ISO8601 (yyyy-MM-dd'T'HH:mm:ssZZ) where time is optional")
     }

@@ -11,8 +11,9 @@ import akka.persistence.typed.scaladsl.{Effect, EventSourcedBehavior, ReplyEffec
 import com.typesafe.scalalogging.Logger
 import io.cafienne.bounded.{BuildInfo, RuntimeInfo, UserContext}
 import io.cafienne.bounded.aggregate.typed.TypedAggregateRootManager
-import java.time.ZonedDateTime
+import java.time.{OffsetDateTime, ZonedDateTime}
 import java.util.UUID
+
 import scala.concurrent.duration._
 import akka.actor.typed.scaladsl.{Behaviors, TimerScheduler}
 import akka.persistence.RecoveryCompleted
@@ -33,7 +34,7 @@ object TypedSimpleAggregate {
   final case class Items(items: List[String]) extends Response
 
   // Command Type
-  final case class AggregateCommandMetaData(timestamp: ZonedDateTime, userContext: Option[UserContext])
+  final case class AggregateCommandMetaData(timestamp: OffsetDateTime, userContext: Option[UserContext])
       extends CommandMetaData
 
   sealed trait SimpleAggregateCommand extends DomainCommand
@@ -171,7 +172,7 @@ class SimpleAggregateManager() extends TypedAggregateRootManager[SimpleAggregate
 }
 
 case class TestMetaData(
-  timestamp: ZonedDateTime,
+  timestamp: OffsetDateTime,
   userContext: Option[UserContext],
   causedByCommand: Option[UUID],
   buildInfo: BuildInfo,
