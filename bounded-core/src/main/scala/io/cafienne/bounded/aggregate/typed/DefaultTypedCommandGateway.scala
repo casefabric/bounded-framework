@@ -60,7 +60,7 @@ class DefaultTypedCommandGateway[Cmd <: DomainCommand](
       .receive[AggregateControl] { (context, message) =>
         message match {
           case SpawnAggregate(aggregateId, replyTo) =>
-            context.log.info("Spawning Aggregate {}!", aggregateId)
+            context.log.debug("Find or create aggregate {}", aggregateId)
             val ref = aggregates.getOrElseUpdate(
               aggregateId, {
                 val ref = context.spawn(aggregateRootCreator.behavior(aggregateId), name = aggregateId)
@@ -103,7 +103,6 @@ class DefaultTypedCommandGateway[Cmd <: DomainCommand](
   }
 
   override def tell(command: Cmd)(implicit validator: ValidateableCommand[Cmd]): Future[_] = {
-    system.log.debug("Received send {}", command)
     CommandValidator
       .validate(command)
       .flatMap { validatedCommand =>

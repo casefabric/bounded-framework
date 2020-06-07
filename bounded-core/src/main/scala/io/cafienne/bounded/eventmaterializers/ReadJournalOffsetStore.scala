@@ -12,6 +12,7 @@ import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
 import io.cafienne.bounded.akka.ActorSystemProvider
 import io.cafienne.bounded.akka.persistence.ReadJournalProvider
 import io.cafienne.bounded.eventmaterializers.offsetstores._
+import slick.basic.DatabaseConfig
 
 import scala.concurrent.Future
 import scala.concurrent.duration._
@@ -34,6 +35,13 @@ trait ReadJournalOffsetStore extends OffsetStore {
       val levelDbDir = system.settings.config.getString("akka.persistence.journal.leveldb.dir")
       val c          = ConfigFactory.empty().withValue("path", ConfigValueFactory.fromAnyRef(levelDbDir + "/lmdb_offsets"))
       LmdbOffsetStore(new LmdbConfig(c))
+    } else if (configuredJournal.endsWith("jdbc-journal")) {
+      new JdbcOffsetStore(
+        DatabaseConfig.forConfig(
+          config = system.settings.config,
+          path = system.settings.config.getString("akka.persistence.offset.jdbc.store")
+        )
+      )
     } else {
       throw new RuntimeException(s"Offsetstore $configuredJournal is not supported as ReadJournalOffsetStore")
     }

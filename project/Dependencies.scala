@@ -6,7 +6,7 @@ import sbt._
 
 object Dependencies {
 
-  val akkaVersion = "2.6.4"
+  val akkaVersion = "2.6.5"
   val akkaHttpVersion = "10.1.11"
   val staminaVersion = "0.1.5"
   val persistenceInMemVersion = "2.5.15.2"
@@ -29,7 +29,7 @@ object Dependencies {
       akkaModule("stream-testkit") % Test,
       akkaModule("testkit") % Test,
       akkaModule("actor-testkit-typed") % Test,
-      "com.scalapenos"              %% "stamina-json"                           % staminaVersion,
+      akkaModule("persistence-testkit") % Test,
       "io.spray"                    %% "spray-json"                             % "1.3.5",
       "com.github.dnvriend"         %% "akka-persistence-inmemory"              % persistenceInMemVersion,
       "com.typesafe.scala-logging"  %% "scala-logging"                          % "3.9.2"
@@ -43,9 +43,7 @@ object Dependencies {
 
 
   val  test = log ++ Seq(
-      "org.scalatest"       %% "scalatest"                   % scalaTestVersion % Test,
-      "com.scalapenos"      %% "stamina-testkit"             % staminaVersion % Test,
-      //"org.scalamock"       %% "scalamock-scalatest-support" % "4.4.0" % Test
+      "org.scalatest"       %% "scalatest"                   % scalaTestVersion % Test
     )
 
 
@@ -56,12 +54,7 @@ object Dependencies {
     baseDeps ++ Seq(
       akkaHttpModule("http"),
       akkaHttpModule("http-spray-json"),
-      akkaHttpModule("http-testkit") % Test,
-      "io.swagger" % "swagger-jaxrs" % "1.6.1",
-      // As suggested in https://stackoverflow.com/questions/43574426/how-to-resolve-java-lang-noclassdeffounderror-javax-xml-bind-jaxbexception-in-j
-      // to resolve blow-up due to swagger :  java.lang.NoClassDefFoundError: javax/xml/bind/annotation/XmlRootElement.
-      "javax.xml.bind" % "jaxb-api" % "2.3.1",
-      "com.github.swagger-akka-http" %% "swagger-akka-http" % "2.0.4"
+      akkaHttpModule("http-testkit") % Test
     ) ++ test
   }
 
@@ -70,6 +63,7 @@ object Dependencies {
       "org.scalatest"          %% "scalatest"                 % scalaTestVersion,
       "com.typesafe.akka"      %% "akka-testkit"              % akkaVersion,
       "com.typesafe.akka"      %% "akka-actor-testkit-typed"  % akkaVersion,
+      "com.typesafe.akka"      %% "akka-persistence-testkit"  % akkaVersion,
       "com.typesafe.akka"      %% "akka-http-testkit"         % akkaHttpVersion
     ) ++ test
   }
@@ -90,6 +84,13 @@ object Dependencies {
   val persistenceCassandraDeps = {
     baseDeps ++ Seq(
       "com.typesafe.akka" %% "akka-persistence-cassandra" % "0.103"
+    )
+  }
+
+  val persistenceJdbcDeps = {
+    baseDeps ++ Seq(
+      "com.lightbend.akka" %% "akka-persistence-jdbc" % "4.0.0-RC2",
+      "com.typesafe.slick" %% "slick" % "3.3.2"
     )
   }
 

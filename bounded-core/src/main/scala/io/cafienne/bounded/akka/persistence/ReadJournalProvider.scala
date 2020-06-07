@@ -7,6 +7,7 @@ package io.cafienne.bounded.akka.persistence
 import akka.actor.Props
 import akka.persistence.cassandra.query.scaladsl.CassandraReadJournal
 import akka.persistence.inmemory.query.scaladsl.InMemoryReadJournal
+import akka.persistence.jdbc.query.scaladsl.JdbcReadJournal
 import akka.persistence.journal.leveldb.{SharedLeveldbJournal, SharedLeveldbStore}
 import akka.persistence.query.PersistenceQuery
 import akka.persistence.query.journal.leveldb.scaladsl.LeveldbReadJournal
@@ -49,6 +50,13 @@ trait ReadJournalProvider { systemProvider: ActorSystemProvider =>
     if (configuredJournal.endsWith("inmemory-journal")) {
       return PersistenceQuery(system)
         .readJournalFor[InMemoryReadJournal](InMemoryReadJournal.Identifier)
+        .asInstanceOf[
+          ReadJournal with CurrentPersistenceIdsQuery with CurrentEventsByPersistenceIdQuery with CurrentEventsByTagQuery with EventsByPersistenceIdQuery with EventsByTagQuery
+        ]
+    }
+    if (configuredJournal.endsWith("jdbc-journal")) {
+      return PersistenceQuery(system)
+        .readJournalFor[JdbcReadJournal](JdbcReadJournal.Identifier)
         .asInstanceOf[
           ReadJournal with CurrentPersistenceIdsQuery with CurrentEventsByPersistenceIdQuery with CurrentEventsByTagQuery with EventsByPersistenceIdQuery with EventsByTagQuery
         ]
