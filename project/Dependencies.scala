@@ -6,8 +6,8 @@ import sbt._
 
 object Dependencies {
 
-  val akkaVersion = "2.6.5"
-  val akkaHttpVersion = "10.1.11"
+  val akkaVersion = "2.6.6"
+  val akkaHttpVersion = "10.1.12"
   val staminaVersion = "0.1.5"
   val persistenceInMemVersion = "2.5.15.2"
   val scalaTestVersion = "3.1.1"

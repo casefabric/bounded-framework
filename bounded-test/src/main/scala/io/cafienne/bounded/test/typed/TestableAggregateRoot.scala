@@ -128,9 +128,10 @@ class TestableAggregateRoot[A <: DomainCommand, B <: DomainEvent, C: ClassTag] p
   private var lastCommand: Option[DomainCommand]   = Option.empty
 
   import TestableAggregateRoot.testId
-  final val arTestId        = testId(id)
-  final val arTestIdInStore = manager.entityTypeKey.name + persistenceIdSeparator + arTestId
-  if (evt != null && evt.nonEmpty) persistenceTestKit.persistForRecovery(arTestIdInStore, evt)
+  private final val arTestId = testId(id)
+//  final val arTestIdInStore = manager.entityTypeKey.name + persistenceIdSeparator + arTestId
+  //if (evt != null && evt.nonEmpty) persistenceTestKit.persistForRecovery(arTestIdInStore, evt)
+  if (evt != null && evt.nonEmpty) persistenceTestKit.persistForRecovery(arTestId, evt)
 
   def supervise: Behavior[A] =
     Behaviors.supervise(handler).onFailure(SupervisorStrategy.stop)
@@ -194,7 +195,7 @@ class TestableAggregateRoot[A <: DomainCommand, B <: DomainEvent, C: ClassTag] p
   def events: List[DomainEvent] = {
     if (lastCommand.isEmpty) throw NoCommandsIssued
     val unwanted = givenEvents.toSet
-    persistenceTestKit.persistedInStorage(arTestIdInStore).map(_.asInstanceOf[B]).toList.filterNot(unwanted)
+    persistenceTestKit.persistedInStorage(arTestId).map(_.asInstanceOf[B]).toList.filterNot(unwanted)
   }
 
   /** Last known command handling failure */
