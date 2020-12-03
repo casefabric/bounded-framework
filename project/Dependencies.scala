@@ -6,11 +6,11 @@ import sbt._
 
 object Dependencies {
 
-  val akkaVersion = "2.6.6"
-  val akkaHttpVersion = "10.1.12"
+  val akkaVersion = "2.6.10"
+  val akkaHttpVersion = "10.2.1"
   val staminaVersion = "0.1.5"
   val persistenceInMemVersion = "2.5.15.2"
-  val scalaTestVersion = "3.1.1"
+  val scalaTestVersion = "3.2.3"
 
   val baseDeps = {
     def akkaModule(name: String, version: String = akkaVersion) =
@@ -30,7 +30,7 @@ object Dependencies {
       akkaModule("testkit") % Test,
       akkaModule("actor-testkit-typed") % Test,
       akkaModule("persistence-testkit") % Test,
-      "io.spray"                    %% "spray-json"                             % "1.3.5",
+      "io.spray"                    %% "spray-json"                             % "1.3.6",
       "com.github.dnvriend"         %% "akka-persistence-inmemory"              % persistenceInMemVersion,
       "com.typesafe.scala-logging"  %% "scala-logging"                          % "3.9.2"
     )
@@ -38,7 +38,7 @@ object Dependencies {
 
   val log = Seq(
       "ch.qos.logback" % "logback-classic" % "1.2.3",
-      "net.logstash.logback" % "logstash-logback-encoder" % "6.3"
+      "net.logstash.logback" % "logstash-logback-encoder" % "6.5"
     )
 
 
@@ -77,20 +77,20 @@ object Dependencies {
 
   val persistanceLmdbDBDeps = {
     baseDeps ++ Seq(
-      "org.lmdbjava"                % "lmdbjava"        % "0.7.0"
+      "org.lmdbjava"                % "lmdbjava"        % "0.8.1"
     )
   }
 
   val persistenceCassandraDeps = {
     baseDeps ++ Seq(
-      "com.typesafe.akka" %% "akka-persistence-cassandra" % "0.103"
+      "com.typesafe.akka" %% "akka-persistence-cassandra" % "1.0.4"
     )
   }
 
   val persistenceJdbcDeps = {
     baseDeps ++ Seq(
-      "com.lightbend.akka" %% "akka-persistence-jdbc" % "4.0.0-RC2",
-      "com.typesafe.slick" %% "slick" % "3.3.2"
+      "com.lightbend.akka" %% "akka-persistence-jdbc" % "4.0.0",
+      "com.typesafe.slick" %% "slick" % "3.3.3"
     )
   }
 
