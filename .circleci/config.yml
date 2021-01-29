@@ -29,7 +29,8 @@ jobs:
             - v1-dependencies-
       - run:
           name: Run tests 
-          command: cat /dev/null | sbt clean coverage test coverageReport 
+          #command: cat /dev/null | sbt clean coverage test coverageReport 
+          command: cat /dev/null | sbt clean test 
           #- store_artifacts: # for display in Artifacts: https://circleci.com/docs/2.0/artifacts/ 
           #path: target/universal/samplescala.zip
           #destination: samplescala
