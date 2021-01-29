@@ -6,8 +6,8 @@ import sbt._
 
 object Dependencies {
 
-  val akkaVersion = "2.6.10"
-  val akkaHttpVersion = "10.2.1"
+  val akkaVersion = "2.6.12"
+  val akkaHttpVersion = "10.2.3"
   val staminaVersion = "0.1.5"
   val persistenceInMemVersion = "2.5.15.2"
   val scalaTestVersion = "3.2.3"
@@ -38,7 +38,7 @@ object Dependencies {
 
   val log = Seq(
       "ch.qos.logback" % "logback-classic" % "1.2.3",
-      "net.logstash.logback" % "logstash-logback-encoder" % "6.5"
+      "net.logstash.logback" % "logstash-logback-encoder" % "6.6"
     )
 
 
@@ -89,7 +89,7 @@ object Dependencies {
 
   val persistenceJdbcDeps = {
     baseDeps ++ Seq(
-      "com.lightbend.akka" %% "akka-persistence-jdbc" % "4.0.0",
+      "com.lightbend.akka" %% "akka-persistence-jdbc" % "5.0.0",
       "com.typesafe.slick" %% "slick" % "3.3.3"
     )
   }
