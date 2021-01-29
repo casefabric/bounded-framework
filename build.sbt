@@ -1,7 +1,7 @@
 
 lazy val basicSettings = {
   val scala213 = "2.13.4"
-  val scala212 = "2.12.12"
+  val scala212 = "2.12.13"
   val supportedScalaVersions = List(scala213, scala212)
 
   Seq(
