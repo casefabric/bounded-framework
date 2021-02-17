@@ -4,14 +4,11 @@
 
 package io.cafienne.bounded.test
 
-import java.time.{OffsetDateTime, ZonedDateTime}
-
+import java.time.OffsetDateTime
 import akka.actor.ActorSystem
 import akka.event.{Logging, LoggingAdapter}
-import akka.persistence.typed.PersistenceId
 import akka.testkit.TestKit
 import akka.util.Timeout
-import io.cafienne.bounded.{BuildInfo, RuntimeInfo}
 import io.cafienne.bounded.test.TestableAggregateRoot._
 import io.cafienne.bounded.test.DomainProtocol._
 import io.cafienne.bounded.test.TestAggregateRoot.TestAggregateRootState
@@ -28,12 +25,10 @@ class TestableAggregateRootSpec extends AsyncWordSpecLike with Matchers with Sca
   implicit val timeout                = Timeout(10.seconds)
   implicit val system                 = ActorSystem("TestSystem", SpecConfig.testConfig)
   implicit val logger: LoggingAdapter = Logging(system, getClass)
-  implicit val buildInfo              = BuildInfo("spec", "1.0")
-  implicit val runtimeInfo            = RuntimeInfo("current")
 
   val testAggregateRootCreator = new TestAggregateRootCreator(system)
 
-  val currentMeta = TestMetaData(OffsetDateTime.parse("2018-01-01T17:43:00+01:00"), None, None, buildInfo, runtimeInfo)
+  val currentMeta = TestMetaData(OffsetDateTime.parse("2018-01-01T17:43:00+01:00"), None, None)
   val metaData    = TestCommandMetaData(currentMeta.timestamp, None)
 
   "The testable aggregate root" must {

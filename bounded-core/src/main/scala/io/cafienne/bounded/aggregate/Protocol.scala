@@ -4,67 +4,25 @@
 
 package io.cafienne.bounded.aggregate
 
-import java.time.OffsetDateTime
-import java.util.UUID
-
 import akka.actor.typed.ActorRef
-import akka.persistence.typed.PersistenceId
-import io.cafienne.bounded.{BuildInfo, Id, RuntimeInfo, UserContext}
-
 import scala.collection.immutable.Seq
 
-/**
-  * Metadata of the event contains data that is used within the framework and may be used by the application
-  * @param timestamp the moment the event was created
-  * @param userContext contains an assumed known user, events generated via an HTTP API will most of the time be authenticated
-  */
-trait CommandMetaData {
-  def timestamp: OffsetDateTime
-  def userContext: Option[UserContext]
-  val commandId: UUID = UUID.randomUUID()
-}
-
 trait DomainCommand {
-
   def aggregateRootId: String
-
-  def metaData: CommandMetaData
 }
 
 trait ReplyTo {
   var replyTo: ActorRef[_]
 }
 
-/**
-  * Metadata of the event contains data that is used within the framework and may be used by the application
-  * @param timestamp the moment the event was created
-  * @param userContext contains an assumed known user, events generated via an HTTP API will most of the time be authenticated
-  * @param causedByCommand contains a reference to the command that has caused this event.
-  * @param buildInfo contains the build information of the application. The Version is used to ensure version specific routing of messages.
-  * @param runTimeInfo contains information on the runtime the event is generated and stored
-  */
-trait MetaData {
-  def timestamp: OffsetDateTime
-  def userContext: Option[UserContext]
-  def causedByCommand: Option[UUID]
-  def buildInfo: BuildInfo
-  def runTimeInfo: RuntimeInfo
-}
-
-trait WithMetaData {
-  def metaData: MetaData
-}
-
-trait DomainEvent extends WithMetaData {
-
+trait DomainEvent {
   def id: String
-
 }
 
 trait HandlingFailure
 
-class AggregateNotInitialized(id: PersistenceId) extends HandlingFailure
-class UnexpectedCommand(command: DomainCommand)  extends HandlingFailure
+//class AggregateNotInitialized(id: PersistenceId) extends HandlingFailure
+class UnexpectedCommand(command: DomainCommand) extends HandlingFailure
 
 sealed trait Reply
 

@@ -4,13 +4,11 @@
 
 package io.cafienne.bounded.aggregate
 
-import java.time.{OffsetDateTime, ZonedDateTime}
+import java.time.OffsetDateTime
 
-import akka.actor.testkit.typed.javadsl.LoggingTestKit
-import akka.actor.testkit.typed.scaladsl.{LogCapturing, ManualTime, ScalaTestWithActorTestKit}
+import akka.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
 import akka.actor.typed.ActorSystem
 import akka.util.Timeout
-import io.cafienne.bounded.{BuildInfo, RuntimeInfo}
 import io.cafienne.bounded.aggregate.typed.DefaultTypedCommandGateway
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.concurrent.ScalaFutures
@@ -48,8 +46,6 @@ class TypedCommandGatewaySpec extends ScalaTestWithActorTestKit(s"""
   behavior of "Typed Command Gateway"
 
   implicit val gatewayTimeout = Timeout(10.seconds)
-  implicit val buildInfo      = BuildInfo("spec", "1.0")
-  implicit val runtimeInfo    = RuntimeInfo("current")
 
   val commandMetaData     = AggregateCommandMetaData(OffsetDateTime.now(), None)
   val creator             = new SimpleAggregateManager()
@@ -119,7 +115,7 @@ class TypedCommandGatewaySpec extends ScalaTestWithActorTestKit(s"""
   }
 
   protected override def afterAll(): Unit = {
-    Await.ready(typedCommandGateway.shutdown(), 5.seconds)
+    Await.ready(typedCommandGateway.shutdown(), 5.seconds).map(_ => (): Unit)
   }
 
 }

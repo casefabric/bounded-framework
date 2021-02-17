@@ -45,8 +45,6 @@ abstract class SagaEventMaterializer(
     with ExceptionWriter
     with Configured {
 
-  import EventMaterializerExecutionContext._
-
   /**
     * Unique ID for this materializer
     */
@@ -56,7 +54,7 @@ abstract class SagaEventMaterializer(
 
   val logger: Logger
 
-  implicit val mat = ActorMaterializer()
+  implicit val mat = actorSystem.dispatcher
 
   val journal = readJournal
 

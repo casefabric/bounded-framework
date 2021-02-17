@@ -5,35 +5,13 @@
 package io.cafienne.bounded.test
 
 import akka.actor.{ActorSystem, Props}
-import io.cafienne.bounded.{BuildInfo, RuntimeInfo}
 import io.cafienne.bounded.aggregate._
 import io.cafienne.bounded.test.DomainProtocol.StateUpdated
 import io.cafienne.bounded.test.TestAggregateRoot.TestAggregateRootState
-
 import scala.collection.immutable.Seq
 
-object DomainProtocol {
-
-  case class CreateInitialState(metaData: CommandMetaData, aggregateRootId: String, state: String) extends DomainCommand
-  case class InitialStateCreated(metaData: MetaData, id: String, state: String)                    extends DomainEvent
-
-  case class UpdateState(metaData: CommandMetaData, aggregateRootId: String, state: String) extends DomainCommand
-  case class StateUpdated(metaData: MetaData, id: String, state: String)                    extends DomainEvent
-
-  //This can be sent but is not handled so gives a Ko(UnExpectedCommand)
-  case class CommandWithoutHandler(metaData: CommandMetaData, aggregateRootId: String, msg: String)
-      extends DomainCommand
-
-  case class InvalidCommand(msg: String)                                extends HandlingFailure
-  case class StateTransitionForbidden(from: Option[String], to: String) extends HandlingFailure
-}
-
-class TestAggregateRoot(aggregateRootId: String, buildInfo: BuildInfo, runtimeInfo: RuntimeInfo)
-    extends AggregateRootActor[TestAggregateRootState] {
+class TestAggregateRoot(aggregateRootId: String) extends AggregateRootActor[TestAggregateRootState] {
   import DomainProtocol._
-
-  implicit val bi = buildInfo
-  implicit val ri = runtimeInfo
 
   override def aggregateId: String = aggregateRootId
 
@@ -96,16 +74,13 @@ object TestAggregateRoot {
   val aggregateRootTag = "ar-test"
 }
 
-class TestAggregateRootCreator(system: ActorSystem)(implicit buildInfo: BuildInfo, runtimeInfo: RuntimeInfo)
-    extends AggregateRootCreator {
+class TestAggregateRootCreator(system: ActorSystem) extends AggregateRootCreator {
 
   override def props(aggregateRootId: String): Props = {
     system.log.debug("Returning new Props for {}", aggregateRootId)
     Props(
       classOf[TestAggregateRoot],
-      aggregateRootId,
-      buildInfo,
-      runtimeInfo
+      aggregateRootId
     )
   }
 

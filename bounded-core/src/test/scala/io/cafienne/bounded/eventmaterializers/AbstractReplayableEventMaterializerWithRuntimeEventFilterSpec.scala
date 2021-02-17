@@ -4,9 +4,7 @@
 
 package io.cafienne.bounded.eventmaterializers
 
-import java.time.{OffsetDateTime, ZonedDateTime}
-import java.util.UUID
-
+import java.time.OffsetDateTime
 import akka.Done
 import akka.actor.{ActorSystem, PoisonPill, Props}
 import akka.event.{Logging, LoggingAdapter}
@@ -14,8 +12,7 @@ import akka.persistence.query.Sequence
 import akka.testkit.{TestKit, TestProbe}
 import akka.util.Timeout
 import com.typesafe.scalalogging.Logger
-import io.cafienne.bounded.aggregate.{DomainEvent, MetaData}
-import io.cafienne.bounded._
+import io.cafienne.bounded.aggregate.DomainEvent
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.matchers.should.Matchers
@@ -28,17 +25,29 @@ import scala.concurrent.duration._
 
 case class TestMetaData(
   timestamp: OffsetDateTime,
-  userContext: Option[UserContext],
-  causedByCommand: Option[UUID],
-  buildInfo: BuildInfo,
-  runTimeInfo: RuntimeInfo
-) extends MetaData
+  userContext: Option[String]
+)
 
 case class TestedEvent(metaData: TestMetaData, text: String) extends DomainEvent {
   def id: String = "entityId"
 }
 
-class AbstractReplayableEventMaterializerWithRuntimeEventFilterSpec
+class UserEventFilter(
+  userToFilter: String
+) extends MaterializerEventFilter {
+
+  override def filter(evt: DomainEvent): Boolean = {
+    evt match {
+      case TestedEvent(metaData, text)
+          if (metaData.userContext.isDefined && metaData.userContext.get.equalsIgnoreCase("user-b")) =>
+        true
+      case _ => false
+    }
+  }
+
+}
+
+class AbstractReplayableEventMaterializerWithEventFilterSpec
     extends AnyWordSpec
     with Matchers
     with ScalaFutures
@@ -49,34 +58,25 @@ class AbstractReplayableEventMaterializerWithRuntimeEventFilterSpec
   implicit val system                 = ActorSystem("MaterializerTestSystem", SpecConfig.testConfig)
   implicit val logger: LoggingAdapter = Logging(system, getClass)
   implicit val defaultPatience        = PatienceConfig(timeout = Span(4, Seconds), interval = Span(100, Millis))
-  implicit val buildInfo              = BuildInfo("spec", "1.0")
-  implicit val runtimeInfo            = RuntimeInfo("current")
 
   val eventStreamListener = TestProbe()
 
-  val currentRuntime = runtimeInfo
-  val otherRuntime   = runtimeInfo.copy("previous")
-
-  val currentBuild  = buildInfo
-  val previousBuild = buildInfo.copy(version = "0.9")
-  val futureBuild   = buildInfo.copy(version = "1.1")
-
   val currentMeta =
-    TestMetaData(OffsetDateTime.parse("2018-01-01T17:43:00+01:00"), None, None, currentBuild, currentRuntime)
+    TestMetaData(OffsetDateTime.parse("2018-01-01T17:43:00+01:00"), None)
 
   val testSet = Seq(
     TestedEvent(currentMeta, "current-current"),
-    TestedEvent(currentMeta.copy(buildInfo = previousBuild), "previous-current"),
-    TestedEvent(currentMeta.copy(buildInfo = futureBuild), "future-current"),
-    TestedEvent(currentMeta.copy(runTimeInfo = otherRuntime), "current-other"),
-    TestedEvent(currentMeta.copy(buildInfo = previousBuild, runTimeInfo = otherRuntime), "previous-other"),
-    TestedEvent(currentMeta.copy(buildInfo = futureBuild, runTimeInfo = otherRuntime), "future-other")
+    TestedEvent(currentMeta.copy(userContext = Some("user-a")), "current+1"),
+    TestedEvent(currentMeta.copy(userContext = Some("user-b")), "current+2"),
+    TestedEvent(currentMeta.copy(userContext = Some("user-a")), "current+3"),
+    TestedEvent(currentMeta.copy(userContext = Some("user-b")), "current+4"),
+    TestedEvent(currentMeta.copy(userContext = Some("user-b")), "current+5")
   )
 
   "The Event Materializer" must {
 
     "materialize all given events" in {
-      val materializer = new TestMaterializer(DefaultCompatibility)
+      val materializer = new TestMaterializer()
 
       val toBeRun = new EventMaterializers(List(materializer))
       whenReady(toBeRun.startUp(false)) { replayResult =>
@@ -87,13 +87,13 @@ class AbstractReplayableEventMaterializerWithRuntimeEventFilterSpec
       assert(materializer.storedEvents.size == 6)
     }
 
-    "materialize all events within the current runtime" in {
-      val materializer = new TestMaterializer(Compatibility(RuntimeCompatibility.CURRENT))
+    "materialize all events for user-b" in {
+      val materializer = new TestMaterializer(new UserEventFilter("user-b"))
 
       val toBeRun = new EventMaterializers(List(materializer))
       whenReady(toBeRun.startUp(false)) { replayResult =>
         logger.debug("replayResult: {}", replayResult)
-        assert(replayResult.head.offset == Some(Sequence(3L)))
+        assert(replayResult.head.offset == Some(Sequence(6L)))
       }
       logger.debug("DUMP current runtime and all versions {}", materializer.storedEvents)
       assert(materializer.storedEvents.size == 3)
@@ -128,11 +128,11 @@ class AbstractReplayableEventMaterializerWithRuntimeEventFilterSpec
     TestKit.shutdownActorSystem(system, 30.seconds, verifySystemShutdown = true)
   }
 
-  class TestMaterializer(compatible: Compatibility)(implicit runtimeInfo: RuntimeInfo)
+  class TestMaterializer(eventFilter: MaterializerEventFilter = NoFilterEventFilter)
       extends AbstractReplayableEventMaterializer(
         system,
         false,
-        new RuntimeMaterializerEventFilter(runtimeInfo, compatible)
+        eventFilter
       ) {
 
     var storedEvents = Seq[DomainEvent]()

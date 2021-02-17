@@ -4,14 +4,10 @@
 
 package io.cafienne.bounded.aggregate
 
-import java.time.{OffsetDateTime, ZonedDateTime}
-
-import akka.actor.testkit.typed.scaladsl.{ActorTestKit, ScalaTestWithActorTestKit}
-import akka.cluster.sharding.typed.scaladsl.{ClusterSharding, Entity}
+import java.time.OffsetDateTime
+import akka.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
 import org.scalatest.flatspec.AsyncFlatSpecLike
-
 import scala.concurrent.Future
-import scala.util.{Failure, Success}
 
 class TypedClusteredSpec extends ScalaTestWithActorTestKit(s"""
     //akka.actor.provider = "cluster"
@@ -25,9 +21,7 @@ class TypedClusteredSpec extends ScalaTestWithActorTestKit(s"""
   //NOTE: Be aware that the config of the TestKit contains the name of the Cluster based on the name of this Spec (TypedClusteredSpec).
   //      When you copy this for your own use, change the name of the cluser.seed-nodes.
 
-  import akka.actor.typed.scaladsl.adapter._
   import TypedSimpleAggregate._
-  //import akka.actor.typed.scaladsl.AskPattern._
 
   implicit val commandValidator = new ValidateableCommand[SimpleAggregateCommand] {
     override def validate(cmd: SimpleAggregateCommand): Future[SimpleAggregateCommand] =

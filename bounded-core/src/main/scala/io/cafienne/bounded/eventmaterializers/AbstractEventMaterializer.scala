@@ -9,7 +9,7 @@ import java.util.UUID
 import akka.{Done, NotUsed}
 import akka.actor.ActorSystem
 import akka.persistence.query.{EventEnvelope, Offset}
-import akka.stream.{ActorMaterializer, KillSwitches, UniqueKillSwitch}
+import akka.stream.{KillSwitches, UniqueKillSwitch}
 import akka.stream.scaladsl.{Keep, Sink, Source}
 import io.cafienne.bounded.akka.ActorSystemProvider
 import io.cafienne.bounded.akka.persistence.ReadJournalProvider
@@ -45,8 +45,6 @@ abstract class AbstractEventMaterializer(
     with ExceptionWriter
     with Configured {
 
-  import EventMaterializerExecutionContext._
-
   /**
     * Unique ID for this materializer
     */
@@ -56,7 +54,7 @@ abstract class AbstractEventMaterializer(
 
   val logger: Logger
 
-  implicit val mat = ActorMaterializer()
+  implicit val mat = actorSystem.dispatcher
 
   val journal = readJournal
 

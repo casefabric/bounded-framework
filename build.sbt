@@ -7,7 +7,7 @@ lazy val basicSettings = {
   Seq(
     organization := "io.cafienne.bounded",
     description := "Scala and Akka based Domain Driven Design Framework",
-    scalaVersion := scala212,
+    scalaVersion := scala213,
     crossScalaVersions := supportedScalaVersions,
     releaseCrossBuild := true,
     scalacOptions := Seq(

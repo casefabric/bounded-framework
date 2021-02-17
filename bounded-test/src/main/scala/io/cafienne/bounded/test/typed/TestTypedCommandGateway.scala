@@ -43,7 +43,7 @@ class TestTypedCommandGateway[T <: DomainCommand](
 
   override def shutdown(): Future[Unit] = {
     aggregates.values.foreach { aggregateActor => testKit.stop(aggregateActor) }
-    Future.successful()
+    Future.successful((): Unit)
   }
 
 }

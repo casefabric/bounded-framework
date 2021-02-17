@@ -4,10 +4,8 @@
 
 package io.cafienne.bounded.test
 
-import akka.actor.{ActorContext, ActorRef}
 import akka.persistence.{PersistentActor, RecoveryCompleted}
 import akka.persistence.journal.Tagged
-import akka.persistence.typed.PersistenceId
 import io.cafienne.bounded.aggregate.DomainEvent
 
 class CreateEventsInStoreActor(aggregateId: String, tags: Set[String] = Set.empty) extends PersistentActor {

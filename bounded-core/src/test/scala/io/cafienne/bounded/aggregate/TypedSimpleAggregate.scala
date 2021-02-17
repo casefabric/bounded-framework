@@ -9,20 +9,16 @@ import akka.cluster.sharding.typed.scaladsl.EntityTypeKey
 import akka.persistence.typed.PersistenceId
 import akka.persistence.typed.scaladsl.{Effect, EventSourcedBehavior, ReplyEffect}
 import com.typesafe.scalalogging.Logger
-import io.cafienne.bounded.{BuildInfo, RuntimeInfo, UserContext}
 import io.cafienne.bounded.aggregate.typed.TypedAggregateRootManager
-import java.time.{OffsetDateTime, ZonedDateTime}
+import java.time.OffsetDateTime
 import java.util.UUID
-
 import scala.concurrent.duration._
 import akka.actor.typed.scaladsl.{Behaviors, TimerScheduler}
 import akka.persistence.RecoveryCompleted
+import io.cafienne.bounded.SampleProtocol.{CommandMetaData, MetaData, UserContext}
 
 object TypedSimpleAggregate {
   val aggregateRootTag = "ar-simple"
-
-  implicit val buildInfo   = BuildInfo("spec", "1.0")
-  implicit val runtimeInfo = RuntimeInfo("current")
 
   var replayed = false
 
@@ -123,17 +119,6 @@ object TypedSimpleAggregate {
       .thenReply(cmd.replyTo)(_ ⇒ OK)
   }
 
-  private def stopAfter(cmd: StopAfter): ReplyEffect[SimpleAggregateEvent, SimpleAggregateState] = {
-    logger.debug("StoppedAfter " + cmd)
-    Effect
-      .persist(StoppedAfter(cmd.aggregateRootId, TestMetaData.fromCommand(cmd.metaData), cmd.waitInSecs))
-      .thenReply(cmd.replyTo)(_ ⇒ OK)
-  }
-
-  //  private def getItems(cmd: GetItems): ReplyEffect[SimpleAggregateEvent, SimpleAggregateState] = {
-  //    Effect.reply(cmd)(_ => OK)
-  //  }
-
   // event handler to keep internal aggregate state
   val eventHandler: (SimpleAggregateState, SimpleAggregateEvent) => SimpleAggregateState = { (state, event) =>
     logger.debug("updating state with {}", event)
@@ -174,21 +159,17 @@ class SimpleAggregateManager() extends TypedAggregateRootManager[SimpleAggregate
 case class TestMetaData(
   timestamp: OffsetDateTime,
   userContext: Option[UserContext],
-  causedByCommand: Option[UUID],
-  buildInfo: BuildInfo,
-  runTimeInfo: RuntimeInfo
+  causedByCommand: Option[UUID]
 ) extends MetaData
 
 object TestMetaData {
   def fromCommand(
     metadata: CommandMetaData
-  )(implicit buildInfo: BuildInfo, runtimeInfo: RuntimeInfo): TestMetaData = {
+  ): TestMetaData = {
     TestMetaData(
       metadata.timestamp,
       metadata.userContext,
-      Some(metadata.commandId),
-      buildInfo,
-      runtimeInfo
+      Some(metadata.commandId)
     )
   }
 }

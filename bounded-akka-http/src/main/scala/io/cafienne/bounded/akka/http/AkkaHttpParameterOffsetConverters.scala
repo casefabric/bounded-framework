@@ -7,7 +7,7 @@ package io.cafienne.bounded.akka.http
 import java.util.UUID
 
 import akka.http.scaladsl.unmarshalling._
-import akka.persistence.query.{Offset, Sequence}
+import akka.persistence.query.Offset
 import io.cafienne.bounded.config.Configured
 
 /**

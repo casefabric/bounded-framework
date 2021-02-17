@@ -70,6 +70,10 @@ class DefaultTypedCommandGateway[Cmd <: DomainCommand](
             )
             replyTo ! ref
             Behaviors.same
+          case StopAggregate(aggregateId) =>
+            context.log.debug("Aggregate {} needs to stop", aggregateId)
+            aggregates.get(aggregateId).foreach(aggregateActorRef => context.stop(aggregateActorRef))
+            Behaviors.same
           case GracefulShutdown =>
             context.log.info("Initiating graceful shutdown...")
             //Stopping the guardian will stop the aggregate root actors.
@@ -116,7 +120,7 @@ class DefaultTypedCommandGateway[Cmd <: DomainCommand](
 
   def shutdown(): Future[Unit] = {
     gateway ! CommandGatewayGuardian.GracefulShutdown
-    Future.successful()
+    Future.successful((): Unit)
   }
 
 }

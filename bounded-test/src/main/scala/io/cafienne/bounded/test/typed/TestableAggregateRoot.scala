@@ -9,7 +9,7 @@ import java.util.concurrent.atomic.AtomicInteger
 import akka.actor.ActorSystem
 import akka.actor.testkit.typed.scaladsl.ActorTestKit
 import akka.actor.typed.eventstream.EventStream.Subscribe
-import akka.actor.typed.{ActorRef, Behavior, ChildFailed, SupervisorStrategy, Terminated}
+import akka.actor.typed.{Behavior, ChildFailed, SupervisorStrategy}
 import akka.actor.typed.scaladsl.Behaviors
 import io.cafienne.bounded.test.typed.TestableAggregateRoot._
 
@@ -122,15 +122,13 @@ class TestableAggregateRoot[A <: DomainCommand, B <: DomainEvent, C: ClassTag] p
   val testKit                      = ActorTestKit(system.toTyped)
   val persistenceTestKit           = PersistenceTestKit(system)
   implicit val duration: Duration  = timeout.duration
-  private var givenEvents: List[B] = evt.toList
+  private val givenEvents: List[B] = evt.toList
 
   private var lastFailure: Option[HandlingFailure] = Option.empty
   private var lastCommand: Option[DomainCommand]   = Option.empty
 
   import TestableAggregateRoot.testId
   private final val arTestId = testId(id)
-//  final val arTestIdInStore = manager.entityTypeKey.name + persistenceIdSeparator + arTestId
-  //if (evt != null && evt.nonEmpty) persistenceTestKit.persistForRecovery(arTestIdInStore, evt)
   if (evt != null && evt.nonEmpty) persistenceTestKit.persistForRecovery(arTestId, evt)
 
   def supervise: Behavior[A] =
@@ -172,20 +170,9 @@ class TestableAggregateRoot[A <: DomainCommand, B <: DomainEvent, C: ClassTag] p
     if (command.aggregateRootId != id) throw MisdirectedCommand(id, command)
     wrappedActor.tell(command)
     lastCommand = Some(command)
-    //    eventProbe.receiveMessages(2)
-    //    eventProbe.expectNoMessage())
     Thread.sleep(1000)
     this
   }
-
-  /**
-    * Fetch the current state of the Aggregate Root Actor.
-    * As the state is stored in the actor, the method will ask the actor for its' internal state so the method
-    * returns a Future that will complete when the state is returned.
-    *
-    * @return Future with the AggregateState as defined for this Aggregate Root.
-    */
-  //def currentState: Future[Option[B]] = (aggregateRootActor ? GetState).mapTo[Option[B]]
 
   private def assumingCommandIssued[T](thunk: DomainCommand => T): T =
     lastCommand.fold(throw NoCommandsIssued)(thunk)
