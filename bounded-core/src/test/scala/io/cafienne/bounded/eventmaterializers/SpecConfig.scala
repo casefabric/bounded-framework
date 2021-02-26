@@ -67,9 +67,7 @@ object SpecConfig {
       |      refresh-interval = "10ms"
       |      max-buffer-size = "1000"
       |    }
-      |
       |    bounded.eventmaterializers.publish = true
-      |
       |    bounded.eventmaterializers.offsetstore {
       |       type = "inmemory"
       |   }

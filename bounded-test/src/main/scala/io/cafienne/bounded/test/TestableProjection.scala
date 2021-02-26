@@ -19,6 +19,7 @@ import io.cafienne.bounded.eventmaterializers.{
 
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future}
+import akka.persistence.testkit.scaladsl.PersistenceTestKit
 
 object TestableProjection {
 
@@ -49,6 +50,7 @@ class TestableProjection private (system: ActorSystem, timeout: Timeout, tags: S
   private var materializerId: Option[UUID]                   = None
 
   val eventStreamListener = TestProbe()
+//  val persistenceTestKit  = PersistenceTestKit(system)
 
   if (!system.settings.config.hasPath("bounded.eventmaterializers.publish") || !system.settings.config.getBoolean(
         "bounded.eventmaterializers.publish"
@@ -76,6 +78,9 @@ class TestableProjection private (system: ActorSystem, timeout: Timeout, tags: S
 
   // Blocking way to store events.
   private def storeEvents(evt: Seq[DomainEvent]): Unit = {
+
+//    evt.groupBy(evt => evt.id).foreach(grp => persistenceTestKit.persistForRecovery(grp._1, grp._2))
+
     val storeEventsActor =
       system.actorOf(Props(classOf[CreateEventsInStoreActor], evt.head.id, tags), "create-events-actor")
 

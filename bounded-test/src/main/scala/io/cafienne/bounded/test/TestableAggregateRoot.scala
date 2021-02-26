@@ -5,12 +5,12 @@
 package io.cafienne.bounded.test
 
 import java.util.concurrent.atomic.AtomicInteger
-
 import io.cafienne.bounded.test.TestableAggregateRoot._
 
 import scala.reflect.ClassTag
 import akka.actor._
 import akka.pattern.ask
+import akka.persistence.testkit.scaladsl.PersistenceTestKit
 import akka.testkit.TestProbe
 import akka.util.Timeout
 import io.cafienne.bounded.aggregate.AggregateRootActor.GetState
@@ -105,25 +105,13 @@ class TestableAggregateRoot[A <: AggregateRootActor[B], B <: AggregateState[B]: 
   import TestableAggregateRoot.testId
   final val arTestId = testId(id)
 
+  val persistenceTestKit = PersistenceTestKit(system)
   if (evt != null && evt.nonEmpty) storeEvents(evt)
   // Start the Aggregate Root and replay to initial state
   private val aggregateRootActor: ActorRef = system.actorOf(creator.props(arTestId), s"test-aggregate-$arTestId")
 
   private def storeEvents(evt: Seq[DomainEvent]): Unit = {
-    val storeEventsActor = system.actorOf(
-      Props(classOf[CreateEventsInStoreActor], arTestId, Set.empty),
-      "create-events-actor"
-    )
-    val testProbe = TestProbe()
-
-    testProbe watch storeEventsActor
-    evt foreach { event =>
-      testProbe.send(storeEventsActor, event)
-      testProbe.expectMsgAllConformingOf(classOf[DomainEvent])
-    }
-    storeEventsActor ! PoisonPill
-    testProbe.expectTerminated(storeEventsActor)
-    ()
+    persistenceTestKit.persistForRecovery(arTestId, evt)
   }
 
   /**

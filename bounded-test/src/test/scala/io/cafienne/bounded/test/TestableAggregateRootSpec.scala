@@ -6,7 +6,9 @@ package io.cafienne.bounded.test
 
 import java.time.OffsetDateTime
 import akka.actor.ActorSystem
+import akka.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
 import akka.event.{Logging, LoggingAdapter}
+import akka.persistence.testkit.PersistenceTestKitPlugin
 import akka.testkit.TestKit
 import akka.util.Timeout
 import io.cafienne.bounded.test.TestableAggregateRoot._
@@ -23,7 +25,7 @@ class TestableAggregateRootSpec extends AsyncWordSpecLike with Matchers with Sca
 
   //Setup required supporting classes
   implicit val timeout                = Timeout(10.seconds)
-  implicit val system                 = ActorSystem("TestSystem", SpecConfig.testConfig)
+  implicit val system                 = ActorSystem("TestSystem", PersistenceTestKitPlugin.config.withFallback(SpecConfig.testConfig))
   implicit val logger: LoggingAdapter = Logging(system, getClass)
 
   val testAggregateRootCreator = new TestAggregateRootCreator(system)

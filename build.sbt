@@ -5,7 +5,7 @@ lazy val basicSettings = {
   val supportedScalaVersions = List(scala213, scala212)
 
   Seq(
-    organization := "io.cafienne.bounded",
+    organization := "io.cafienne",
     description := "Scala and Akka based Domain Driven Design Framework",
     scalaVersion := scala213,
     crossScalaVersions := supportedScalaVersions,

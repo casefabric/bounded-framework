@@ -5,10 +5,10 @@
 package io.cafienne.bounded.aggregate.typed
 
 import akka.actor.typed.{ActorRef, ActorSystem, Behavior, PostStop, Scheduler, Terminated}
-import akka.actor.typed.scaladsl.Behaviors
+import akka.actor.typed.scaladsl.{Behaviors, TimerScheduler}
 import akka.util.Timeout
 import io.cafienne.bounded.aggregate.{CommandValidator, DomainCommand, ValidateableCommand}
-
+import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future}
 
 trait TypedCommandGateway[T <: DomainCommand] {
@@ -29,6 +29,7 @@ trait TypedCommandGateway[T <: DomainCommand] {
   *
   * @param system A typed actorsystem
   * @param aggregateRootCreator The class that creates the specific type of aggregate root
+  * @param aggregateMayIdleFor The time a specific aggregate root may be idle, default is set to 6 minutes
   * @param timeout timeout used for ask
   * @param ec implicit ExecutionContext
   * @param scheduler implicit scheduler for the ask
@@ -36,7 +37,8 @@ trait TypedCommandGateway[T <: DomainCommand] {
   */
 class DefaultTypedCommandGateway[Cmd <: DomainCommand](
   system: ActorSystem[_],
-  aggregateRootCreator: TypedAggregateRootManager[Cmd]
+  aggregateRootCreator: TypedAggregateRootManager[Cmd],
+  aggregateMayIdleFor: FiniteDuration = 6.minutes
 )(implicit timeout: Timeout, ec: ExecutionContext, scheduler: Scheduler)
     extends TypedCommandGateway[Cmd] {
 
@@ -54,44 +56,48 @@ class DefaultTypedCommandGateway[Cmd <: DomainCommand](
 
     def apply(): Behavior[AggregateControl] =
       Behaviors
-        .setup[AggregateControl] { context => behaviors }
+        .setup[AggregateControl] { context => Behaviors.withTimers { timers => behaviors(timers) } }
 
-    val behaviors: Behavior[CommandGatewayGuardian.AggregateControl] = Behaviors
-      .receive[AggregateControl] { (context, message) =>
-        message match {
-          case SpawnAggregate(aggregateId, replyTo) =>
-            context.log.debug("Find or create aggregate {}", aggregateId)
-            val ref = aggregates.getOrElseUpdate(
-              aggregateId, {
-                val ref = context.spawn(aggregateRootCreator.behavior(aggregateId), name = aggregateId)
-                context.watchWith(ref, AggregateTerminated(aggregateId))
-                ref
-              }
-            )
-            replyTo ! ref
+    def behaviors(timers: TimerScheduler[AggregateControl]): Behavior[CommandGatewayGuardian.AggregateControl] =
+      Behaviors
+        .receive[AggregateControl] { (context, message) =>
+          message match {
+            case SpawnAggregate(aggregateId, replyTo) =>
+              context.log.debug("Find or create aggregate {}", aggregateId)
+              val ref = aggregates.getOrElseUpdate(
+                aggregateId, {
+                  val ref = context.spawn(aggregateRootCreator.behavior(aggregateId), name = aggregateId)
+                  context.watchWith(ref, AggregateTerminated(aggregateId))
+                  ref
+                }
+              )
+              // Note that the timer will be overwritten, so the last message sent will set the timer.
+              timers.startTimerWithFixedDelay(aggregateId, StopAggregate(aggregateId), aggregateMayIdleFor)
+              replyTo ! ref
+              Behaviors.same
+            case StopAggregate(aggregateId) =>
+              context.log.debug("Aggregate {} needs to stop", aggregateId)
+              aggregates.get(aggregateId).foreach(aggregateActorRef => context.stop(aggregateActorRef))
+              Behaviors.same
+            case GracefulShutdown =>
+              context.log.info("Initiating graceful shutdown...")
+              //Stopping the guardian will stop the aggregate root actors.
+              Behaviors.stopped { () => context.log.debug("Stopped base on message {}", message) }
+            case AggregateTerminated(aggregateId) =>
+              context.log.debug("Aggregate {} terminated", aggregateId)
+              timers.cancel(aggregateId)
+              aggregates.-=(aggregateId)
+              Behaviors.same
+          }
+        }
+        .receiveSignal {
+          case (context, PostStop) =>
+            context.log.info("Typed Command Gateway Guardian stopped")
             Behaviors.same
-          case StopAggregate(aggregateId) =>
-            context.log.debug("Aggregate {} needs to stop", aggregateId)
-            aggregates.get(aggregateId).foreach(aggregateActorRef => context.stop(aggregateActorRef))
-            Behaviors.same
-          case GracefulShutdown =>
-            context.log.info("Initiating graceful shutdown...")
-            //Stopping the guardian will stop the aggregate root actors.
-            Behaviors.stopped { () => context.log.debug("Stopped base on message {}", message) }
-          case AggregateTerminated(aggregateId) =>
-            context.log.debug("Aggregate {} terminated", aggregateId)
-            aggregates.-=(aggregateId)
+          case (context, Terminated(ref)) =>
+            context.log.debug("Terminated actor with ref {}", ref)
             Behaviors.same
         }
-      }
-      .receiveSignal {
-        case (context, PostStop) =>
-          context.log.info("Typed Command Gateway Guardian stopped")
-          Behaviors.same
-        case (context, Terminated(ref)) =>
-          context.log.debug("Terminated actor with ref {}", ref)
-          Behaviors.same
-      }
   }
 
   val gateway = system.systemActorOf(CommandGatewayGuardian(), "typedcommandgateway")
