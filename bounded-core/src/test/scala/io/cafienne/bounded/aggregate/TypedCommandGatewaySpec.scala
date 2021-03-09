@@ -151,6 +151,13 @@ class TypedCommandGatewaySpec
     }
   }
 
+  "Command Gateway" should "be able to be created multiple times to route to other aggregates" in {
+    val creator             = new AnotherAggregateManager()
+    val anotherTypedCommandGateway = new DefaultTypedCommandGateway[SimpleAggregateCommand](system, creator, 6.seconds)
+
+    assert(anotherTypedCommandGateway != null)
+  }
+
   protected override def afterAll(): Unit = {
     Await.ready(typedCommandGateway.shutdown(), 5.seconds).map(_ => (): Unit)
   }

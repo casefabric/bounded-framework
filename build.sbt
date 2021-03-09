@@ -1,15 +1,15 @@
 
 lazy val basicSettings = {
-  val scala213 = "2.13.4"
+  val scala213 = "2.13.5"
   val scala212 = "2.12.13"
   val supportedScalaVersions = List(scala213, scala212)
 
   Seq(
-    organization := "io.cafienne",
+    organization := "io.cafienne.bounded",
     description := "Scala and Akka based Domain Driven Design Framework",
     scalaVersion := scala213,
-    crossScalaVersions := supportedScalaVersions,
-    releaseCrossBuild := true,
+    //crossScalaVersions := supportedScalaVersions,
+    //releaseCrossBuild := false,
     scalacOptions := Seq(
       "-encoding", "UTF-8",
       //"-target:jvm-1.8",
