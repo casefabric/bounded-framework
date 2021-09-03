@@ -23,7 +23,6 @@ object TypedAnotherAggregate {
 
   final val logger = Logger(TypedSimpleAggregate.getClass.getSimpleName)
 
-
   // Command handler logic
   def commandHandler(
     timers: TimerScheduler[SimpleAggregateCommand]

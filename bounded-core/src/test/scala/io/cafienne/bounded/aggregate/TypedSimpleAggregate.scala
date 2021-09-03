@@ -48,8 +48,7 @@ object TypedSimpleAggregate {
   final case class Stop(aggregateRootId: String, metaData: CommandMetaData, replyTo: ActorRef[Response])
       extends SimpleAggregateCommand
 
-  final case class InternalStop(aggregateRootId: String, metaData: CommandMetaData)
-      extends SimpleAggregateCommand
+  final case class InternalStop(aggregateRootId: String, metaData: CommandMetaData) extends SimpleAggregateCommand
 
   final case class StopAfter(
     aggregateRootId: String,

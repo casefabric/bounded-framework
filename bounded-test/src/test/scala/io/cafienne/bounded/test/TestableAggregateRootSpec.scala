@@ -83,6 +83,7 @@ class TestableAggregateRootSpec extends AsyncWordSpecLike with Matchers with Sca
         )
         .when(updateStateCommand)
 
+      ar.events.size should be(1)
       ar.events should contain(
         StateUpdated(
           TestMetaData.fromCommand(commandMetaData),
@@ -95,6 +96,36 @@ class TestableAggregateRootSpec extends AsyncWordSpecLike with Matchers with Sca
         assert(state.isDefined, s"There is no defined state but expected $targetState")
         assert(state.get == targetState)
       }
+    }
+
+    "ensure the event count is correct" in {
+      val testAggregateRootId1 = "4"
+      val now                  = OffsetDateTime.now()
+      val commandMetaData      = TestCommandMetaData(now, None)
+      val updateStateCommand   = UpdateState(commandMetaData, testAggregateRootId1, "updated")
+      val initialStateCreatedEvent = InitialStateCreated(
+        currentMeta,
+        testAggregateRootId1,
+        "new"
+      )
+
+      val ar = TestableAggregateRoot
+        .given[TestAggregateRoot, TestAggregateRootState](
+          testAggregateRootCreator,
+          testAggregateRootId1,
+          initialStateCreatedEvent
+        )
+        .when(updateStateCommand)
+
+      ar.events.size should be(1)
+      ar.events.last should be(
+        StateUpdated(
+          TestMetaData.fromCommand(commandMetaData),
+          testAggregateRootId1,
+          "updated"
+        )
+      )
+
     }
 
     "provide command handling failure for assertions" in {

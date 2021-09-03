@@ -6,8 +6,8 @@ import sbt._
 
 object Dependencies {
 
-  val akkaVersion = "2.6.12"
-  val akkaHttpVersion = "10.2.3"
+  val akkaVersion = "2.6.16"
+  val akkaHttpVersion = "10.2.6"
   val staminaVersion = "0.1.5"
   val persistenceInMemVersion = "2.5.15.2"
   val scalaTestVersion = "3.2.3"
@@ -83,7 +83,7 @@ object Dependencies {
 
   val persistenceCassandraDeps = {
     baseDeps ++ Seq(
-      "com.typesafe.akka" %% "akka-persistence-cassandra" % "1.0.4"
+      "com.typesafe.akka" %% "akka-persistence-cassandra" % "1.0.5"
     )
   }
 

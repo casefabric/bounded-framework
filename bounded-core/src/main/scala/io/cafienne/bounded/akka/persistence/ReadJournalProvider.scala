@@ -42,7 +42,14 @@ trait ReadJournalProvider { systemProvider: ActorSystemProvider =>
       return PersistenceQuery(system)
         .readJournalFor[LeveldbReadJournal](LeveldbReadJournal.Identifier)
     }
+    //0.x series
     if (configuredJournal.endsWith("cassandra-journal")) {
+      system.log.debug("configuring read journal for cassandra")
+      return PersistenceQuery(system)
+        .readJournalFor[CassandraReadJournal](CassandraReadJournal.Identifier)
+    }
+    // 1.x series
+    if (configuredJournal.endsWith("cassandra.journal")) {
       system.log.debug("configuring read journal for cassandra")
       return PersistenceQuery(system)
         .readJournalFor[CassandraReadJournal](CassandraReadJournal.Identifier)

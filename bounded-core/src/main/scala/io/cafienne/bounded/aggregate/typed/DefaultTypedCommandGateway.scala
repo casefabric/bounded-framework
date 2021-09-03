@@ -100,7 +100,8 @@ class DefaultTypedCommandGateway[Cmd <: DomainCommand](
         }
   }
 
-  val gateway = system.systemActorOf(CommandGatewayGuardian(), "typedcommandgateway-" + aggregateRootCreator.getClass.getSimpleName)
+  val gateway =
+    system.systemActorOf(CommandGatewayGuardian(), "typedcommandgateway-" + aggregateRootCreator.getClass.getSimpleName)
 
   override def ask[Res](aggregateRootId: String, replyTo: ActorRef[Res] => Cmd)(
     implicit validator: ValidateableCommand[Cmd]
