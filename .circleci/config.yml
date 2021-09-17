@@ -3,10 +3,9 @@ jobs:
   build:
     working_directory: ~/bounded-framework
     docker:
-      - image: circleci/openjdk:11-jdk
+      - image: cimg/openjdk:11.0
     environment:
       CODECOV_TOKEN: "abba3073-45f3-4b09-8a18-2cb63f72bbe5"
-      SBT_VERSION: 1.5.2
       SBT_OPTS: "-XX:MaxMetaspaceSize=512m"
       JVM_OPTS: -Xmx3200m
       TERM: dumb
@@ -15,12 +14,12 @@ jobs:
       - run:
           name: Get sbt binary
           command: |
-                    echo "deb https://repo.scala-sbt.org/scalasbt/debian all main" | sudo tee /etc/apt/sources.list.d/sbt.list
-                    echo "deb https://repo.scala-sbt.org/scalasbt/debian /" | sudo tee /etc/apt/sources.list.d/sbt_old.list
-                    curl -sL "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x2EE0EA64E40A89B84B2DF73499E82A75642AC823" | sudo apt-key add
-                    sudo apt-get update
-                    sudo apt-get install sbt
-                    sudo apt-get clean && sudo apt-get autoclean
+            echo "deb https://repo.scala-sbt.org/scalasbt/debian all main" | sudo tee /etc/apt/sources.list.d/sbt.list
+            echo "deb https://repo.scala-sbt.org/scalasbt/debian /" | sudo tee /etc/apt/sources.list.d/sbt_old.list
+            curl -sL "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x2EE0EA64E40A89B84B2DF73499E82A75642AC823" | sudo apt-key add
+            sudo apt-get update
+            sudo apt-get install sbt
+            sudo apt-get clean && sudo apt-get autoclean
       - checkout
       - restore_cache:
           keys:
@@ -28,10 +27,12 @@ jobs:
             # fallback to using the latest cache if no exact match is found
             - v1-dependencies-
       - run:
-          name: Run tests 
-          #command: cat /dev/null | sbt clean coverage test coverageReport 
-          command: cat /dev/null | sbt clean test 
-          #- store_artifacts: # for display in Artifacts: https://circleci.com/docs/2.0/artifacts/ 
+          # sbt-scoverage is not yet compatible with 2.12.13
+          # https://github.com/scoverage/sbt-scoverage/issues/319
+          # We are running 2.13, so should not be an issue
+          name: Run tests
+          command: cat /dev/null | sbt coverage test coverageReport
+          #- store_artifacts: # for display in Artifacts: https://circleci.com/docs/2.0/artifacts/
           #path: target/universal/samplescala.zip
           #destination: samplescala
       - save_cache:

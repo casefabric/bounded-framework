@@ -4,6 +4,8 @@
 
 package io.cafienne.bounded.test
 
+import akka.Done
+
 import java.util.UUID
 import akka.actor._
 import akka.persistence.inmemory.extension.{InMemoryJournalStorage, InMemorySnapshotStorage, StorageExtension}
@@ -64,20 +66,20 @@ class TestableProjection private (system: ActorSystem, timeout: Timeout, tags: S
     eventMaterializers.get.startUp(true).map(list => list.head)
   }
 
-  def addEvents(evt: Seq[DomainEvent]): Unit = {
+  def addEvents(evt: Seq[DomainEvent]): Future[Done] = {
     eventMaterializers.fold(throw new IllegalStateException("You start the projection before you add events"))(_ => {
       storeEvents(evt)
     })
   }
 
-  def addEvent(evt: DomainEvent): Unit = {
+  def addEvent(evt: DomainEvent): Future[Done] = {
     eventMaterializers.fold(throw new IllegalStateException("You start the projection before you add events"))(_ => {
       storeEvents(Seq(evt))
     })
   }
 
   // Blocking way to store events.
-  private def storeEvents(evt: Seq[DomainEvent]): Unit = {
+  private def storeEvents(evt: Seq[DomainEvent]): Future[Done] = {
 
 //    evt.groupBy(evt => evt.id).foreach(grp => persistenceTestKit.persistForRecovery(grp._1, grp._2))
 
@@ -101,12 +103,20 @@ class TestableProjection private (system: ActorSystem, timeout: Timeout, tags: S
     waitTillLastEventIsProcessed(evt)
   }
 
-  private def waitTillLastEventIsProcessed(evt: Seq[DomainEvent]) = {
+  private def waitTillLastEventIsProcessed(evt: Seq[DomainEvent]): Future[Done] = {
     if (materializerId.isDefined) {
-      eventStreamListener.fishForSpecificMessage(timeout.duration, "wait till last event is processed") {
-        case e: EventProcessed if materializerId.get == e.materializerId && evt.last == e.evt =>
-          system.log.debug("catch " + e)
+      var messageProcessedCounter = 0
+      while (messageProcessedCounter < evt.length) {
+        eventStreamListener.fishForSpecificMessage(timeout.duration, "wait till last event is processed") {
+          case e: EventProcessed if materializerId.get == e.materializerId =>
+            messageProcessedCounter += 1
+            system.log.debug("catch " + e)
+          case other => system.log.debug("other message fished: {}", other)
+        }
       }
+      Future.successful(Done)
+    } else {
+      Future.failed(new Exception("No materializer with id:" + materializerId + " found"))
     }
   }
 }

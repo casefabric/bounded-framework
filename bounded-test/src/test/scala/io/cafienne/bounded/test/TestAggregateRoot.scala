@@ -43,6 +43,23 @@ class TestAggregateRoot(aggregateRootId: String) extends AggregateRootActor[Test
         } else {
           Ko(StateTransitionForbidden(aggregateState.map(_.state), state))
         }
+      case UpdateStateSlow(metaData, aggregateRootId, state, waitFor) =>
+        Thread.sleep(waitFor.length)
+        val testMetaData = metaData.asInstanceOf[TestCommandMetaData]
+        if (aggregateState.isDefined) {
+          Ok(
+            Seq(
+              SlowStateUpdated(
+                TestMetaData.fromCommand(testMetaData),
+                aggregateRootId,
+                state,
+                waitFor.length
+              )
+            )
+          )
+        } else {
+          Ko(StateTransitionForbidden(aggregateState.map(_.state), state))
+        }
       case other => Ko(new UnexpectedCommand(other))
     }
   }

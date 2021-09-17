@@ -8,6 +8,7 @@ import io.cafienne.bounded.aggregate.{DomainCommand, DomainEvent, HandlingFailur
 
 import java.time.OffsetDateTime
 import java.util.UUID
+import scala.concurrent.duration.Duration
 
 object DomainProtocol {
 
@@ -67,7 +68,12 @@ object DomainProtocol {
 
   case class UpdateState(metaData: CommandMetaData, aggregateRootId: String, state: String) extends DomainCommand
 
+  case class UpdateStateSlow(metaData: CommandMetaData, aggregateRootId: String, state: String, waitFor: Duration)
+      extends DomainCommand
+
   case class StateUpdated(metaData: MetaData, id: String, state: String) extends DomainEvent
+
+  case class SlowStateUpdated(metaData: MetaData, id: String, state: String, waited: Long) extends DomainEvent
 
   //This can be sent but is not handled so gives a Ko(UnExpectedCommand)
   case class CommandWithoutHandler(metaData: CommandMetaData, aggregateRootId: String, msg: String)

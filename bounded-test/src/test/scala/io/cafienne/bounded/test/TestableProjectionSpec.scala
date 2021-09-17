@@ -26,25 +26,22 @@ import java.time.OffsetDateTime
 
 class TestableProjectionSpec extends AsyncWordSpecLike with Matchers with ScalaFutures with BeforeAndAfterAll {
 
-  implicit val timeout = Timeout(10.seconds)
+  implicit val timeout = Timeout(30.seconds)
   implicit val system =
     ActorSystem("TestableProjectionSpecSystem", SpecConfig.testConfig)
 
   implicit val logger: LoggingAdapter = Logging(system, getClass)
 
-  val testProjectionMaterializer = new TestProjectionMaterializer(system) with OffsetStoreProvider
-  val metaDate                   = TestMetaData(OffsetDateTime.now(), None, None)
+  val metaDate = TestMetaData(OffsetDateTime.now(), None, None)
 
   "The testable projection" must {
-
-    val testAggregateRootId1 = "arTest1"
-    val evt1                 = InitialStateCreated(metaDate, testAggregateRootId1, "initialState")
-    val evt2                 = StateUpdated(metaDate, testAggregateRootId1, "updatedState")
-
-    val fixture = TestableProjection.given(Seq(evt1, evt2), Set("ar-test", "aggregate"))
+    val testProjectionMaterializer = new TestProjectionMaterializer(system) with OffsetStoreProvider
+    val testAggregateRootId1       = "arTest1"
+    val evt1                       = InitialStateCreated(metaDate, testAggregateRootId1, "initialState")
+    val evt2                       = StateUpdated(metaDate, testAggregateRootId1, "updatedState")
+    val fixture                    = TestableProjection.given(Seq(evt1, evt2), Set("ar-test", "aggregate"))
 
     "Store basic events at the start" in {
-
       whenReady(fixture.startProjection(testProjectionMaterializer)) { replayResult =>
         logger.info("replayResult: {}", replayResult)
         assert(replayResult.offset == Some(Sequence(2L)))
@@ -53,13 +50,30 @@ class TestableProjectionSpec extends AsyncWordSpecLike with Matchers with ScalaF
 
     "Store more events" in {
       val evt3 = StateUpdated(metaDate, testAggregateRootId1, "morestate")
-
-      fixture.addEvent(evt3)
-
-      testProjectionMaterializer.events.size should be(3)
+      whenReady(fixture.addEvent(evt3)) { result => testProjectionMaterializer.events.size should be(3) }
     }
 
+    "Store more events slowly" in {
+      val evt4 = SlowStateUpdated(metaDate, testAggregateRootId1, "morestate", 1000L)
+      whenReady(fixture.addEvent(evt4)) { result => testProjectionMaterializer.events.size should be(4) }
+    }
+
+    "Store even more events slowly" in {
+      val evt5 = SlowStateUpdated(metaDate, testAggregateRootId1, "morestate2", 1000L)
+      val evt6 = SlowStateUpdated(metaDate, testAggregateRootId1, "morestate3", 1000L)
+      whenReady(fixture.addEvents(Seq(evt5, evt6))) { result => testProjectionMaterializer.events.size should be(6) }
+    }
+
+    "Store even more and more events slowly" in {
+      val evt7 = SlowStateUpdated(metaDate, testAggregateRootId1, "morestate4", 2000L)
+      val evt8 = SlowStateUpdated(metaDate, testAggregateRootId1, "morestate5", 2000L)
+      val evt9 = SlowStateUpdated(metaDate, testAggregateRootId1, "morestate6", 2000L)
+      whenReady(fixture.addEvents(Seq(evt7, evt8, evt9))) { result =>
+        testProjectionMaterializer.events.size should be(9)
+      }
+    }
   }
+
 }
 
 class TestProjectionMaterializer(actorSystem: ActorSystem) extends AbstractReplayableEventMaterializer(actorSystem) {
@@ -89,6 +103,10 @@ class TestProjectionMaterializer(actorSystem: ActorSystem) extends AbstractRepla
           events = events :+ event
           Future.successful(Done)
         case event: StateUpdated =>
+          events = events :+ event
+          Future.successful(Done)
+        case event: SlowStateUpdated =>
+          Thread.sleep(event.waited)
           events = events :+ event
           Future.successful(Done)
         case _ => Future.successful(Done)
