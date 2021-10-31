@@ -3,7 +3,7 @@ jobs:
   build:
     working_directory: ~/bounded-framework
     docker:
-      - image: cimg/openjdk:11.0
+      - image: cimg/openjdk:17.0
     environment:
       CODECOV_TOKEN: "abba3073-45f3-4b09-8a18-2cb63f72bbe5"
       SBT_OPTS: "-XX:MaxMetaspaceSize=512m"
