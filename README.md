@@ -1,6 +1,7 @@
 ## Domain driven design framework for Scala and Akka
 
 Bounded is a framework that supports the Domain Driven Design approach. It enables you to leverage Scala and Akka technologies in a way that gives you a structured DDD based application.
+[![Maintainability Rating](https://sonarcloud.io/api/project_badges/measure?project=cafienne_bounded-framework&metric=sqale_rating)](https://sonarcloud.io/summary/new_code?id=cafienne_bounded-framework)
 
 
 ```scala
