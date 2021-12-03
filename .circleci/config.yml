@@ -1,4 +1,4 @@
-version: 2
+version: 2.1
 jobs:
   build:
     working_directory: ~/bounded-framework
@@ -44,3 +44,15 @@ jobs:
       - run:
           name: Store Coverage Report
           command: bash <(curl -s https://codecov.io/bash)
+      - sonarcloud/scan
+
+orbs:
+  sonarcloud: sonarsource/sonarcloud@1.0.2
+
+workflows:
+  version: 2
+  ci:
+    jobs:
+      - build:
+          context:
+            - SonarCloud
