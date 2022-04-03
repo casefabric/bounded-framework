@@ -31,7 +31,7 @@ lazy val basicSettings = {
     headerLicense := {
       val toYear = java.time.Year.now
       Some(HeaderLicense.Custom(
-        s"Copyright (C) 2016-$toYear Cafienne B.V. <https://www.cafienne.io/bounded>"
+        s"Copyright (C) 2016-$toYear Batav B.V. <https://www.cafienne.io/bounded>"
       ))
     },
     homepage := Some(url("https://github.com/cafienne/bounded-framework")),
