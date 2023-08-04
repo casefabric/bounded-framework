@@ -1,19 +1,20 @@
 /*
- * Copyright (C) 2016-2022 Batav B.V. <https://www.cafienne.io/bounded>
+ * Copyright (C) 2016-2023 Batav B.V. <https://www.cafienne.io/bounded>
  */
 
 package io.cafienne.bounded.test.typed
 
-import java.time.OffsetDateTime
+import akka.actor.{ActorSystem, typed}
 
+import java.time.OffsetDateTime
 import akka.actor.testkit.typed.scaladsl.{ActorTestKit, ScalaTestWithActorTestKit, TestProbe}
 import akka.util.Timeout
 import io.cafienne.bounded.aggregate.typed.TypedAggregateRootManager
-import io.cafienne.bounded.test.DomainProtocol._
+import io.cafienne.bounded.test.DomainProtocol.*
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.flatspec.AsyncFlatSpecLike
-import akka.actor.typed.scaladsl.adapter._
+import akka.actor.typed.scaladsl.adapter.*
 import akka.persistence.testkit.PersistenceTestKitPlugin
 import akka.persistence.testkit.scaladsl.PersistenceTestKit
 import com.typesafe.config.ConfigFactory
@@ -24,7 +25,7 @@ import io.cafienne.bounded.test.typed.TestableAggregateRoot.{
   UnexpectedCommandHandlingSuccess
 }
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 class TestableAggregateRootSpec
     extends ScalaTestWithActorTestKit(
@@ -37,14 +38,14 @@ class TestableAggregateRootSpec
     with BeforeAndAfterAll { //with LogCapturing {
 
   import TypedSimpleAggregate._
-  implicit val classicActorSystem = system.toClassic
-  implicit val typedTestKit       = testKit
-  val persistenceTestKit          = PersistenceTestKit(system)
+  implicit val classicActorSystem: ActorSystem = system.toClassic
+  implicit val typedTestKit: ActorTestKit      = testKit
+  val persistenceTestKit: PersistenceTestKit   = PersistenceTestKit(system)
 
   behavior of "Testable Typed Aggregate Root"
 
-  implicit val gatewayTimeout = Timeout(10.seconds)
-  implicit val actorSytem     = system
+  implicit val gatewayTimeout: Timeout                = Timeout(10.seconds)
+  implicit val actorSytem: typed.ActorSystem[Nothing] = system
 
   val creator: TypedAggregateRootManager[SimpleAggregateCommand] = new SimpleAggregateManager()
 

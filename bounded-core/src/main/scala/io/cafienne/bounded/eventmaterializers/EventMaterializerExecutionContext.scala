@@ -1,10 +1,12 @@
 /*
- * Copyright (C) 2016-2022 Batav B.V. <https://www.cafienne.io/bounded>
+ * Copyright (C) 2016-2023 Batav B.V. <https://www.cafienne.io/bounded>
  */
 
 package io.cafienne.bounded.eventmaterializers
 
+import scala.concurrent.ExecutionContext
+
 object EventMaterializerExecutionContext {
-  implicit val executionContext =
+  implicit val executionContext: ExecutionContext =
     scala.concurrent.ExecutionContext.Implicits.global
 }

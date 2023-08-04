@@ -1,11 +1,10 @@
 /*
- * Copyright (C) 2016-2022 Batav B.V. <https://www.cafienne.io/bounded>
+ * Copyright (C) 2016-2023 Batav B.V. <https://www.cafienne.io/bounded>
  */
 
 package io.cafienne.bounded.eventmaterializers
 
 import java.util.UUID
-
 import akka.{Done, NotUsed}
 import akka.actor.ActorSystem
 import akka.persistence.query.{EventEnvelope, Offset}
@@ -18,8 +17,8 @@ import com.typesafe.scalalogging.Logger
 import io.cafienne.bounded.aggregate.DomainEvent
 import io.cafienne.bounded.eventmaterializers.offsetstores.OffsetStore
 
-import scala.concurrent.{Await, Future}
-import scala.concurrent.duration._
+import scala.concurrent.{Await, ExecutionContextExecutor, Future}
+import scala.concurrent.duration.*
 
 /**
   * Abstract class to be used to create eventlisteners. Use this class as a base for listening for
@@ -54,7 +53,7 @@ abstract class AbstractEventMaterializer(
 
   val logger: Logger
 
-  implicit val mat = actorSystem.dispatcher
+  implicit val mat: ExecutionContextExecutor = actorSystem.dispatcher
 
   val journal = readJournal
 

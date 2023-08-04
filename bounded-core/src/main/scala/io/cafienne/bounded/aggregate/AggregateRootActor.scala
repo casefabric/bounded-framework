@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016-2022 Batav B.V. <https://www.cafienne.io/bounded>
+ * Copyright (C) 2016-2023 Batav B.V. <https://www.cafienne.io/bounded>
  */
 
 package io.cafienne.bounded.aggregate
@@ -48,7 +48,7 @@ trait AggregateRootActor[A <: AggregateState[A]]
 
   def state: Option[A] = { internalState }
 
-  private def updateState(evt: DomainEvent) {
+  private def updateState(evt: DomainEvent): Unit = {
     internalState = internalState.fold(newState(evt))(_ update evt)
   }
 

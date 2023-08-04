@@ -1,25 +1,24 @@
 /*
- * Copyright (C) 2016-2022 Batav B.V. <https://www.cafienne.io/bounded>
+ * Copyright (C) 2016-2023 Batav B.V. <https://www.cafienne.io/bounded>
  */
 
 package io.cafienne.bounded.test.typed
 
 import java.util.concurrent.atomic.AtomicInteger
-
-import akka.actor.ActorSystem
+import akka.actor.{ActorSystem, typed}
 import akka.actor.testkit.typed.scaladsl.ActorTestKit
 import akka.actor.typed.eventstream.EventStream.Subscribe
 import akka.actor.typed.{Behavior, ChildFailed, SupervisorStrategy}
 import akka.actor.typed.scaladsl.Behaviors
-import io.cafienne.bounded.test.typed.TestableAggregateRoot._
+import io.cafienne.bounded.test.typed.TestableAggregateRoot.*
 
 import scala.reflect.ClassTag
 import akka.util.Timeout
 import io.cafienne.bounded.aggregate.{DomainCommand, DomainEvent, HandlingFailure}
-import io.cafienne.bounded.aggregate.typed._
+import io.cafienne.bounded.aggregate.typed.*
 
 import scala.concurrent.duration.Duration
-import akka.actor.typed.scaladsl.adapter._
+import akka.actor.typed.scaladsl.adapter.*
 import akka.persistence.testkit.scaladsl.PersistenceTestKit
 
 import scala.collection.immutable
@@ -118,11 +117,11 @@ class TestableAggregateRoot[A <: DomainCommand, B <: DomainEvent, C: ClassTag] p
   ctag: reflect.ClassTag[A]
 ) {
 
-  implicit val typedActorSystem    = system.toTyped
-  val testKit                      = ActorTestKit(system.toTyped)
-  val persistenceTestKit           = PersistenceTestKit(system)
-  implicit val duration: Duration  = timeout.duration
-  private val givenEvents: List[B] = evt.toList
+  implicit val typedActorSystem: typed.ActorSystem[Nothing] = system.toTyped
+  val testKit: ActorTestKit                                 = ActorTestKit(system.toTyped)
+  val persistenceTestKit: PersistenceTestKit                = PersistenceTestKit(system)
+  implicit val duration: Duration                           = timeout.duration
+  private val givenEvents: List[B]                          = evt.toList
 
   private var lastFailure: Option[HandlingFailure] = Option.empty
   private var lastCommand: Option[DomainCommand]   = Option.empty

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016-2022 Batav B.V. <https://www.cafienne.io/bounded>
+ * Copyright (C) 2016-2023 Batav B.V. <https://www.cafienne.io/bounded>
  */
 
 package io.cafienne.bounded.test
@@ -26,13 +26,13 @@ import java.time.OffsetDateTime
 
 class TestableProjectionSpec extends AsyncWordSpecLike with Matchers with ScalaFutures with BeforeAndAfterAll {
 
-  implicit val timeout = Timeout(30.seconds)
-  implicit val system =
+  implicit val timeout: Timeout = Timeout(30.seconds)
+  implicit val system: ActorSystem =
     ActorSystem("TestableProjectionSpecSystem", SpecConfig.testConfig)
 
   implicit val logger: LoggingAdapter = Logging(system, getClass)
 
-  val metaDate = TestMetaData(OffsetDateTime.now(), None, None)
+  val metaDate: TestMetaData = TestMetaData(OffsetDateTime.now(), None, None)
 
   "The testable projection" must {
     val testProjectionMaterializer = new TestProjectionMaterializer(system) with OffsetStoreProvider

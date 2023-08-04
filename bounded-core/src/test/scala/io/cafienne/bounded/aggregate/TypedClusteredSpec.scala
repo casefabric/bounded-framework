@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016-2022 Batav B.V. <https://www.cafienne.io/bounded>
+ * Copyright (C) 2016-2023 Batav B.V. <https://www.cafienne.io/bounded>
  */
 
 package io.cafienne.bounded.aggregate
@@ -7,7 +7,8 @@ package io.cafienne.bounded.aggregate
 import java.time.OffsetDateTime
 import akka.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
 import org.scalatest.flatspec.AsyncFlatSpecLike
-import scala.concurrent.Future
+
+import scala.concurrent.{ExecutionContextExecutor, Future}
 
 class TypedClusteredSpec extends ScalaTestWithActorTestKit(s"""
     //akka.actor.provider = "cluster"
@@ -23,12 +24,13 @@ class TypedClusteredSpec extends ScalaTestWithActorTestKit(s"""
 
   import TypedSimpleAggregate._
 
-  implicit val commandValidator = new ValidateableCommand[SimpleAggregateCommand] {
-    override def validate(cmd: SimpleAggregateCommand): Future[SimpleAggregateCommand] =
-      Future.successful(cmd)
-  }
+  implicit val commandValidator: ValidateableCommand[SimpleAggregateCommand] =
+    new ValidateableCommand[SimpleAggregateCommand] {
+      override def validate(cmd: SimpleAggregateCommand): Future[SimpleAggregateCommand] =
+        Future.successful(cmd)
+    }
 
-  implicit val ec = system.executionContext
+  implicit val ec: ExecutionContextExecutor = system.executionContext
 
   behavior of "Typed Cluster"
 

@@ -1,6 +1,6 @@
 
 lazy val basicSettings = {
-  val scala213 = "2.13.5"
+  val scala213 = "2.13.11"
   val scala212 = "2.12.13"
   val supportedScalaVersions = List(scala213, scala212)
 
@@ -19,11 +19,12 @@ lazy val basicSettings = {
       "-Xlint", // recommended additional warnings
       "-Ywarn-value-discard", // Warn when non-Unit expression results are unused
       "-Ywarn-dead-code",
-      "-Ywarn-unused" //,
+      "-Ywarn-unused",
+      "-Xsource:3" //,
       //"-Ywarn-unused-import"
     ),
     scalastyleConfig := baseDirectory.value / "project/scalastyle-config.xml",
-    scalafmtConfig := (baseDirectory in ThisBuild).value / "project/.scalafmt.conf",
+    scalafmtConfig := (ThisBuild / baseDirectory).value / "project/.scalafmt.conf",
     scalafmtOnCompile := true,
 
     startYear := Some(2018),
@@ -53,7 +54,7 @@ lazy val basicSettings = {
         Opts.resolver.sonatypeStaging
     ),
     publishMavenStyle := true,
-    publishArtifact in Test := false,
+    Test / publishArtifact := false,
     pomIncludeRepository := { _ => false },
   )
 }

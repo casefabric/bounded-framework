@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016-2022 Batav B.V. <https://www.cafienne.io/bounded>
+ * Copyright (C) 2016-2023 Batav B.V. <https://www.cafienne.io/bounded>
  */
 
 package io.cafienne.bounded.aggregate
@@ -12,7 +12,7 @@ import akka.actor.testkit.typed.scaladsl.{
   ScalaTestWithActorTestKit,
   TestProbe
 }
-import akka.actor.typed.ActorSystem
+import akka.actor.typed.{ActorSystem, Scheduler}
 import akka.util.Timeout
 import io.cafienne.bounded.aggregate.typed.DefaultTypedCommandGateway
 import org.scalatest.BeforeAndAfterAll
@@ -20,8 +20,8 @@ import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.flatspec.AsyncFlatSpecLike
 import com.typesafe.config.ConfigFactory
 
-import scala.concurrent.duration._
-import scala.concurrent.{Await, Future}
+import scala.concurrent.duration.*
+import scala.concurrent.{Await, ExecutionContextExecutor, Future}
 
 class TypedCommandGatewaySpec
     extends ScalaTestWithActorTestKit(ManualTime.config.withFallback(ConfigFactory.parseString(s"""
@@ -45,20 +45,21 @@ class TypedCommandGatewaySpec
 
   import TypedSimpleAggregate._
 
-  implicit val commandValidator = new ValidateableCommand[SimpleAggregateCommand] {
-    override def validate(cmd: SimpleAggregateCommand): Future[SimpleAggregateCommand] =
-      Future.successful(cmd)
-  }
+  implicit val commandValidator: ValidateableCommand[SimpleAggregateCommand] =
+    new ValidateableCommand[SimpleAggregateCommand] {
+      override def validate(cmd: SimpleAggregateCommand): Future[SimpleAggregateCommand] =
+        Future.successful(cmd)
+    }
 
-  implicit val actorSystem: ActorSystem[_] = system
-  implicit val ec                          = system.executionContext
-  implicit val scheduler                   = system.scheduler
+  implicit val actorSystem: ActorSystem[_]  = system
+  implicit val ec: ExecutionContextExecutor = system.executionContext
+  implicit val scheduler: Scheduler         = system.scheduler
 
   val manualTime: ManualTime = ManualTime()
 
   behavior of "Typed Command Gateway"
 
-  implicit val gatewayTimeout = Timeout(10.seconds)
+  implicit val gatewayTimeout: Timeout = Timeout(10.seconds)
 
   val commandMetaData     = AggregateCommandMetaData(OffsetDateTime.now(), None)
   val creator             = new SimpleAggregateManager()

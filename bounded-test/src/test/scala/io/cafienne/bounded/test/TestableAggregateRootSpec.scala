@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016-2022 Batav B.V. <https://www.cafienne.io/bounded>
+ * Copyright (C) 2016-2023 Batav B.V. <https://www.cafienne.io/bounded>
  */
 
 package io.cafienne.bounded.test
@@ -24,8 +24,9 @@ import scala.concurrent.duration._
 class TestableAggregateRootSpec extends AsyncWordSpecLike with Matchers with ScalaFutures with BeforeAndAfterAll {
 
   //Setup required supporting classes
-  implicit val timeout                = Timeout(10.seconds)
-  implicit val system                 = ActorSystem("TestSystem", PersistenceTestKitPlugin.config.withFallback(SpecConfig.testConfig))
+  implicit val timeout: Timeout = Timeout(10.seconds)
+  implicit val system: ActorSystem =
+    ActorSystem("TestSystem", PersistenceTestKitPlugin.config.withFallback(SpecConfig.testConfig))
   implicit val logger: LoggingAdapter = Logging(system, getClass)
 
   val testAggregateRootCreator = new TestAggregateRootCreator(system)

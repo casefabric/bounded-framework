@@ -6,7 +6,7 @@ import sbt._
 
 object Dependencies {
 
-  val akkaVersion = "2.6.19"
+  val akkaVersion = "2.6.21"
   val akkaHttpVersion = "10.2.9"
   val staminaVersion = "0.1.6"
   val persistenceInMemVersion = "2.5.15.2"
@@ -32,13 +32,13 @@ object Dependencies {
       akkaModule("persistence-testkit") % Test,
       "io.spray"                    %% "spray-json"                             % "1.3.6",
       "com.github.dnvriend"         %% "akka-persistence-inmemory"              % persistenceInMemVersion,
-      "com.typesafe.scala-logging"  %% "scala-logging"                          % "3.9.4"
+      "com.typesafe.scala-logging"  %% "scala-logging"                          % "3.9.5"
     )
   }
 
   val log = Seq(
-      "ch.qos.logback" % "logback-classic" % "1.2.11",
-      "net.logstash.logback" % "logstash-logback-encoder" % "7.0.1"
+      "ch.qos.logback" % "logback-classic" % "1.4.7",
+      "net.logstash.logback" % "logstash-logback-encoder" % "7.3"
     )
 
 

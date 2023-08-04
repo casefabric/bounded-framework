@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016-2022 Batav B.V. <https://www.cafienne.io/bounded>
+ * Copyright (C) 2016-2023 Batav B.V. <https://www.cafienne.io/bounded>
  */
 
 package io.cafienne.bounded.aggregate
@@ -23,8 +23,8 @@ class DefaultCommandGateway[A <: AggregateRootCreator](system: ActorSystem, aggr
 ) extends CommandGateway {
   import akka.pattern.ask
 
-  implicit val actorSystem   = system
-  val logger: LoggingAdapter = Logging(system, getClass)
+  implicit val actorSystem: ActorSystem = system
+  val logger: LoggingAdapter            = Logging(system, getClass)
 
   //TODO normal Routee functionality + sleep of actors that were not used for a while
   val aggregateRootInstanceActors =

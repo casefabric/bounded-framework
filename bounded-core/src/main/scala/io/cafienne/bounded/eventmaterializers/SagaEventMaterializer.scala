@@ -1,12 +1,17 @@
 /*
- * Copyright (C) 2016-2022 Batav B.V. <https://www.cafienne.io/bounded>
+ * Copyright (C) 2016-2023 Batav B.V. <https://www.cafienne.io/bounded>
  */
 
 package io.cafienne.bounded.eventmaterializers
 
 import java.util.UUID
-
 import akka.actor.ActorSystem
+import akka.persistence.query.scaladsl.{
+  CurrentEventsByPersistenceIdQuery,
+  CurrentEventsByTagQuery,
+  EventsByTagQuery,
+  ReadJournal
+}
 import akka.persistence.query.{EventEnvelope, Offset}
 import akka.stream.scaladsl.{Keep, Merge, Sink, Source}
 import akka.stream.{ActorMaterializer, KillSwitches, UniqueKillSwitch}
@@ -18,8 +23,8 @@ import io.cafienne.bounded.akka.persistence.ReadJournalProvider
 import io.cafienne.bounded.config.Configured
 import io.cafienne.bounded.eventmaterializers.offsetstores.OffsetStore
 
-import scala.concurrent.duration._
-import scala.concurrent.{Await, Future}
+import scala.concurrent.duration.*
+import scala.concurrent.{Await, ExecutionContextExecutor, Future}
 
 /**
   * Abstract class to be used to create eventlisteners. Use this class as a base for listening for
@@ -54,9 +59,10 @@ abstract class SagaEventMaterializer(
 
   val logger: Logger
 
-  implicit val mat = actorSystem.dispatcher
+  implicit val mat: ExecutionContextExecutor = actorSystem.dispatcher
 
-  val journal = readJournal
+  val journal: ReadJournal with CurrentEventsByTagQuery with EventsByTagQuery with CurrentEventsByPersistenceIdQuery =
+    readJournal
 
   /**
     * Tagname used to identify eventstream to listen to

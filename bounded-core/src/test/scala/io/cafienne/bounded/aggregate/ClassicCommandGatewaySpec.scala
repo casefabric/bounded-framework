@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016-2022 Batav B.V. <https://www.cafienne.io/bounded>
+ * Copyright (C) 2016-2023 Batav B.V. <https://www.cafienne.io/bounded>
  */
 
 package io.cafienne.bounded.aggregate
@@ -13,8 +13,8 @@ import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.flatspec.AsyncFlatSpecLike
 import org.scalatest.matchers.should.Matchers
 
-import scala.concurrent.{Await, ExecutionContext, Future}
-import scala.concurrent.duration._
+import scala.concurrent.{Await, ExecutionContext, ExecutionContextExecutor, Future}
+import scala.concurrent.duration.*
 import org.scalatest.time.{Millis, Seconds, Span}
 
 class ClassicCommandGatewaySpec
@@ -44,28 +44,30 @@ class ClassicCommandGatewaySpec
     with BeforeAndAfterAll {
 
   //Setup required supporting classes
-  implicit val timeout         = Timeout(10.seconds)
-  implicit val defaultPatience = PatienceConfig(timeout = Span(10, Seconds), interval = Span(100, Millis))
-  implicit val ec              = ExecutionContext.global
+  implicit val timeout: Timeout = Timeout(10.seconds)
+  implicit val defaultPatience: PatienceConfig =
+    PatienceConfig(timeout = Span(10, Seconds), interval = Span(100, Millis))
+  implicit val ec: ExecutionContextExecutor = ExecutionContext.global
 
   val classicSimpleCreator = new ClassicSimpleAggregateCreator(system)
-  val commandGateway       = new RouterCommandGateway(system, 2.seconds, classicSimpleCreator)
+  val commandGateway: RouterCommandGateway[ClassicSimpleAggregateCreator] =
+    new RouterCommandGateway(system, 2.seconds, classicSimpleCreator)
 
   import akka.pattern.ask
   import ClassicSimpleAggregate._
 
   //All commands are valid in this test
-  implicit val commandValidator = new ValidateableCommand[Create] {
+  implicit val commandValidator: ValidateableCommand[Create] = new ValidateableCommand[Create] {
     override def validate(cmd: Create): Future[Create] =
       Future.successful(cmd)
   }
 
-  implicit val commandValidator2 = new ValidateableCommand[AddItem] {
+  implicit val commandValidator2: ValidateableCommand[AddItem] = new ValidateableCommand[AddItem] {
     override def validate(cmd: AddItem): Future[AddItem] =
       Future.successful(cmd)
   }
 
-  implicit val commandValidator3 = new ValidateableCommand[GetItems] {
+  implicit val commandValidator3: ValidateableCommand[GetItems] = new ValidateableCommand[GetItems] {
     override def validate(cmd: GetItems): Future[GetItems] =
       Future.successful(cmd)
   }

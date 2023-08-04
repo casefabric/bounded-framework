@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016-2022 Batav B.V. <https://www.cafienne.io/bounded>
+ * Copyright (C) 2016-2023 Batav B.V. <https://www.cafienne.io/bounded>
  */
 
 package io.cafienne.bounded.eventmaterializers
@@ -54,10 +54,11 @@ class AbstractReplayableEventMaterializerWithEventFilterSpec
     with BeforeAndAfterAll {
 
   //Setup required supporting classes
-  implicit val timeout                = Timeout(10.seconds)
-  implicit val system                 = ActorSystem("MaterializerTestSystem", SpecConfig.testConfig)
+  implicit val timeout: Timeout       = Timeout(10.seconds)
+  implicit val system: ActorSystem    = ActorSystem("MaterializerTestSystem", SpecConfig.testConfig)
   implicit val logger: LoggingAdapter = Logging(system, getClass)
-  implicit val defaultPatience        = PatienceConfig(timeout = Span(4, Seconds), interval = Span(100, Millis))
+  implicit val defaultPatience: PatienceConfig =
+    PatienceConfig(timeout = Span(4, Seconds), interval = Span(100, Millis))
 
   val eventStreamListener = TestProbe()
 
@@ -124,7 +125,7 @@ class AbstractReplayableEventMaterializerWithEventFilterSpec
     populateEventStore(testSet)
   }
 
-  override def afterAll {
+  override def afterAll(): Unit = {
     TestKit.shutdownActorSystem(system, 30.seconds, verifySystemShutdown = true)
   }
 
