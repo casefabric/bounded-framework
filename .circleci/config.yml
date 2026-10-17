@@ -10,6 +10,7 @@ jobs:
       JVM_OPTS: -Xmx3200m
       TERM: dumb
     steps:
+      - checkout
       - run: echo 'export ARTIFACT_BUILD=$CIRCLE_PROJECT_REPONAME-$CIRCLE_BUILD_NUM.zip' >> $BASH_ENV
       - run:
           name: Get sbt binary
@@ -20,7 +21,6 @@ jobs:
             sudo apt-get update
             sudo apt-get install sbt
             sudo apt-get clean && sudo apt-get autoclean
-      - checkout
       - restore_cache:
           keys:
             - v1-dependencies-{{ checksum "build.sbt" }}
