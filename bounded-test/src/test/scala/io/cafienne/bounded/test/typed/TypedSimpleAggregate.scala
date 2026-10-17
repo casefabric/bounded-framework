@@ -137,7 +137,7 @@ class SimpleAggregateManager() extends TypedAggregateRootManager[SimpleAggregate
   override def behavior(id: String): Behavior[SimpleAggregateCommand] = {
     logger.debug("Create aggregate behavior for {}", id)
     val persistenceId = PersistenceId.ofUniqueId(id)
-    Behaviors.withTimers { timers ⇒
+    Behaviors.withTimers { timers =>
       EventSourcedBehavior
         .withEnforcedReplies(
           persistenceId,

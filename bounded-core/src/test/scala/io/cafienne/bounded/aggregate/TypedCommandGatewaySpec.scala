@@ -9,8 +9,7 @@ import org.apache.pekko.actor.testkit.typed.scaladsl.{
   LogCapturing,
   LoggingTestKit,
   ManualTime,
-  ScalaTestWithActorTestKit,
-  TestProbe
+  ScalaTestWithActorTestKit
 }
 import org.apache.pekko.actor.typed.{ActorSystem, Scheduler}
 import org.apache.pekko.util.Timeout

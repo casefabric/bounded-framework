@@ -4,20 +4,12 @@
 
 package io.cafienne.bounded.test.typed
 
-import org.apache.pekko.actor.{ActorSystem, typed}
-
 import java.time.OffsetDateTime
-import org.apache.pekko.actor.testkit.typed.scaladsl.{ActorTestKit, ScalaTestWithActorTestKit, TestProbe}
 import org.apache.pekko.util.Timeout
 import io.cafienne.bounded.aggregate.typed.TypedAggregateRootManager
 import io.cafienne.bounded.test.DomainProtocol._
-import org.scalatest.BeforeAndAfterAll
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.flatspec.AsyncFlatSpecLike
-import org.apache.pekko.actor.typed.scaladsl.adapter._
-import org.apache.pekko.persistence.testkit.PersistenceTestKitPlugin
-import org.apache.pekko.persistence.testkit.scaladsl.PersistenceTestKit
-import com.typesafe.config.ConfigFactory
 import io.cafienne.bounded.test.typed.TestableAggregateRoot.{
   AggregateThrownException,
   MisdirectedCommand,

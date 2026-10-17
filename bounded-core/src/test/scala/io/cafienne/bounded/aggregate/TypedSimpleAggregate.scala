@@ -108,14 +108,14 @@ object TypedSimpleAggregate {
 
   private def createAggregate(cmd: Create): ReplyEffect[SimpleAggregateEvent, SimpleAggregateState] = {
     logger.debug(s"Create Aggregate (replayed: $replayed)" + cmd)
-    Effect.persist(Created(cmd.aggregateRootId, TestMetaData.fromCommand(cmd.metaData))).thenReply(cmd.replyTo)(_ ⇒ OK)
+    Effect.persist(Created(cmd.aggregateRootId, TestMetaData.fromCommand(cmd.metaData))).thenReply(cmd.replyTo)(_ => OK)
   }
 
   private def addItem(cmd: AddItem): ReplyEffect[SimpleAggregateEvent, SimpleAggregateState] = {
     logger.debug("AddItem " + cmd)
     Effect
       .persist(ItemAdded(cmd.aggregateRootId, TestMetaData.fromCommand(cmd.metaData), cmd.item))
-      .thenReply(cmd.replyTo)(_ ⇒ OK)
+      .thenReply(cmd.replyTo)(_ => OK)
   }
 
   // event handler to keep internal aggregate state
@@ -134,7 +134,7 @@ class SimpleAggregateManager() extends TypedAggregateRootManager[SimpleAggregate
 
   override def behavior(id: String): Behavior[SimpleAggregateCommand] = {
     logger.debug("Create aggregate behavior for {}", id)
-    Behaviors.withTimers { timers ⇒
+    Behaviors.withTimers { timers =>
       EventSourcedBehavior
         .withEnforcedReplies(
           PersistenceId(aggregateRootTag, id),

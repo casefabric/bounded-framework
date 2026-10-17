@@ -14,7 +14,7 @@ import org.apache.pekko.persistence.query.scaladsl.{
 }
 import org.apache.pekko.persistence.query.{EventEnvelope, Offset}
 import org.apache.pekko.stream.scaladsl.{Keep, Merge, Sink, Source}
-import org.apache.pekko.stream.{ActorMaterializer, KillSwitches, UniqueKillSwitch}
+import org.apache.pekko.stream.{KillSwitches, UniqueKillSwitch}
 import org.apache.pekko.{Done, NotUsed}
 import com.typesafe.scalalogging.Logger
 import io.cafienne.bounded.aggregate.DomainEvent

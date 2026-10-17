@@ -6,7 +6,6 @@ package io.cafienne.bounded.test
 
 import java.time.OffsetDateTime
 import org.apache.pekko.actor.ActorSystem
-import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
 import org.apache.pekko.event.{Logging, LoggingAdapter}
 import org.apache.pekko.persistence.testkit.PersistenceTestKitPlugin
 import org.apache.pekko.testkit.TestKit

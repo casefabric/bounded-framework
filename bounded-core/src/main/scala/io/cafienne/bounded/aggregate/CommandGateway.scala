@@ -4,7 +4,7 @@
 
 package io.cafienne.bounded.aggregate
 
-import org.apache.pekko.actor.{Actor, ActorContext, ActorRef, ActorSystem, Props, Terminated, TimerScheduler, Timers}
+import org.apache.pekko.actor.{Actor, ActorRef, ActorSystem, Props, Terminated, Timers}
 import org.apache.pekko.event.{Logging, LoggingAdapter}
 import org.apache.pekko.routing.{NoRoutee, Routee, RoutingLogic}
 import org.apache.pekko.util.Timeout

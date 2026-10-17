@@ -41,9 +41,9 @@ object SpecConfig {
       |       publish-confirmations = on
       |       publish-plugin-commands = on
       |       journal {
-      |          plugin = "pekko.persistence.journal.inmem"
+      |          plugin = "inmemory-journal"
       |       }
-      |       snapshot-store.plugin = "pekko.persistence.snapshot-store.local"
+      |       snapshot-store.plugin = "inmemory-snapshot-store"
       |      }
       |      test {
       |        single-expect-default = 10s

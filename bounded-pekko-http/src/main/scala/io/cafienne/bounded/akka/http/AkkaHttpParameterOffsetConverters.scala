@@ -20,7 +20,7 @@ trait AkkaHttpParameterOffsetConverters extends Configured {
     config.getString("akka.persistence.journal.plugin")
 
   implicit val string2OffsetUnmarshaller: FromStringUnmarshaller[Offset] = {
-    Unmarshaller.strict[String, Offset] { string ⇒
+    Unmarshaller.strict[String, Offset] { string =>
       try {
         configuredJournal match { //depending on the journal a specific kind of Offset is required, parse according to that.
           case "cassandra-journal" =>

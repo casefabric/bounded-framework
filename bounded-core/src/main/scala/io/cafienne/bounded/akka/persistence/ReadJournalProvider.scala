@@ -11,9 +11,7 @@ import org.apache.pekko.persistence.query.scaladsl._
 import io.cafienne.bounded.akka.ActorSystemProvider
 import org.apache.pekko.persistence.jdbc.query.scaladsl.JdbcReadJournal
 import org.apache.pekko.persistence.r2dbc.query.scaladsl.R2dbcReadJournal
-import org.apache.pekko.persistence.journal.inmem.InmemJournal
-import org.apache.pekko.persistence.testkit.PersistenceTestKitPlugin
-import org.apache.pekko.persistence.testkit.query.scaladsl.PersistenceTestKitReadJournal
+import io.github.alstanchev.pekko.persistence.inmemory.query.scaladsl.InMemoryReadJournal
 
 /**
   * Provides a readJournal that has the eventsByTag available that's used for
@@ -50,9 +48,9 @@ trait ReadJournalProvider { systemProvider: ActorSystemProvider =>
 //        ReadJournal with CurrentPersistenceIdsQuery with CurrentEventsByPersistenceIdQuery with CurrentEventsByTagQuery with EventsByPersistenceIdQuery with EventsByTagQuery
 //      ]
     }
-    if (configuredJournal.endsWith("inmem")) {
+    if (configuredJournal.endsWith("inmemory-journal")) {
       return PersistenceQuery(system)
-        .readJournalFor("pekko.persistence.journal.inmem")
+        .readJournalFor[InMemoryReadJournal](InMemoryReadJournal.Identifier)
         .asInstanceOf[
           ReadJournal with CurrentPersistenceIdsQuery with CurrentEventsByPersistenceIdQuery with CurrentEventsByTagQuery with EventsByPersistenceIdQuery with EventsByTagQuery
         ]

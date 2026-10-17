@@ -79,7 +79,7 @@ val boundedCore = (project in file("bounded-core"))
   .settings(basicSettings: _*)
   .settings(
     name := "bounded-core",
-    libraryDependencies ++= Dependencies.baseDeps ++ Dependencies.persistenceLevelDBDeps ++ Dependencies.persistenceCassandraDeps ++ Dependencies.persistenceJdbcDeps ++ Dependencies.testDeps,
+    libraryDependencies ++= Dependencies.baseDeps ++ Dependencies.persistenceLevelDBDeps ++ Dependencies.persistenceInMemoryDeps ++ Dependencies.persistenceCassandraDeps ++ Dependencies.persistenceJdbcDeps ++ Dependencies.testDeps,
   )
 
 val boundedAkkaHttp = (project in file("bounded-pekko-http"))

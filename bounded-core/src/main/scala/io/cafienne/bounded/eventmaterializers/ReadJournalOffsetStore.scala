@@ -4,8 +4,6 @@
 
 package io.cafienne.bounded.eventmaterializers
 
-import org.apache.pekko.persistence.cassandra.query.scaladsl.CassandraReadJournal
-
 import java.util.concurrent.TimeUnit
 import org.apache.pekko.persistence.cassandra.query.scaladsl.CassandraReadJournal
 import org.apache.pekko.persistence.query.Offset

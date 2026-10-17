@@ -84,6 +84,12 @@ object Dependencies {
     )
   }
 
+  val persistenceInMemoryDeps = {
+    baseDeps ++ Seq(
+      "io.github.alstanchev" %% "pekko-persistence-inmemory" % "1.3.0" excludeAll ExclusionRule(organization = "org.apache.pekko")
+    )
+  }
+
   val persistenceCassandraDeps = {
     baseDeps ++ Seq(
       "org.apache.pekko" %% "pekko-persistence-cassandra" % "1.1.0"

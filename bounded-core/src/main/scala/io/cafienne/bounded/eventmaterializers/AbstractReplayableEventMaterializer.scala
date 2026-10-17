@@ -19,8 +19,6 @@ abstract class AbstractReplayableEventMaterializer(
 ) extends AbstractEventMaterializer(actorSystem, withPartialReplay, materializerEventFilter)
     with ResumableReplayable {
 
-  import EventMaterializerExecutionContext._
-
   /**
     * Handle event during replay
     *
