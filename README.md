@@ -114,6 +114,46 @@ The framework allows you to write a CQRS based application that seperates the in
 
 The code is  [Apache2 licensed](https://www.apache.org/licenses/LICENSE-2.0)  and available in the  [Cafienne Bounded Framework Github Repository](https://github.com/cafienne/bounded-framework) .
 
+# Releasing
+
+Bounded is published to Maven Central (`io.cafienne.bounded` : `bounded-core`, `bounded-test`, `bounded-pekko-http`) using sbt's built-in Sonatype Central support.
+
+## Prerequisites
+
+- A Sonatype Central user token for the `io.cafienne` namespace, stored in `~/.sbt/sonatype_central_credentials`:
+  ```
+  host=central.sonatype.com
+  user=<token username>
+  password=<token password>
+  ```
+- A GPG key that is published to a public keyserver; it is used by sbt-pgp to sign the artifacts.
+
+## Versioning
+
+There is no version file: the version is derived from the git tag. Release tags have the form `vX.Y.Z`.
+
+- A build on a commit that carries a tag `vX.Y.Z`, without uncommitted changes, has version `X.Y.Z`.
+- Any other build (commits after the last tag, or local changes) has version `X.Y.(Z+1)-SNAPSHOT`.
+
+Check which version will be published with `sbt "show boundedCore/version"`.
+
+## Publishing a release
+
+```bash
+git checkout main && git pull
+git tag v0.4.0
+git push origin v0.4.0
+sbt publishSigned sonaRelease
+```
+
+`publishSigned` signs the artifacts and stages them locally; `sonaRelease` uploads the bundle to Sonatype Central and releases it to Maven Central. Use `sonaUpload` instead of `sonaRelease` to upload only, and publish the deployment manually from the [Central Portal](https://central.sonatype.com/publishing/deployments).
+
+Afterwards, create a GitHub release for the tag with the release notes.
+
+## Publishing a snapshot
+
+On any commit that is not a release tag, `sbt publishSigned` publishes the `-SNAPSHOT` version directly to the [Central snapshots repository](https://central.sonatype.com/repository/maven-snapshots/).
+
 # Release notes
 
 Are found at [https://github.com/cafienne/bounded-framework/releases](https://github.com/cafienne/bounded-framework/releases)

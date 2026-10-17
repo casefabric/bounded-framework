@@ -1,4 +1,4 @@
-import xerial.sbt.Sonatype.sonatypeCentralHost
+import sbt.Keys.localStaging
 
 lazy val basicSettings = {
   val scala213 = "2.13.18"
@@ -9,7 +9,6 @@ lazy val basicSettings = {
     description := "Scala and Pekko based Domain Driven Design Framework",
     scalaVersion := scala213,
     //crossScalaVersions := supportedScalaVersions,
-    //releaseCrossBuild := false,
     scalacOptions := Seq(
       "-encoding", "UTF-8",
       //"-target:jvm-1.8",
@@ -51,17 +50,33 @@ lazy val basicSettings = {
       url("https://github.com/olger"))
     ),
     versionScheme := Some("early-semver"),
-    // Add sonatype repository settings
-    publishTo := {
-      val centralSnapshots = "https://central.sonatype.com/repository/maven-snapshots/"
-        if (isSnapshot.value) Some("central-snapshots" at centralSnapshots)
-        else localStaging.value
-    },
-    credentials += Credentials(Path.userHome / ".sbt" / "sonatype_central_credentials"),
-    sonatypeCredentialHost := sonatypeCentralHost,
     publishMavenStyle := true,
+    // Do not publish any test artifacts
     Test / publishArtifact := false,
     pomIncludeRepository := { _ => false },
+
+    //When you add the file below to your .sbt folder, ask the repository manager for a set of credentials
+    credentials += Credentials(Path.userHome / ".sbt" / "sonatype_central_credentials"),
+    publishTo := {
+      val centralSnapshots = "https://central.sonatype.com/repository/maven-snapshots/"
+      if (isSnapshot.value) Some("central-snapshots" at centralSnapshots)
+      else localStaging.value
+    },
+
+    /**
+     * Version generation from the git tag (vX.Y.Z), depends on the [[GitInfoAnalyzer]]
+     */
+    git.useGitDescribe := true,
+    git.gitTagToVersionNumber := { tag =>
+      // This code sets the gitDescribedVersion from the current git tag.
+      //  We do not actually return a version, but the version + the description.
+      //  Next task is to pull them apart from each other again.
+      //  This is done because somehow it is not possible to keep state inside the GitInfoAnalyzer object :(
+      GitInfoAnalyzer.getVersionPlusDescription(tag, git.gitCurrentBranch.value, git.gitHeadCommit.value, git.gitUncommittedChanges.value)
+    },
+    // Now convert the generated gitDescribedVersion into a proper 'version'.
+    // Unlike the case engine, 'description' is kept as is because it ends up in the published pom.
+    version := GitInfoAnalyzer.version(version.value, git.gitDescribedVersion.value),
   )
 }
 
@@ -70,21 +85,36 @@ lazy val boundedRoot = (project in file("."))
   .settings(publishArtifact := false,
             publish / skip := true,
             crossScalaVersions := Nil)
-  .enablePlugins(AutomateHeaderPlugin)
-  //.settings(releaseSettings)
+  .enablePlugins(GitPlugin, GitVersioning, GitBranchPrompt, AutomateHeaderPlugin)
   .aggregate(boundedCore, boundedPekkoHttp, boundedTest)
 
 val boundedCore = (project in file("bounded-core"))
-  .enablePlugins(ReleasePlugin, AutomateHeaderPlugin)
+  .enablePlugins(BuildInfoPlugin, GitPlugin, GitVersioning, GitBranchPrompt, AutomateHeaderPlugin)
   .settings(basicSettings: _*)
   .settings(
     name := "bounded-core",
+    // Generate io.cafienne.bounded.BuildInfo with 'name', 'organization', 'version', 'description' and the git status
+    buildInfoKeys := Seq[BuildInfoKey](
+      name,
+      organization,
+      version,
+      BuildInfoKey.action("buildDescription")(
+        GitInfoAnalyzer.description(description.value, git.gitDescribedVersion.value)
+      ),
+      git.gitHeadCommit,
+      git.gitCurrentBranch,
+      git.gitUncommittedChanges
+    ),
+    buildInfoOptions += BuildInfoOption.BuildTime,
+    buildInfoOptions += BuildInfoOption.ToMap,
+    buildInfoPackage := "io.cafienne.bounded",
+    buildInfoObject := "BuildInfo",
     libraryDependencies ++= Dependencies.baseDeps ++ Dependencies.persistenceLevelDBDeps ++ Dependencies.persistenceInMemoryDeps ++ Dependencies.persistenceCassandraDeps ++ Dependencies.persistenceJdbcDeps ++ Dependencies.testDeps,
   )
 
 val boundedPekkoHttp = (project in file("bounded-pekko-http"))
   .dependsOn(boundedCore)
-  .enablePlugins(ReleasePlugin, AutomateHeaderPlugin)
+  .enablePlugins(GitPlugin, GitVersioning, GitBranchPrompt, AutomateHeaderPlugin)
   .settings(basicSettings: _*)
   .settings(
     name := "bounded-pekko-http",
@@ -92,7 +122,7 @@ val boundedPekkoHttp = (project in file("bounded-pekko-http"))
 
 val boundedTest = (project in file("bounded-test"))
   .dependsOn(boundedCore)
-  .enablePlugins(ReleasePlugin, AutomateHeaderPlugin)
+  .enablePlugins(GitPlugin, GitVersioning, GitBranchPrompt, AutomateHeaderPlugin)
   .settings(basicSettings: _*)
   .settings(
     name := "bounded-test",
