@@ -20,7 +20,14 @@ jobs:
             sudo apt-get update
             sudo apt-get install sbt
             sudo apt-get clean && sudo apt-get autoclean
-      - checkout
+      - add_ssh_keys
+      - run:
+          name: Checkout code
+          command: |
+            mkdir -p ~/.ssh
+            ssh-keyscan github.com >> ~/.ssh/known_hosts 2>/dev/null
+            git clone git@github.com:${CIRCLE_PROJECT_USERNAME}/${CIRCLE_PROJECT_REPONAME}.git .
+            git checkout -q ${CIRCLE_SHA1}
       - restore_cache:
           keys:
             - v1-dependencies-{{ checksum "build.sbt" }}
