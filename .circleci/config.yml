@@ -48,7 +48,7 @@ jobs:
       - sonarcloud/scan
 
 orbs:
-  sonarcloud: sonarsource/sonarcloud@2.0.0
+  sonarcloud: sonarsource/sonarcloud@4.0.0
 
 workflows:
   version: 2
