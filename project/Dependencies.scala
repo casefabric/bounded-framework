@@ -50,14 +50,14 @@ object Dependencies {
     )
 
 
-  val akkaHttpDeps = {
-    def akkaHttpModule(name: String, version: String = pekkoHttpVersion) =
+  val pekkoHttpDeps = {
+    def pekkoHttpModule(name: String, version: String = pekkoHttpVersion) =
       "org.apache.pekko" %% s"pekko-$name" % version
 
     baseDeps ++ Seq(
-      akkaHttpModule("http"),
-      akkaHttpModule("http-spray-json"),
-      akkaHttpModule("http-testkit") % Test
+      pekkoHttpModule("http"),
+      pekkoHttpModule("http-spray-json"),
+      pekkoHttpModule("http-testkit") % Test
     ) ++ test
   }
 

@@ -1,6 +1,6 @@
-## Domain driven design framework for Scala and Akka
+## Domain driven design framework for Scala and Pekko
 
-Bounded is a framework that supports the Domain Driven Design approach. It enables you to leverage Scala and Akka technologies in a way that gives you a structured DDD based application.
+Bounded is a framework that supports the Domain Driven Design approach. It enables you to leverage Scala and Apache Pekko technologies in a way that gives you a structured DDD based application.
 [![Maintainability Rating](https://sonarcloud.io/api/project_badges/measure?project=cafienne_bounded-framework&metric=sqale_rating)](https://sonarcloud.io/summary/new_code?id=cafienne_bounded-framework)
 
 
@@ -39,7 +39,7 @@ class Cargo(cargoId: AggregateRootId)
 ```
         
 
-The example shows the Cargo example as described in the book of Eric Evans. Bounded takes care of the persistence of the aggregate root via an event sourced mechanism based on akka persistence. Next to that, it takes care of handling the internal state of the aggregate root.
+The example shows the Cargo example as described in the book of Eric Evans. Bounded takes care of the persistence of the aggregate root via an event sourced mechanism based on Pekko persistence. Next to that, it takes care of handling the internal state of the aggregate root.
 
 ```scala
 case class CargoAggregateState(
@@ -70,7 +70,7 @@ case class CargoAggregateState(
 
 ## Event sourcing
 
-Bounded makes use of a Event Sourcing approach. All logic is expressed in events that allows you to extend your application based on those events. The resumable projections are built with the reactive technology akka streams. Using an event store also means that you have the full history of the application at hand, allowing to create new historic based views later in time.
+Bounded makes use of a Event Sourcing approach. All logic is expressed in events that allows you to extend your application based on those events. The resumable projections are built with the reactive technology Pekko streams. Using an event store also means that you have the full history of the application at hand, allowing to create new historic based views later in time.
 
 ## Command Query Responsibility Segregation (CQRS)
 

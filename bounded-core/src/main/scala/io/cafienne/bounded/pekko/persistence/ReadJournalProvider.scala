@@ -2,13 +2,13 @@
  * Copyright (C) 2016-2026 Batav B.V. <https://www.cafienne.io/bounded>
  */
 
-package io.cafienne.bounded.akka.persistence
+package io.cafienne.bounded.pekko.persistence
 
 import org.apache.pekko.persistence.cassandra.query.scaladsl.CassandraReadJournal
 import org.apache.pekko.persistence.query.PersistenceQuery
 import org.apache.pekko.persistence.query.journal.leveldb.scaladsl.LeveldbReadJournal
 import org.apache.pekko.persistence.query.scaladsl._
-import io.cafienne.bounded.akka.ActorSystemProvider
+import io.cafienne.bounded.pekko.ActorSystemProvider
 import org.apache.pekko.persistence.jdbc.query.scaladsl.JdbcReadJournal
 import org.apache.pekko.persistence.r2dbc.query.scaladsl.R2dbcReadJournal
 import io.github.alstanchev.pekko.persistence.inmemory.query.scaladsl.InMemoryReadJournal

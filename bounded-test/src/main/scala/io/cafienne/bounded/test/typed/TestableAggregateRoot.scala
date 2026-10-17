@@ -122,7 +122,7 @@ class TestableAggregateRoot[A <: DomainCommand, B <: DomainEvent, C: ClassTag] p
     ActorSystem(
       "TestSystem",
       PersistenceTestKitPlugin.config
-        .withFallback(ConfigFactory.parseString("akka.actor.allow-java-serialization=on"))
+        .withFallback(ConfigFactory.parseString("pekko.actor.allow-java-serialization=on"))
         .withFallback(ConfigFactory.defaultApplication())
         .resolve()
     )

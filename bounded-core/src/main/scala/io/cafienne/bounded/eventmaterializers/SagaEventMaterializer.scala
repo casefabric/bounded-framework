@@ -18,8 +18,8 @@ import org.apache.pekko.stream.{KillSwitches, UniqueKillSwitch}
 import org.apache.pekko.{Done, NotUsed}
 import com.typesafe.scalalogging.Logger
 import io.cafienne.bounded.aggregate.DomainEvent
-import io.cafienne.bounded.akka.ActorSystemProvider
-import io.cafienne.bounded.akka.persistence.ReadJournalProvider
+import io.cafienne.bounded.pekko.ActorSystemProvider
+import io.cafienne.bounded.pekko.persistence.ReadJournalProvider
 import io.cafienne.bounded.config.Configured
 import io.cafienne.bounded.eventmaterializers.offsetstores.OffsetStore
 
@@ -84,7 +84,7 @@ abstract class SagaEventMaterializer(
   def handleEvent(evt: Any): Future[Done]
 
   /**
-    * Publish an event on the AKKA eventbus after the event is processed.
+    * Publish an event on the Pekko eventbus after the event is processed.
     */
   val isPublishRequired: Boolean = (actorSystem.settings.config
     .hasPath("bounded.eventmaterializers.publish") && actorSystem.settings.config

@@ -13,7 +13,7 @@
     <!--
     Logging from tests are silenced by this appender. When there is a test failure
     the captured logging events are flushed to the appenders defined for the
-    akka.actor.testkit.typed.internal.CapturingAppenderDelegate logger.
+    org.apache.pekko.actor.testkit.typed.internal.CapturingAppenderDelegate logger.
     -->
     <appender name="CapturingAppender" class="org.apache.pekko.actor.testkit.typed.internal.CapturingAppender" />
 

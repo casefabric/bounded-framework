@@ -101,7 +101,7 @@ class TestableAggregateRoot[A <: AggregateRootActor[B], B <: AggregateState[B]: 
     ActorSystem(
       "TestSystem",
       PersistenceTestKitPlugin.config
-        .withFallback(ConfigFactory.parseString("akka.actor.allow-java-serialization=true"))
+        .withFallback(ConfigFactory.parseString("pekko.actor.allow-java-serialization=true"))
         .withFallback(ConfigFactory.defaultApplication())
         .resolve()
     )

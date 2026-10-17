@@ -72,7 +72,7 @@ lazy val boundedRoot = (project in file("."))
             crossScalaVersions := Nil)
   .enablePlugins(AutomateHeaderPlugin)
   //.settings(releaseSettings)
-  .aggregate(boundedCore, boundedAkkaHttp, boundedTest)
+  .aggregate(boundedCore, boundedPekkoHttp, boundedTest)
 
 val boundedCore = (project in file("bounded-core"))
   .enablePlugins(ReleasePlugin, AutomateHeaderPlugin)
@@ -82,13 +82,13 @@ val boundedCore = (project in file("bounded-core"))
     libraryDependencies ++= Dependencies.baseDeps ++ Dependencies.persistenceLevelDBDeps ++ Dependencies.persistenceInMemoryDeps ++ Dependencies.persistenceCassandraDeps ++ Dependencies.persistenceJdbcDeps ++ Dependencies.testDeps,
   )
 
-val boundedAkkaHttp = (project in file("bounded-pekko-http"))
+val boundedPekkoHttp = (project in file("bounded-pekko-http"))
   .dependsOn(boundedCore)
   .enablePlugins(ReleasePlugin, AutomateHeaderPlugin)
   .settings(basicSettings: _*)
   .settings(
     name := "bounded-pekko-http",
-    libraryDependencies ++= Dependencies.akkaHttpDeps)
+    libraryDependencies ++= Dependencies.pekkoHttpDeps)
 
 val boundedTest = (project in file("bounded-test"))
   .dependsOn(boundedCore)

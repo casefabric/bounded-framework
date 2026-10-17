@@ -7,7 +7,7 @@ package io.cafienne.bounded.eventmaterializers
 import org.apache.pekko.Done
 import org.apache.pekko.persistence.query.Offset
 import com.typesafe.config.Config
-import io.cafienne.bounded.akka.ActorSystemProvider
+import io.cafienne.bounded.pekko.ActorSystemProvider
 import io.cafienne.bounded.eventmaterializers.offsetstores.{
   InMemoryBasedOffsetStore,
   LmdbConfig,

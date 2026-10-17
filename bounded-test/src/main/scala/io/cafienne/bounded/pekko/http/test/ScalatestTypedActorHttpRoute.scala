@@ -2,7 +2,7 @@
  * Copyright (C) 2016-2026 Batav B.V. <https://www.cafienne.io/bounded>
  */
 
-package io.cafienne.bounded.akka.http.test
+package io.cafienne.bounded.pekko.http.test
 
 import org.apache.pekko.actor.testkit.typed.scaladsl.{ActorTestKit, ActorTestKitBase}
 import org.apache.pekko.actor.{ActorSystem, Scheduler}

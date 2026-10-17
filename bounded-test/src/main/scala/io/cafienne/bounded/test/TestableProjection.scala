@@ -31,9 +31,9 @@ object TestableProjection {
     //Cleanup the store before this test is ran.
     val tp = TestProbe()
 //    tp.send(StorageExtension(system).journalStorage, InMemoryJournalStorage.ClearJournal)
-//    tp.expectMsg(akka.actor.Status.Success(""))
+//    tp.expectMsg(org.apache.pekko.actor.Status.Success(""))
 //    tp.send(StorageExtension(system).snapshotStorage, InMemorySnapshotStorage.ClearSnapshots)
-//    tp.expectMsg(akka.actor.Status.Success(""))
+//    tp.expectMsg(org.apache.pekko.actor.Status.Success(""))
 
     val testedProjection = new TestableProjection(system, timeout, tags)
     OffsetStoreProvider.getInMemoryStore().clear()

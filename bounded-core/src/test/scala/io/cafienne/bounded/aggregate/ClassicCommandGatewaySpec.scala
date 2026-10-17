@@ -29,7 +29,7 @@ class ClassicCommandGatewaySpec
     # snapshot store plugin is NOT defined, things should still work
     pekko.persistence.snapshot-store.local.dir = "target/snapshots-${classOf[TypedCommandGatewaySpec].getName}/"
     #PLEASE NOTE THAT CoordinatedShutdown needs to be disabled as below in order to run the test properly
-    #SEE https://doc.akka.io/docs/akka/current/coordinated-shutdown.html at the end of the page
+    #SEE https://pekko.apache.org/docs/pekko/current/coordinated-shutdown.html at the end of the page
     pekko.coordinated-shutdown.terminate-actor-system = off
     pekko.coordinated-shutdown.run-by-actor-system-terminate = off
     pekko.coordinated-shutdown.run-by-jvm-shutdown-hook = off

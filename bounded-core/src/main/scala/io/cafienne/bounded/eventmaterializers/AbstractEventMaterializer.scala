@@ -10,8 +10,8 @@ import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.persistence.query.{EventEnvelope, Offset}
 import org.apache.pekko.stream.{KillSwitches, UniqueKillSwitch}
 import org.apache.pekko.stream.scaladsl.{Keep, Sink, Source}
-import io.cafienne.bounded.akka.ActorSystemProvider
-import io.cafienne.bounded.akka.persistence.ReadJournalProvider
+import io.cafienne.bounded.pekko.ActorSystemProvider
+import io.cafienne.bounded.pekko.persistence.ReadJournalProvider
 import io.cafienne.bounded.config.Configured
 import com.typesafe.scalalogging.Logger
 import io.cafienne.bounded.aggregate.DomainEvent
@@ -77,7 +77,7 @@ abstract class AbstractEventMaterializer(
   def handleEvent(evt: Any): Future[Done]
 
   /**
-    * Publish an event on the AKKA eventbus after the event is processed.
+    * Publish an event on the Pekko eventbus after the event is processed.
     */
   val isPublishRequired: Boolean = (actorSystem.settings.config
     .hasPath("bounded.eventmaterializers.publish") && actorSystem.settings.config
