@@ -6,10 +6,12 @@ import sbt._
 
 object Dependencies {
 
-  val pekkoVersion = "1.1.2"
-  val pekkoHttpVersion = "1.1.0"
-  val pekkoProjectionSnapshotVersion = "1.1.0-M1"
-  val scalaTestVersion = "3.2.19"
+  val pekkoVersion = "1.7.0"
+  val pekkoHttpVersion = "1.4.0"
+  val pekkoProjectionSnapshotVersion = "1.1.0"
+  val scalaTestVersion = "3.2.20"
+  val slickVersion = "3.6.1"
+  val nettyVersion = "4.1.137.Final"
 
   val baseDeps = {
     def pekkoModule(name: String, version: String = pekkoVersion) =
@@ -33,13 +35,13 @@ object Dependencies {
       pekkoModule("persistence-testkit") % Test,
       pekkoModule("projection-testkit",pekkoProjectionSnapshotVersion) % Test,
       "io.spray"                    %% "spray-json"                             % "1.3.6",
-      "com.typesafe.scala-logging"  %% "scala-logging"                          % "3.9.5"
+      "com.typesafe.scala-logging"  %% "scala-logging"                          % "3.9.6"
     )
   }
 
   val log = Seq(
-      "ch.qos.logback" % "logback-classic" % "1.5.12",
-      "net.logstash.logback" % "logstash-logback-encoder" % "8.0"
+      "ch.qos.logback" % "logback-classic" % "1.6.3",
+      "net.logstash.logback" % "logstash-logback-encoder" % "8.1"
     )
 
 
@@ -78,22 +80,45 @@ object Dependencies {
 
   val persistanceLmdbDBDeps = {
     baseDeps ++ Seq(
-      "org.lmdbjava"                % "lmdbjava"        % "0.9.0"
+      "org.lmdbjava"                % "lmdbjava"        % "0.9.1"
     )
   }
 
   val persistenceCassandraDeps = {
     baseDeps ++ Seq(
-      "org.apache.pekko" %% "pekko-persistence-cassandra" % "1.1.0-M1"
+      "org.apache.pekko" %% "pekko-persistence-cassandra" % "1.1.0"
     )
   }
 
   val persistenceJdbcDeps = {
     baseDeps ++ Seq(
       "org.apache.pekko"   %% "pekko-persistence-r2dbc" % "1.0.0",
-      "org.apache.pekko"   %% "pekko-persistence-jdbc"  % "1.1.0",
-      "com.typesafe.slick" %% "slick"                   % "3.5.2",
+      "org.apache.pekko"   %% "pekko-persistence-jdbc"  % "1.3.0",
+      "com.typesafe.slick" %% "slick"                   % slickVersion,
     )
   }
+
+  /**
+   * Slick follows PVP, so sbt reads 3.5 -> 3.6 as potentially binary incompatible and fails the build.
+   * pekko-persistence-jdbc is still built against Slick 3.5.x, but Slick 3.6.x is a drop-in for the API it uses.
+   */
+  val schemes: Seq[ModuleID] = Seq(
+    "com.typesafe.slick" %% "slick"          % VersionScheme.Always,
+    "com.typesafe.slick" %% "slick-hikaricp" % VersionScheme.Always
+  )
+
+  /**
+   * Versions forced upon transitive dependencies that resolve to a version with known security issues.
+   * Pekko and the Cassandra driver each bring in their own (older) Netty.
+   */
+  val overrides: Seq[ModuleID] = Seq(
+    "buffer", "codec", "codec-dns", "codec-http", "codec-http2", "codec-socks", "common",
+    "handler", "handler-proxy", "resolver", "resolver-dns", "resolver-dns-classes-macos",
+    "resolver-dns-native-macos", "transport", "transport-classes-epoll", "transport-classes-kqueue",
+    "transport-native-epoll", "transport-native-kqueue", "transport-native-unix-common"
+  ).map(name => "io.netty" % s"netty-$name" % nettyVersion) ++ Seq(
+    // Keep slick-hikaricp (via pekko-persistence-jdbc) on the same version as slick
+    "com.typesafe.slick" %% "slick-hikaricp" % slickVersion
+  )
 
 }

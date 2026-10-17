@@ -1,6 +1,7 @@
+import xerial.sbt.Sonatype.sonatypeCentralHost
 
 lazy val basicSettings = {
-  val scala213 = "2.13.15"
+  val scala213 = "2.13.18"
   val supportedScalaVersions = List(scala213)
 
   Seq(
@@ -25,6 +26,10 @@ lazy val basicSettings = {
     //scalastyleConfig := baseDirectory.value / "project/scalastyle-config.xml",
     scalafmtConfig := (ThisBuild / baseDirectory).value / "project/.scalafmt.conf",
     scalafmtOnCompile := true,
+    // Force known-good versions on transitive dependencies, see [[Dependencies.overrides]]
+    dependencyOverrides ++= Dependencies.overrides,
+    // See [[Dependencies.schemes]]
+    libraryDependencySchemes ++= Dependencies.schemes,
 
     startYear := Some(2018),
     licenses := Seq("Apache-2.0" -> url("https://www.apache.org/licenses/LICENSE-2.0")),
@@ -45,25 +50,18 @@ lazy val basicSettings = {
       "olger@spectare.nl",
       url("https://github.com/olger"))
     ),
+    versionScheme := Some("early-semver"),
     // Add sonatype repository settings
     publishTo := {
-      // For accounts created after Feb 2021:
-      // val nexus = "https://s01.oss.sonatype.org/"
-      val nexus = "https://oss.sonatype.org/"
-      if (isSnapshot.value) Some("snapshots" at nexus + "content/repositories/snapshots")
-      else Some("releases" at nexus + "service/local/staging/deploy/maven2")
+      val centralSnapshots = "https://central.sonatype.com/repository/maven-snapshots/"
+        if (isSnapshot.value) Some("central-snapshots" at centralSnapshots)
+        else localStaging.value
     },
-//    publishTo := Some(
-//      if (isSnapshot.value) {
-//        Opts.resolver.sonatypeOssSnapshots
-//      } else {
-//        Opts.resolver.sonatypeStaging
-//      }
-//    ),
+    credentials += Credentials(Path.userHome / ".sbt" / "sonatype_central_credentials"),
+    sonatypeCredentialHost := sonatypeCentralHost,
     publishMavenStyle := true,
     Test / publishArtifact := false,
     pomIncludeRepository := { _ => false },
-    resolvers += Resolver.ApacheMavenSnapshotsRepo,
   )
 }
 
@@ -81,8 +79,8 @@ val boundedCore = (project in file("bounded-core"))
   .settings(basicSettings: _*)
   .settings(
     name := "bounded-core",
-    //libraryDependencies ++= Dependencies.baseDeps ++ Dependencies.persistanceLmdbDBDeps ++ Dependencies.persistenceCassandraDeps ++ Dependencies.persistenceJdbcDeps ++ Dependencies.testDeps)
-    libraryDependencies ++= Dependencies.baseDeps ++ Dependencies.persistenceLevelDBDeps ++ Dependencies.persistenceCassandraDeps ++ Dependencies.persistenceJdbcDeps ++ Dependencies.testDeps)
+    libraryDependencies ++= Dependencies.baseDeps ++ Dependencies.persistenceLevelDBDeps ++ Dependencies.persistenceCassandraDeps ++ Dependencies.persistenceJdbcDeps ++ Dependencies.testDeps,
+  )
 
 val boundedAkkaHttp = (project in file("bounded-pekko-http"))
   .dependsOn(boundedCore)
