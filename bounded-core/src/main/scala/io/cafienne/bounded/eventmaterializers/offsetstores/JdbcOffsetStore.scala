@@ -11,15 +11,9 @@ import slick.lifted.ProvenShape
 
 import scala.concurrent.Future
 import scala.concurrent.ExecutionContext
-import java.util.UUID
 import java.util.concurrent.Executors
 
-import org.apache.pekko.persistence.query.{
-  NoOffset => PersistenceNoOffset,
-  Offset => PersistenceOffset,
-  Sequence => PersistenceSequence,
-  TimeBasedUUID => PersistenceTimeBasedUUID
-}
+import org.apache.pekko.persistence.query.{NoOffset => PersistenceNoOffset, Offset => PersistenceOffset}
 
 object OffsetStoreExecutionContext {
 
@@ -47,26 +41,15 @@ class JdbcOffsetStore(val dbConfig: DatabaseConfig[JdbcProfile]) extends OffsetS
   dbConfig.db.run(DBIO.seq(OffsetStore.schema.createIfNotExists))
 
   override def saveOffset(viewIdentifier: String, offset: PersistenceOffset): Future[Unit] = {
-    val upsertQuery = offset match {
-      case PersistenceNoOffset        => OffsetStore.insertOrUpdate((viewIdentifier, "0", "NoOffset"))
-      case PersistenceSequence(value) => OffsetStore.insertOrUpdate((viewIdentifier, value.toString, "Sequence"))
-      case PersistenceTimeBasedUUID(value) =>
-        OffsetStore.insertOrUpdate((viewIdentifier, value.toString, "TimeBasedUUID"))
-    }
-    dbConfig.db.run(upsertQuery).map(_ => ())
+    val encoded = OffsetCodec.encode(offset)
+    dbConfig.db.run(OffsetStore.insertOrUpdate((viewIdentifier, encoded.value, encoded.offsetType))).map(_ => ())
   }
 
   override def getOffset(viewIdentifier: String): Future[PersistenceOffset] = {
     val query = OffsetStore.filter(_.viewIdentifier === viewIdentifier)
     dbConfig.db.run(query.result.headOption).map {
-      case Some((_, offset, offsetType)) =>
-        offsetType match {
-          case "NoOffset"      => PersistenceNoOffset
-          case "Sequence"      => PersistenceOffset.sequence(offset.toLong)
-          case "TimeBasedUUID" => PersistenceOffset.timeBasedUUID(UUID.fromString(offset))
-          case _               => PersistenceNoOffset
-        }
-      case None => PersistenceNoOffset
+      case Some((_, offset, offsetType)) => OffsetCodec.decode(offsetType, offset)
+      case None                          => PersistenceNoOffset
     }
   }
 

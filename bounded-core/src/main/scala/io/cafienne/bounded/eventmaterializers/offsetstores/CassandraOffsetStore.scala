@@ -4,10 +4,9 @@
 
 package io.cafienne.bounded.eventmaterializers.offsetstores
 
-import java.util.UUID
-
 import org.apache.pekko.persistence.cassandra.query.scaladsl.CassandraReadJournal
-import org.apache.pekko.persistence.query.{Offset, Sequence, TimeBasedUUID}
+import org.apache.pekko.persistence.query.Offset
+import com.typesafe.config.Config
 import io.cafienne.bounded.eventmaterializers.{EventMaterializerExecutionContext}
 
 import scala.concurrent.duration._
@@ -17,18 +16,14 @@ class CassandraOffsetStore(readJournal: CassandraReadJournal, createTableTimeout
     extends OffsetStore {
 
   import EventMaterializerExecutionContext._
+  import CassandraOffsetStore._
 
-  Await.result(
-    readJournal.session.executeWrite(
-      s"CREATE TABLE IF NOT EXISTS $keyspace.vw_offsetstore (view_identifier text PRIMARY KEY, offset_type text, offset_value text);"
-    ),
-    createTableTimeout
-  )
+  Await.result(readJournal.session.executeWrite(createTableStatement(keyspace)), createTableTimeout)
 
   override def saveOffset(viewIdentifier: String, offset: Offset): Future[Unit] = {
     readJournal.session
       .executeWrite(
-        "INSERT INTO akka.vw_offsetstore (\"view_identifier\", \"offset_type\", \"offset_value\" ) VALUES (?, ?, ?)",
+        insertStatement(keyspace),
         viewIdentifier,
         offset2type(offset),
         offset2String(offset)
@@ -38,25 +33,37 @@ class CassandraOffsetStore(readJournal: CassandraReadJournal, createTableTimeout
 
   override def getOffset(viewIdentifier: String): Future[Offset] = {
     readJournal.session
-      .selectOne(
-        s"SELECT offset_value, offset_type FROM $keyspace.vw_offsetstore WHERE view_identifier=\'$viewIdentifier\'"
-      )
+      .selectOne(selectStatement(keyspace), viewIdentifier)
       .map(r => r.fold(Offset.noOffset)(r => string2offset(r.getString("offset_value"), r.getString("offset_type"))))
   }
 
-  protected def offset2String(offset: Offset): String = offset match {
-    case o: Sequence      => o.value.toString
-    case o: TimeBasedUUID => o.value.toString
-  }
+  protected def offset2String(offset: Offset): String = OffsetCodec.encode(offset).value
 
-  protected def string2offset(offsetVal: String, offsetType: String): Offset =
-    offsetType match {
-      case "uuid"     => Offset.timeBasedUUID(UUID.fromString(offsetVal))
-      case "sequence" => Offset.sequence(offsetVal.toLong)
-    }
+  protected def string2offset(offsetVal: String, offsetType: String): Offset = OffsetCodec.decode(offsetType, offsetVal)
 
-  protected def offset2type(ot: Offset) = ot match {
-    case _: Sequence      => "sequence"
-    case _: TimeBasedUUID => "uuid"
-  }
+  protected def offset2type(ot: Offset): String = OffsetCodec.encode(ot).offsetType
+}
+
+object CassandraOffsetStore {
+
+  val KeyspaceConfigPath = "bounded.eventmaterializers.cassandra-offsetstore.keyspace"
+
+  /**
+    * The keyspace of the offset store: the one set at `bounded.eventmaterializers.cassandra-offsetstore.keyspace`,
+    * otherwise the keyspace of the configured journal plugin.
+    *
+    * @param journalPluginPath config path of the journal plugin, e.g. `pekko.persistence.cassandra.journal`
+    */
+  def keyspace(config: Config, journalPluginPath: String): String =
+    if (config.hasPath(KeyspaceConfigPath)) config.getString(KeyspaceConfigPath)
+    else config.getString(s"$journalPluginPath.keyspace")
+
+  def createTableStatement(keyspace: String): String =
+    s"CREATE TABLE IF NOT EXISTS $keyspace.vw_offsetstore (view_identifier text PRIMARY KEY, offset_type text, offset_value text);"
+
+  def insertStatement(keyspace: String): String =
+    s"""INSERT INTO $keyspace.vw_offsetstore ("view_identifier", "offset_type", "offset_value" ) VALUES (?, ?, ?)"""
+
+  def selectStatement(keyspace: String): String =
+    s"SELECT offset_value, offset_type FROM $keyspace.vw_offsetstore WHERE view_identifier = ?"
 }

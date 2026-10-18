@@ -21,19 +21,11 @@ trait ReadJournalOffsetStore extends OffsetStore {
 
   val store: OffsetStore = {
 
-    if (configuredJournal.endsWith("cassandra.journal")) {
-      val keyspace = system.settings.config.getString("cassandra.journal.keyspace")
+    if (configuredJournal.endsWith("cassandra.journal") || configuredJournal.endsWith("cassandra-journal")) {
       new CassandraOffsetStore(
         readJournal.asInstanceOf[CassandraReadJournal],
         cassandraCreateTableTimeout,
-        keyspace = keyspace
-      )
-    } else if (configuredJournal.endsWith("cassandra-journal")) {
-      val keyspace = system.settings.config.getString("cassandra-journal.keyspace")
-      new CassandraOffsetStore(
-        readJournal.asInstanceOf[CassandraReadJournal],
-        cassandraCreateTableTimeout,
-        keyspace = keyspace
+        keyspace = CassandraOffsetStore.keyspace(system.settings.config, configuredJournal)
       )
     } else if (configuredJournal.endsWith("inmemory-journal")) {
       new InMemoryBasedOffsetStore()

@@ -8,9 +8,7 @@ import java.io.File
 import java.nio.{Buffer, ByteBuffer}
 import java.nio.ByteBuffer.allocateDirect
 import java.nio.charset.StandardCharsets.UTF_8
-import java.util.UUID
-
-import org.apache.pekko.persistence.query.{Offset, Sequence, TimeBasedUUID}
+import org.apache.pekko.persistence.query.Offset
 import com.typesafe.config.Config
 import org.lmdbjava.{Dbi, DbiFlags, Env, EnvFlags}
 import org.slf4j.LoggerFactory
@@ -35,8 +33,9 @@ private class LmdbOffsetStore(lmdbConfig: LmdbConfig) extends OffsetStore {
       val keyByteBuffer = allocateDirect(100)
       keyByteBuffer.put(viewIdentifier.getBytes(UTF_8)).asInstanceOf[Buffer].flip
 
-      val valueByteBuffer = allocateDirect(300)
-      valueByteBuffer.put(offset2String(offset).getBytes(UTF_8)).asInstanceOf[Buffer].flip()
+      val valueBytes      = OffsetCodec.encodeString(offset).getBytes(UTF_8)
+      val valueByteBuffer = allocateDirect(valueBytes.length)
+      valueByteBuffer.put(valueBytes).asInstanceOf[Buffer].flip()
       dbi.put(txn, keyByteBuffer, valueByteBuffer)
       txn.commit()
     } finally {
@@ -54,7 +53,7 @@ private class LmdbOffsetStore(lmdbConfig: LmdbConfig) extends OffsetStore {
       if (found != null) {
         val fetchedVal  = txn.`val`()
         val offsetValue = UTF_8.decode(fetchedVal).toString()
-        val offset      = string2offset(offsetValue)
+        val offset      = OffsetCodec.decodeString(offsetValue)
         Future.successful(offset)
       } else {
         Future.successful(Offset.noOffset)
@@ -63,22 +62,6 @@ private class LmdbOffsetStore(lmdbConfig: LmdbConfig) extends OffsetStore {
       txn.close()
     }
   }
-
-  private def offset2String(offset: Offset): String = offset match {
-    case o: Sequence      => "sequence" + ":" + o.value.toString
-    case o: TimeBasedUUID => "uuid" + ":" + o.value.toString
-  }
-
-  private def string2offset(offset: String): Offset = {
-    val parts      = offset.split(":")
-    val offsetType = parts(0)
-    val offsetVal  = parts(1)
-    offsetType match {
-      case "uuid"     => Offset.timeBasedUUID(UUID.fromString(offsetVal))
-      case "sequence" => Offset.sequence(offsetVal.toLong)
-    }
-  }
-
 }
 
 class LmdbConfig(config: Config) {
@@ -89,7 +72,9 @@ class LmdbConfig(config: Config) {
 
 object LmdbOffsetStore {
 
-  private val DbSize = 1024 * 100
+  // Upper bound of the memory map, not allocated up front. LMDB writes copy-on-write pages, so a
+  // small map (it used to be 100 KB) fills up after a few saves.
+  private val DbSize = 16L * 1024 * 1024
   private val DbName = "offsets"
 
   private var store: Option[LmdbOffsetStore] = None
