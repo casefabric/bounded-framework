@@ -13,18 +13,14 @@ import org.apache.pekko.persistence.query.scaladsl.{
   ReadJournal
 }
 import org.apache.pekko.persistence.query.{EventEnvelope, Offset}
-import org.apache.pekko.stream.scaladsl.{Keep, Merge, Sink, Source}
-import org.apache.pekko.stream.{KillSwitches, UniqueKillSwitch}
+import org.apache.pekko.stream.scaladsl.{Merge, Source}
+import org.apache.pekko.stream.UniqueKillSwitch
 import org.apache.pekko.{Done, NotUsed}
 import com.typesafe.scalalogging.Logger
-import io.cafienne.bounded.aggregate.DomainEvent
-import io.cafienne.bounded.pekko.ActorSystemProvider
 import io.cafienne.bounded.pekko.persistence.ReadJournalProvider
 import io.cafienne.bounded.config.Configured
-import io.cafienne.bounded.eventmaterializers.offsetstores.OffsetStore
 
-import scala.concurrent.duration._
-import scala.concurrent.{Await, ExecutionContextExecutor, Future}
+import scala.concurrent.{ExecutionContextExecutor, Future}
 
 /**
   * Abstract class to be used to create eventlisteners. Use this class as a base for listening for
@@ -43,9 +39,8 @@ abstract class SagaEventMaterializer(
   actorSystem: ActorSystem,
   keepCurrentOffset: Boolean = true,
   materialzerEventFilter: MaterializerEventFilter = NoFilterEventFilter
-) extends ActorSystemProvider
+) extends EventStreamHandling
     with ReadJournalProvider
-    with OffsetStore
     with Resumable
     with ExceptionWriter
     with Configured {
@@ -102,39 +97,10 @@ abstract class SagaEventMaterializer(
   def registerListenerWithKillSwitch(maybeStartOffset: Option[Offset]): (UniqueKillSwitch, Future[Offset]) = {
     logger.info(s"Registering saga with killswitch $viewIdentifier")
 
-    val listenStartOffset = maybeStartOffset.getOrElse(Await.result(getOffset(viewIdentifier), 10.seconds))
+    val startOffset = listenStartOffset(maybeStartOffset)
+    val sources: List[Source[EventEnvelope, NotUsed]] =
+      tagNames.map(tag => filtered(journal.eventsByTag(tag, startOffset), materialzerEventFilter))
 
-    val sources: List[Source[EventEnvelope, NotUsed]] = {
-      tagNames.map(tag => {
-        journal
-          .eventsByTag(tag, listenStartOffset)
-          .filter(eventEnvelope => materialzerEventFilter.filter(eventEnvelope.event.asInstanceOf[DomainEvent]))
-      })
-    }
-
-    val lastSnk = Sink.last[Offset]
-    val answer = Source
-      .combine(sources(0), sources(1))(Merge(_))
-      .mapAsync(1) {
-        case EventEnvelope(evtOffset, persistenceId, sequenceNo, evt) =>
-          logger.debug(
-            s"$matMappingName: runStream: Received event: $evt(offset: $evtOffset, persistenceId: $persistenceId, sequenceNo: $sequenceNo)"
-          )
-          handleEvent(evt) map { _ =>
-            if (isPublishRequired) {
-              system.eventStream.publish(EventProcessed(materializerId, evtOffset, persistenceId, sequenceNo, evt))
-            }
-
-            if (keepCurrentOffset) {
-              saveOffset(viewIdentifier, evtOffset)
-            }
-            logger.debug(s"$matMappingName: runStream: Completed processing of event: $evt")
-            evtOffset
-          }
-      }
-      .viaMat(KillSwitches.single)(Keep.right)
-      .toMat(lastSnk)(Keep.both)
-
-    answer.run()
+    runListener(Source.combine(sources(0), sources(1))(Merge(_)), keepCurrentOffset)
   }
 }

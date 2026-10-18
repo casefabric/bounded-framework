@@ -4,11 +4,9 @@
 
 package io.cafienne.bounded.eventmaterializers
 
-import org.apache.pekko.{Done, NotUsed}
+import org.apache.pekko.Done
 import org.apache.pekko.actor.ActorSystem
-import org.apache.pekko.persistence.query.{EventEnvelope, Offset}
-import org.apache.pekko.stream.scaladsl.Source
-import io.cafienne.bounded.aggregate.DomainEvent
+import org.apache.pekko.persistence.query.Offset
 
 import scala.concurrent.Future
 
@@ -43,27 +41,15 @@ abstract class AbstractReplayableEventMaterializer(
     logger.info(s"Start replay existing events for $viewIdentifier")
 
     var eventsReplayed = 0
-    val source: Source[EventEnvelope, NotUsed] =
-      journal
-        .currentEventsByTag(tagName, targetOffset)
-        .filter(eventEnvelope => materializerEventFilter.filter(eventEnvelope.event.asInstanceOf[DomainEvent]))
-    source
-      .runFoldAsync(targetOffset) {
-        case (previousOffset, EventEnvelope(offset, persistenceId, sequenceNo, evt)) =>
-          logger.debug(
-            s"$matMappingName: Received event: $evt(previousOffset: $previousOffset, offset: $offset, persistenceId: $persistenceId, sequenceNo: $sequenceNo)"
-          )
-          handleReplayEvent(evt) map { _ =>
-            logger.debug(s"$matMappingName: Completed processing of event: $evt")
-            eventsReplayed += 1
-            if (eventsReplayed % 100 == 0) {
-              logger.info(s"$viewIdentifier: [$tagName] events replayed: $eventsReplayed")
-            }
-            if (withPartialReplay) {
-              saveOffset(viewIdentifier, offset)
-            }
-            offset
+    filtered(journal.currentEventsByTag(tagName, targetOffset), materializerEventFilter)
+      .runFoldAsync(targetOffset) { (_, eventEnvelope) =>
+        processEvent(eventEnvelope, handleReplayEvent, publish = false, keepOffset = withPartialReplay) map { offset =>
+          eventsReplayed += 1
+          if (eventsReplayed % 100 == 0) {
+            logger.info(s"$viewIdentifier: [$tagName] events replayed: $eventsReplayed")
           }
+          offset
+        }
       }
   }
 }
