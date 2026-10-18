@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016-2023 Batav B.V. <https://www.cafienne.io/bounded>
+ * Copyright (C) 2016-2026 Batav B.V. <https://www.cafienne.io/bounded>
  */
 
 package io.cafienne.bounded.eventmaterializers.offsetstores
@@ -10,7 +10,7 @@ import java.nio.ByteBuffer.allocateDirect
 import java.nio.charset.StandardCharsets.UTF_8
 import java.util.UUID
 
-import akka.persistence.query.{Offset, Sequence, TimeBasedUUID}
+import org.apache.pekko.persistence.query.{Offset, Sequence, TimeBasedUUID}
 import com.typesafe.config.Config
 import org.lmdbjava.{Dbi, DbiFlags, Env, EnvFlags}
 import org.slf4j.LoggerFactory

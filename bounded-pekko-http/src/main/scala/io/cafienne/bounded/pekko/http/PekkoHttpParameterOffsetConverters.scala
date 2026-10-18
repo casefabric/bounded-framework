@@ -1,31 +1,31 @@
 /*
- * Copyright (C) 2016-2023 Batav B.V. <https://www.cafienne.io/bounded>
+ * Copyright (C) 2016-2026 Batav B.V. <https://www.cafienne.io/bounded>
  */
 
-package io.cafienne.bounded.akka.http
+package io.cafienne.bounded.pekko.http
 
 import java.util.UUID
 
-import akka.http.scaladsl.unmarshalling._
-import akka.persistence.query.Offset
+import org.apache.pekko.http.scaladsl.unmarshalling._
+import org.apache.pekko.persistence.query.Offset
 import io.cafienne.bounded.config.Configured
 
 /**
   * Actually Deserializers that allow you to get a query parameter (with the parameters directive)
   * and convert it to 'param.as[Offset]
   */
-trait AkkaHttpParameterOffsetConverters extends Configured {
+trait PekkoHttpParameterOffsetConverters extends Configured {
 
   private val configuredJournal =
-    config.getString("akka.persistence.journal.plugin")
+    config.getString("pekko.persistence.journal.plugin")
 
   implicit val string2OffsetUnmarshaller: FromStringUnmarshaller[Offset] = {
-    Unmarshaller.strict[String, Offset] { string ⇒
+    Unmarshaller.strict[String, Offset] { string =>
       try {
         configuredJournal match { //depending on the journal a specific kind of Offset is required, parse according to that.
-          case "cassandra-journal" =>
+          case journal if journal.endsWith("cassandra-journal") || journal.endsWith("cassandra.journal") =>
             Offset.timeBasedUUID(UUID.fromString(string))
-          case "inmemory-journal" => Offset.sequence(string.toLong)
+          case journal if journal.endsWith("inmemory-journal") => Offset.sequence(string.toLong)
           case other @ _ =>
             throw new IllegalArgumentException(
               s"value $string cannot be transformed to an offset for journal $configuredJournal"

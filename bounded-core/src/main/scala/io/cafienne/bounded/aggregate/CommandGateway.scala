@@ -1,13 +1,13 @@
 /*
- * Copyright (C) 2016-2023 Batav B.V. <https://www.cafienne.io/bounded>
+ * Copyright (C) 2016-2026 Batav B.V. <https://www.cafienne.io/bounded>
  */
 
 package io.cafienne.bounded.aggregate
 
-import akka.actor.{Actor, ActorContext, ActorRef, ActorSystem, Props, Terminated, TimerScheduler, Timers}
-import akka.event.{Logging, LoggingAdapter}
-import akka.routing.{NoRoutee, Routee, RoutingLogic}
-import akka.util.Timeout
+import org.apache.pekko.actor.{Actor, ActorRef, ActorSystem, Props, Terminated, Timers}
+import org.apache.pekko.event.{Logging, LoggingAdapter}
+import org.apache.pekko.routing.{NoRoutee, Routee, RoutingLogic}
+import org.apache.pekko.util.Timeout
 import scala.collection.immutable
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future}
@@ -21,7 +21,7 @@ class DefaultCommandGateway[A <: AggregateRootCreator](system: ActorSystem, aggr
   implicit timeout: Timeout,
   ec: ExecutionContext
 ) extends CommandGateway {
-  import akka.pattern.ask
+  import org.apache.pekko.pattern.ask
 
   implicit val actorSystem: ActorSystem = system
   val logger: LoggingAdapter            = Logging(system, getClass)
@@ -68,7 +68,7 @@ class RouterCommandGateway[A <: AggregateRootCreator](
   implicit timeout: Timeout,
   ec: ExecutionContext
 ) extends CommandGateway {
-  import akka.pattern.ask
+  import org.apache.pekko.pattern.ask
 
   implicit val actorSystem: ActorSystem = system
   val logger: LoggingAdapter            = Logging(system, getClass)
@@ -90,7 +90,7 @@ class RouterCommandGateway[A <: AggregateRootCreator](
 
 }
 
-import akka.routing.{ActorRefRoutee, Router}
+import org.apache.pekko.routing.{ActorRefRoutee, Router}
 
 private class AggregateGatewayRouter[A <: AggregateRootCreator](aggregateRootCreator: A, idleTime: FiniteDuration)
     extends Actor

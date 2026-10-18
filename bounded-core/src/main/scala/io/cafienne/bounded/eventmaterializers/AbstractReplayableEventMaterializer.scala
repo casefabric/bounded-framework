@@ -1,13 +1,13 @@
 /*
- * Copyright (C) 2016-2023 Batav B.V. <https://www.cafienne.io/bounded>
+ * Copyright (C) 2016-2026 Batav B.V. <https://www.cafienne.io/bounded>
  */
 
 package io.cafienne.bounded.eventmaterializers
 
-import akka.{Done, NotUsed}
-import akka.actor.ActorSystem
-import akka.persistence.query.{EventEnvelope, Offset}
-import akka.stream.scaladsl.Source
+import org.apache.pekko.{Done, NotUsed}
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.persistence.query.{EventEnvelope, Offset}
+import org.apache.pekko.stream.scaladsl.Source
 import io.cafienne.bounded.aggregate.DomainEvent
 
 import scala.concurrent.Future
@@ -18,8 +18,6 @@ abstract class AbstractReplayableEventMaterializer(
   materializerEventFilter: MaterializerEventFilter = NoFilterEventFilter
 ) extends AbstractEventMaterializer(actorSystem, withPartialReplay, materializerEventFilter)
     with ResumableReplayable {
-
-  import EventMaterializerExecutionContext._
 
   /**
     * Handle event during replay

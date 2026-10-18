@@ -1,25 +1,28 @@
 /*
- * Copyright (C) 2016-2023 Batav B.V. <https://www.cafienne.io/bounded>
+ * Copyright (C) 2016-2026 Batav B.V. <https://www.cafienne.io/bounded>
  */
 
 package io.cafienne.bounded.test.typed
 
+import com.typesafe.config.ConfigFactory
+
 import java.util.concurrent.atomic.AtomicInteger
-import akka.actor.{ActorSystem, typed}
-import akka.actor.testkit.typed.scaladsl.ActorTestKit
-import akka.actor.typed.eventstream.EventStream.Subscribe
-import akka.actor.typed.{Behavior, ChildFailed, SupervisorStrategy}
-import akka.actor.typed.scaladsl.Behaviors
-import io.cafienne.bounded.test.typed.TestableAggregateRoot.*
+import org.apache.pekko.actor.{ActorSystem, typed}
+import org.apache.pekko.actor.testkit.typed.scaladsl.ActorTestKit
+import org.apache.pekko.actor.typed.eventstream.EventStream.Subscribe
+import org.apache.pekko.actor.typed.{Behavior, ChildFailed, SupervisorStrategy}
+import org.apache.pekko.actor.typed.scaladsl.Behaviors
+import io.cafienne.bounded.test.typed.TestableAggregateRoot._
 
 import scala.reflect.ClassTag
-import akka.util.Timeout
+import org.apache.pekko.util.Timeout
 import io.cafienne.bounded.aggregate.{DomainCommand, DomainEvent, HandlingFailure}
-import io.cafienne.bounded.aggregate.typed.*
+import io.cafienne.bounded.aggregate.typed._
 
 import scala.concurrent.duration.Duration
-import akka.actor.typed.scaladsl.adapter.*
-import akka.persistence.testkit.scaladsl.PersistenceTestKit
+import org.apache.pekko.actor.typed.scaladsl.adapter._
+import org.apache.pekko.persistence.testkit.PersistenceTestKitPlugin
+import org.apache.pekko.persistence.testkit.scaladsl.PersistenceTestKit
 
 import scala.collection.immutable
 
@@ -67,7 +70,7 @@ object TestableAggregateRoot {
     creator: TypedAggregateRootManager[A],
     id: String,
     evt: B*
-  )(implicit system: ActorSystem, timeout: Timeout, ctag: reflect.ClassTag[A]): TestableAggregateRoot[A, B, C] = {
+  )(implicit timeout: Timeout, ctag: reflect.ClassTag[A]): TestableAggregateRoot[A, B, C] = {
     new TestableAggregateRoot[A, B, C](creator, id, immutable.Seq.concat(evt))
   }
 
@@ -81,7 +84,7 @@ object TestableAggregateRoot {
   def given[A <: DomainCommand, B <: DomainEvent, C: ClassTag](
     creator: TypedAggregateRootManager[A],
     id: String
-  )(implicit system: ActorSystem, timeout: Timeout, ctag: reflect.ClassTag[A]): TestableAggregateRoot[A, B, C] = {
+  )(implicit timeout: Timeout, ctag: reflect.ClassTag[A]): TestableAggregateRoot[A, B, C] = {
     new TestableAggregateRoot[A, B, C](creator, id, immutable.Seq.empty[B])
   }
 
@@ -112,10 +115,17 @@ class TestableAggregateRoot[A <: DomainCommand, B <: DomainEvent, C: ClassTag] p
   evt: immutable.Seq[B],
   persistenceIdSeparator: String = "|"
 )(
-  implicit system: ActorSystem,
-  timeout: Timeout,
+  implicit timeout: Timeout,
   ctag: reflect.ClassTag[A]
 ) {
+  implicit val system: ActorSystem =
+    ActorSystem(
+      "TestSystem",
+      PersistenceTestKitPlugin.config
+        .withFallback(ConfigFactory.parseString("pekko.actor.allow-java-serialization=on"))
+        .withFallback(ConfigFactory.defaultApplication())
+        .resolve()
+    )
 
   implicit val typedActorSystem: typed.ActorSystem[Nothing] = system.toTyped
   val testKit: ActorTestKit                                 = ActorTestKit(system.toTyped)
@@ -169,7 +179,9 @@ class TestableAggregateRoot[A <: DomainCommand, B <: DomainEvent, C: ClassTag] p
     if (command.aggregateRootId != id) throw MisdirectedCommand(id, command)
     wrappedActor.tell(command)
     lastCommand = Some(command)
-    Thread.sleep(1000)
+    val msgs = eventProbe.receiveMessages(1)
+    system.log.debug(s"found $msgs")
+    Thread.sleep(500)
     this
   }
 

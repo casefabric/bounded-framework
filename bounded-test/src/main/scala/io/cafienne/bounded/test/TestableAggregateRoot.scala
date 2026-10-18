@@ -1,20 +1,23 @@
 /*
- * Copyright (C) 2016-2023 Batav B.V. <https://www.cafienne.io/bounded>
+ * Copyright (C) 2016-2026 Batav B.V. <https://www.cafienne.io/bounded>
  */
 
 package io.cafienne.bounded.test
+
+import com.typesafe.config.ConfigFactory
 
 import java.util.concurrent.atomic.AtomicInteger
 import io.cafienne.bounded.test.TestableAggregateRoot._
 
 import scala.reflect.ClassTag
-import akka.actor._
-import akka.pattern.ask
-import akka.persistence.testkit.scaladsl.PersistenceTestKit
-import akka.testkit.TestProbe
-import akka.util.Timeout
+import org.apache.pekko.actor._
+import org.apache.pekko.pattern.ask
+import org.apache.pekko.persistence.testkit.scaladsl.PersistenceTestKit
+import org.apache.pekko.testkit.TestProbe
+import org.apache.pekko.util.Timeout
 import io.cafienne.bounded.aggregate.AggregateRootActor.GetState
 import io.cafienne.bounded.aggregate._
+import org.apache.pekko.persistence.testkit.PersistenceTestKitPlugin
 
 import scala.concurrent.Future
 import scala.concurrent.duration.Duration
@@ -61,7 +64,7 @@ object TestableAggregateRoot {
     creator: AggregateRootCreator,
     id: String,
     evt: DomainEvent*
-  )(implicit system: ActorSystem, timeout: Timeout, ctag: reflect.ClassTag[A]): TestableAggregateRoot[A, B] = {
+  )(implicit timeout: Timeout, ctag: reflect.ClassTag[A]): TestableAggregateRoot[A, B] = {
     new TestableAggregateRoot[A, B](creator, id, evt)
   }
 
@@ -75,7 +78,7 @@ object TestableAggregateRoot {
   def given[A <: AggregateRootActor[B], B <: AggregateState[B]: ClassTag](
     creator: AggregateRootCreator,
     id: String
-  )(implicit system: ActorSystem, timeout: Timeout, ctag: reflect.ClassTag[A]): TestableAggregateRoot[A, B] = {
+  )(implicit timeout: Timeout, ctag: reflect.ClassTag[A]): TestableAggregateRoot[A, B] = {
 
     new TestableAggregateRoot[A, B](creator, id, Seq.empty[DomainEvent])
   }
@@ -91,10 +94,17 @@ class TestableAggregateRoot[A <: AggregateRootActor[B], B <: AggregateState[B]: 
   id: String,
   evt: Seq[DomainEvent]
 )(
-  implicit system: ActorSystem,
-  timeout: Timeout,
+  implicit timeout: Timeout,
   ctag: reflect.ClassTag[A]
 ) {
+  implicit val system: ActorSystem =
+    ActorSystem(
+      "TestSystem",
+      PersistenceTestKitPlugin.config
+        .withFallback(ConfigFactory.parseString("pekko.actor.allow-java-serialization=true"))
+        .withFallback(ConfigFactory.defaultApplication())
+        .resolve()
+    )
 
   implicit val duration: Duration              = timeout.duration
   private var handledEvents: List[DomainEvent] = List.empty

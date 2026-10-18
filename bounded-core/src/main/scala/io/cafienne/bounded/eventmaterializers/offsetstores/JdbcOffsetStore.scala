@@ -1,10 +1,10 @@
 /*
- * Copyright (C) 2016-2023 Batav B.V. <https://www.cafienne.io/bounded>
+ * Copyright (C) 2016-2026 Batav B.V. <https://www.cafienne.io/bounded>
  */
 
 package io.cafienne.bounded.eventmaterializers.offsetstores
 
-import akka.Done
+import org.apache.pekko.Done
 import slick.basic.DatabaseConfig
 import slick.jdbc.JdbcProfile
 import slick.lifted.ProvenShape
@@ -14,7 +14,7 @@ import scala.concurrent.ExecutionContext
 import java.util.UUID
 import java.util.concurrent.Executors
 
-import akka.persistence.query.{
+import org.apache.pekko.persistence.query.{
   NoOffset => PersistenceNoOffset,
   Offset => PersistenceOffset,
   Sequence => PersistenceSequence,

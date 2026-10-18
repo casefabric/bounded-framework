@@ -1,11 +1,11 @@
 /*
- * Copyright (C) 2016-2023 Batav B.V. <https://www.cafienne.io/bounded>
+ * Copyright (C) 2016-2026 Batav B.V. <https://www.cafienne.io/bounded>
  */
 
 package io.cafienne.bounded.aggregate.typed
 
-import akka.actor.typed.Behavior
-import akka.cluster.sharding.typed.scaladsl.EntityTypeKey
+import org.apache.pekko.actor.typed.Behavior
+import org.apache.pekko.cluster.sharding.typed.scaladsl.EntityTypeKey
 import io.cafienne.bounded.aggregate.DomainCommand
 
 trait TypedAggregateRootManager[T <: DomainCommand] {

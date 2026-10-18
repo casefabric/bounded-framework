@@ -1,16 +1,15 @@
 /*
- * Copyright (C) 2016-2023 Batav B.V. <https://www.cafienne.io/bounded>
+ * Copyright (C) 2016-2026 Batav B.V. <https://www.cafienne.io/bounded>
  */
 
 package io.cafienne.bounded.test
 
 import java.time.OffsetDateTime
-import akka.actor.ActorSystem
-import akka.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
-import akka.event.{Logging, LoggingAdapter}
-import akka.persistence.testkit.PersistenceTestKitPlugin
-import akka.testkit.TestKit
-import akka.util.Timeout
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.event.{Logging, LoggingAdapter}
+import org.apache.pekko.persistence.testkit.PersistenceTestKitPlugin
+import org.apache.pekko.testkit.TestKit
+import org.apache.pekko.util.Timeout
 import io.cafienne.bounded.test.TestableAggregateRoot._
 import io.cafienne.bounded.test.DomainProtocol._
 import io.cafienne.bounded.test.TestAggregateRoot.TestAggregateRootState

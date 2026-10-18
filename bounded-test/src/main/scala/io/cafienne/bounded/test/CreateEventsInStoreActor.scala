@@ -1,11 +1,11 @@
 /*
- * Copyright (C) 2016-2023 Batav B.V. <https://www.cafienne.io/bounded>
+ * Copyright (C) 2016-2026 Batav B.V. <https://www.cafienne.io/bounded>
  */
 
 package io.cafienne.bounded.test
 
-import akka.persistence.{PersistentActor, RecoveryCompleted}
-import akka.persistence.journal.Tagged
+import org.apache.pekko.persistence.{PersistentActor, RecoveryCompleted}
+import org.apache.pekko.persistence.journal.Tagged
 import io.cafienne.bounded.aggregate.DomainEvent
 
 class CreateEventsInStoreActor(aggregateId: String, tags: Set[String] = Set.empty) extends PersistentActor {

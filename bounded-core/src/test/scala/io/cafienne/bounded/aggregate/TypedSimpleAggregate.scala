@@ -1,20 +1,20 @@
 /*
- * Copyright (C) 2016-2023 Batav B.V. <https://www.cafienne.io/bounded>
+ * Copyright (C) 2016-2026 Batav B.V. <https://www.cafienne.io/bounded>
  */
 
 package io.cafienne.bounded.aggregate
 
-import akka.actor.typed.{ActorRef, Behavior}
-import akka.cluster.sharding.typed.scaladsl.EntityTypeKey
-import akka.persistence.typed.PersistenceId
-import akka.persistence.typed.scaladsl.{Effect, EventSourcedBehavior, ReplyEffect}
+import org.apache.pekko.actor.typed.{ActorRef, Behavior}
+import org.apache.pekko.cluster.sharding.typed.scaladsl.EntityTypeKey
+import org.apache.pekko.persistence.typed.PersistenceId
+import org.apache.pekko.persistence.typed.scaladsl.{Effect, EventSourcedBehavior, ReplyEffect}
 import com.typesafe.scalalogging.Logger
 import io.cafienne.bounded.aggregate.typed.TypedAggregateRootManager
 import java.time.OffsetDateTime
 import java.util.UUID
 import scala.concurrent.duration._
-import akka.actor.typed.scaladsl.{Behaviors, TimerScheduler}
-import akka.persistence.RecoveryCompleted
+import org.apache.pekko.actor.typed.scaladsl.{Behaviors, TimerScheduler}
+import org.apache.pekko.persistence.typed.RecoveryCompleted
 import io.cafienne.bounded.SampleProtocol.{CommandMetaData, MetaData, UserContext}
 
 object TypedSimpleAggregate {
@@ -93,7 +93,7 @@ object TypedSimpleAggregate {
           logger.debug("Stopping Aggregate {}", cmd.aggregateRootId)
           //timers.cancelAll()
           Effect.stop().thenReply(cmd.replyTo)(_ => OK)
-        //case cmd: GetItems => getItems(cmd)
+        case cmd: GetItems => Effect.none.thenReply(cmd.replyTo)(_ => Items(state.items))
         case cmd: StopAfter =>
           timers.startSingleTimer(
             InternalStop(aggregateRootId = cmd.aggregateRootId, metaData = cmd.metaData),
@@ -108,14 +108,14 @@ object TypedSimpleAggregate {
 
   private def createAggregate(cmd: Create): ReplyEffect[SimpleAggregateEvent, SimpleAggregateState] = {
     logger.debug(s"Create Aggregate (replayed: $replayed)" + cmd)
-    Effect.persist(Created(cmd.aggregateRootId, TestMetaData.fromCommand(cmd.metaData))).thenReply(cmd.replyTo)(_ ⇒ OK)
+    Effect.persist(Created(cmd.aggregateRootId, TestMetaData.fromCommand(cmd.metaData))).thenReply(cmd.replyTo)(_ => OK)
   }
 
   private def addItem(cmd: AddItem): ReplyEffect[SimpleAggregateEvent, SimpleAggregateState] = {
     logger.debug("AddItem " + cmd)
     Effect
       .persist(ItemAdded(cmd.aggregateRootId, TestMetaData.fromCommand(cmd.metaData), cmd.item))
-      .thenReply(cmd.replyTo)(_ ⇒ OK)
+      .thenReply(cmd.replyTo)(_ => OK)
   }
 
   // event handler to keep internal aggregate state
@@ -134,7 +134,7 @@ class SimpleAggregateManager() extends TypedAggregateRootManager[SimpleAggregate
 
   override def behavior(id: String): Behavior[SimpleAggregateCommand] = {
     logger.debug("Create aggregate behavior for {}", id)
-    Behaviors.withTimers { timers ⇒
+    Behaviors.withTimers { timers =>
       EventSourcedBehavior
         .withEnforcedReplies(
           PersistenceId(aggregateRootTag, id),
@@ -143,7 +143,7 @@ class SimpleAggregateManager() extends TypedAggregateRootManager[SimpleAggregate
           eventHandler
         )
         .receiveSignal {
-          case (state, b: RecoveryCompleted) => {
+          case (state, _: RecoveryCompleted) => {
             logger.debug("Received RecoveryCompleted for actor with state {}", state)
             replayed = true
           }

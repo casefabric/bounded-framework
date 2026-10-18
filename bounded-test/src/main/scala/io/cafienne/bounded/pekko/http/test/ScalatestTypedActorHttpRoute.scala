@@ -1,18 +1,18 @@
 /*
- * Copyright (C) 2016-2023 Batav B.V. <https://www.cafienne.io/bounded>
+ * Copyright (C) 2016-2026 Batav B.V. <https://www.cafienne.io/bounded>
  */
 
-package io.cafienne.bounded.akka.http.test
+package io.cafienne.bounded.pekko.http.test
 
-import akka.actor.testkit.typed.scaladsl.{ActorTestKit, ActorTestKitBase}
-import akka.actor.{ActorSystem, Scheduler}
-import akka.http.scaladsl.testkit.ScalatestRouteTest
-import akka.util.Timeout
+import org.apache.pekko.actor.testkit.typed.scaladsl.{ActorTestKit, ActorTestKitBase}
+import org.apache.pekko.actor.{ActorSystem, Scheduler}
+import org.apache.pekko.http.scaladsl.testkit.ScalatestRouteTest
+import org.apache.pekko.util.Timeout
 import org.scalatest.Suite
 
 //Thanks babloo80 -> https://github.com/akka/akka-http/issues/2036
 trait ScalatestTypedActorHttpRoute extends ScalatestRouteTest { this: Suite =>
-  import akka.actor.typed.scaladsl.adapter._
+  import org.apache.pekko.actor.typed.scaladsl.adapter._
 
   var typedTestKit
     : ActorTestKit                  = _ //val init causes createActorSystem() to cause NPE when typedTestKit.system is called in createActorSystem().

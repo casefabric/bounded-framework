@@ -7,7 +7,7 @@
       </encoder>
     </appender>
 
-    <logger name="akka" level="ERROR" />
+    <logger name="pekko" level="ERROR" />
     <root level="DEBUG">
         <appender-ref ref="STDOUT"/>
     </root>

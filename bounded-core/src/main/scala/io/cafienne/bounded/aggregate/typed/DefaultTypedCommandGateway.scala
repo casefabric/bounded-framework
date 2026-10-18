@@ -1,12 +1,12 @@
 /*
- * Copyright (C) 2016-2023 Batav B.V. <https://www.cafienne.io/bounded>
+ * Copyright (C) 2016-2026 Batav B.V. <https://www.cafienne.io/bounded>
  */
 
 package io.cafienne.bounded.aggregate.typed
 
-import akka.actor.typed.{ActorRef, ActorSystem, Behavior, PostStop, Scheduler, Terminated}
-import akka.actor.typed.scaladsl.{Behaviors, TimerScheduler}
-import akka.util.Timeout
+import org.apache.pekko.actor.typed.{ActorRef, ActorSystem, Behavior, PostStop, Scheduler, Terminated}
+import org.apache.pekko.actor.typed.scaladsl.{Behaviors, TimerScheduler}
+import org.apache.pekko.util.Timeout
 import io.cafienne.bounded.aggregate.{CommandValidator, DomainCommand, ValidateableCommand}
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future}
@@ -42,7 +42,7 @@ class DefaultTypedCommandGateway[Cmd <: DomainCommand](
 )(implicit timeout: Timeout, ec: ExecutionContext, scheduler: Scheduler)
     extends TypedCommandGateway[Cmd] {
 
-  import akka.actor.typed.scaladsl.AskPattern._
+  import org.apache.pekko.actor.typed.scaladsl.AskPattern._
 
   object CommandGatewayGuardian {
 

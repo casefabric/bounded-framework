@@ -1,17 +1,17 @@
 /*
- * Copyright (C) 2016-2023 Batav B.V. <https://www.cafienne.io/bounded>
+ * Copyright (C) 2016-2026 Batav B.V. <https://www.cafienne.io/bounded>
  */
 
 package io.cafienne.bounded.test
 
-import akka.actor.ActorSystem
-import akka.event.{Logging, LoggingAdapter}
-import akka.util.Timeout
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.event.{Logging, LoggingAdapter}
+import org.apache.pekko.util.Timeout
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AsyncWordSpecLike
-import akka.Done
+import org.apache.pekko.Done
 import com.typesafe.scalalogging.Logger
 import io.cafienne.bounded.eventmaterializers.{AbstractReplayableEventMaterializer, OffsetStoreProvider}
 import org.slf4j.LoggerFactory
@@ -19,7 +19,7 @@ import org.slf4j.LoggerFactory
 import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration._
 import DomainProtocol._
-import akka.persistence.query.Sequence
+import org.apache.pekko.persistence.query.Sequence
 import io.cafienne.bounded.aggregate.DomainEvent
 
 import java.time.OffsetDateTime

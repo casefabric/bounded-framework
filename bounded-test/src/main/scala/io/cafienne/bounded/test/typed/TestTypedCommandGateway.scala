@@ -1,12 +1,12 @@
 /*
- * Copyright (C) 2016-2023 Batav B.V. <https://www.cafienne.io/bounded>
+ * Copyright (C) 2016-2026 Batav B.V. <https://www.cafienne.io/bounded>
  */
 
 package io.cafienne.bounded.test.typed
 
-import akka.actor.testkit.typed.scaladsl.ActorTestKit
-import akka.actor.typed.{ActorRef, Scheduler}
-import akka.util.Timeout
+import org.apache.pekko.actor.testkit.typed.scaladsl.ActorTestKit
+import org.apache.pekko.actor.typed.{ActorRef, Scheduler}
+import org.apache.pekko.util.Timeout
 import io.cafienne.bounded.aggregate.typed.{TypedAggregateRootManager, TypedCommandGateway}
 import io.cafienne.bounded.aggregate.{DomainCommand, ValidateableCommand}
 
@@ -21,7 +21,7 @@ class TestTypedCommandGateway[T <: DomainCommand](
   ec: ExecutionContext,
   scheduler: Scheduler
 ) extends TypedCommandGateway[T] {
-  import akka.actor.typed.scaladsl.AskPattern._
+  import org.apache.pekko.actor.typed.scaladsl.AskPattern._
 
   val aggregates = mutable.Map[String, ActorRef[T]]()
 

@@ -1,11 +1,11 @@
 /*
- * Copyright (C) 2016-2023 Batav B.V. <https://www.cafienne.io/bounded>
+ * Copyright (C) 2016-2026 Batav B.V. <https://www.cafienne.io/bounded>
  */
 
 package io.cafienne.bounded.test
 
-import akka.actor.{ActorRef, ActorSystem}
-import akka.testkit.{TestActor, TestProbe}
+import org.apache.pekko.actor.{ActorRef, ActorSystem}
+import org.apache.pekko.testkit.{TestActor, TestProbe}
 
 object LoggingTestProbe {
   def apply()(implicit system: ActorSystem): TestProbe = {

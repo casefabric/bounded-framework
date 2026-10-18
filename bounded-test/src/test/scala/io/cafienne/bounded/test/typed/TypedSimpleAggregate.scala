@@ -1,15 +1,15 @@
 /*
- * Copyright (C) 2016-2023 Batav B.V. <https://www.cafienne.io/bounded>
+ * Copyright (C) 2016-2026 Batav B.V. <https://www.cafienne.io/bounded>
  */
 
 package io.cafienne.bounded.test.typed
 
-import akka.actor.typed.scaladsl.{Behaviors, TimerScheduler}
-import akka.actor.typed.{ActorRef, Behavior}
-import akka.cluster.sharding.typed.scaladsl.EntityTypeKey
-import akka.persistence.RecoveryCompleted
-import akka.persistence.typed.PersistenceId
-import akka.persistence.typed.scaladsl.{Effect, EventSourcedBehavior, ReplyEffect}
+import org.apache.pekko.actor.typed.scaladsl.{Behaviors, TimerScheduler}
+import org.apache.pekko.actor.typed.{ActorRef, Behavior}
+import org.apache.pekko.cluster.sharding.typed.scaladsl.EntityTypeKey
+import org.apache.pekko.persistence.typed.RecoveryCompleted
+import org.apache.pekko.persistence.typed.PersistenceId
+import org.apache.pekko.persistence.typed.scaladsl.{Effect, EventSourcedBehavior, ReplyEffect}
 import com.typesafe.scalalogging.Logger
 import io.cafienne.bounded.aggregate.{DomainCommand, DomainEvent}
 import io.cafienne.bounded.aggregate.typed.TypedAggregateRootManager
@@ -30,14 +30,12 @@ object TypedSimpleAggregate {
 
   sealed trait SimpleAggregateCommand extends DomainCommand
 
-  final case class Create(aggregateRootId: String, metaData: TestCommandMetaData, replyTo: ActorRef[Response])
-      extends SimpleAggregateCommand
+  final case class Create(aggregateRootId: String, metaData: TestCommandMetaData) extends SimpleAggregateCommand
 
   final case class AddItem(
     aggregateRootId: String,
     metaData: TestCommandMetaData,
-    item: String,
-    replyTo: ActorRef[Response]
+    item: String
   ) extends SimpleAggregateCommand
 
   final case class Stop(aggregateRootId: String, metaData: TestCommandMetaData, replyTo: ActorRef[Response])
@@ -53,8 +51,7 @@ object TypedSimpleAggregate {
     replyTo: ActorRef[Response]
   ) extends SimpleAggregateCommand
 
-  final case class TriggerError(aggregateRootId: String, metaData: TestCommandMetaData, replyTo: ActorRef[Response])
-      extends SimpleAggregateCommand
+  final case class TriggerError(aggregateRootId: String, metaData: TestCommandMetaData) extends SimpleAggregateCommand
 
   //NOTE that a GET on the aggregate is not according to the CQRS pattern and added here for testing.
   sealed trait SimpleDirectAggregateQuery extends SimpleAggregateCommand
@@ -113,14 +110,14 @@ object TypedSimpleAggregate {
 
   private def createAggregate(cmd: Create): ReplyEffect[SimpleAggregateEvent, SimpleAggregateState] = {
     logger.debug(s"Create Aggregate (replayed: $replayed)" + cmd)
-    Effect.persist(Created(cmd.aggregateRootId, TestMetaData.fromCommand(cmd.metaData))).thenReply(cmd.replyTo)(_ ⇒ OK)
+    Effect.persist(Created(cmd.aggregateRootId, TestMetaData.fromCommand(cmd.metaData))).thenNoReply()
   }
 
   private def addItem(cmd: AddItem): ReplyEffect[SimpleAggregateEvent, SimpleAggregateState] = {
     logger.debug("AddItem " + cmd)
     Effect
       .persist(ItemAdded(cmd.aggregateRootId, TestMetaData.fromCommand(cmd.metaData), cmd.item))
-      .thenReply(cmd.replyTo)(_ ⇒ OK)
+      .thenNoReply()
   }
 
   // event handler to keep internal aggregate state
@@ -140,7 +137,7 @@ class SimpleAggregateManager() extends TypedAggregateRootManager[SimpleAggregate
   override def behavior(id: String): Behavior[SimpleAggregateCommand] = {
     logger.debug("Create aggregate behavior for {}", id)
     val persistenceId = PersistenceId.ofUniqueId(id)
-    Behaviors.withTimers { timers ⇒
+    Behaviors.withTimers { timers =>
       EventSourcedBehavior
         .withEnforcedReplies(
           persistenceId,

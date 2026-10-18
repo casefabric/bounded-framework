@@ -1,13 +1,13 @@
 /*
- * Copyright (C) 2016-2023 Batav B.V. <https://www.cafienne.io/bounded>
+ * Copyright (C) 2016-2026 Batav B.V. <https://www.cafienne.io/bounded>
  */
 
 package io.cafienne.bounded.eventmaterializers.offsetstores
 
 import java.util.UUID
 
-import akka.persistence.cassandra.query.scaladsl.CassandraReadJournal
-import akka.persistence.query.{Offset, Sequence, TimeBasedUUID}
+import org.apache.pekko.persistence.cassandra.query.scaladsl.CassandraReadJournal
+import org.apache.pekko.persistence.query.{Offset, Sequence, TimeBasedUUID}
 import io.cafienne.bounded.eventmaterializers.{EventMaterializerExecutionContext}
 
 import scala.concurrent.duration._
