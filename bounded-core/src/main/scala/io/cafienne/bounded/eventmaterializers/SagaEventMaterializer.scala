@@ -72,7 +72,8 @@ abstract class SagaEventMaterializer(
   def viewIdentifier: String = matMappingName
 
   /**
-    * Handle new incoming event
+    * Handle new incoming event. After a failure the event stream restarts from the last handled event, so an
+    * event can be handled more than once: make the handler idempotent.
     *
     * @param evt event
     */
@@ -87,20 +88,21 @@ abstract class SagaEventMaterializer(
 
   /**
     * Register listener for events. Should be registered *after* replay is finished
-    * @return Future
+    * @return Future that completes when the listener is stopped, and fails when its restarts are used up
     */
   override def registerListener(maybeStartOffset: Option[Offset]): Future[Done] = {
     val (_, offsetFuture) = registerListenerWithKillSwitch(maybeStartOffset)
-    offsetFuture.mapTo[Done]
+    offsetFuture.map(_ => Done)
   }
 
   def registerListenerWithKillSwitch(maybeStartOffset: Option[Offset]): (UniqueKillSwitch, Future[Offset]) = {
     logger.info(s"Registering saga with killswitch $viewIdentifier")
 
-    val startOffset = listenStartOffset(maybeStartOffset)
-    val sources: List[Source[EventEnvelope, NotUsed]] =
-      tagNames.map(tag => filtered(journal.eventsByTag(tag, startOffset), materialzerEventFilter))
+    def events(offset: Offset): Source[EventEnvelope, NotUsed] = {
+      val sources = tagNames.map(tag => filtered(journal.eventsByTag(tag, offset), materialzerEventFilter))
+      Source.combine(sources(0), sources(1))(Merge(_))
+    }
 
-    runListener(Source.combine(sources(0), sources(1))(Merge(_)), keepCurrentOffset)
+    runListener(events, listenStartOffset(maybeStartOffset), keepCurrentOffset)
   }
 }

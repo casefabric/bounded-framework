@@ -44,8 +44,8 @@ class EventMaterializers(replayables: List[Resumable]) {
         .onComplete({
           case Success(msg) =>
             logger.info("Listener {} is done msg: {}", replayed.viewMaterializer, msg)
-          case Failure(msg) =>
-            logger.error("Listener {} stopped with a failure: {}", replayed.viewMaterializer, msg)
+          case Failure(cause) =>
+            logger.error(s"Listener ${replayed.viewMaterializer} stopped with a failure", cause)
         })
     }
     replayed
