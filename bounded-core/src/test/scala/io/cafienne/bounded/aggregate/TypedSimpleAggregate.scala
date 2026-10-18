@@ -14,7 +14,7 @@ import java.time.OffsetDateTime
 import java.util.UUID
 import scala.concurrent.duration._
 import org.apache.pekko.actor.typed.scaladsl.{Behaviors, TimerScheduler}
-import org.apache.pekko.persistence.RecoveryCompleted
+import org.apache.pekko.persistence.typed.RecoveryCompleted
 import io.cafienne.bounded.SampleProtocol.{CommandMetaData, MetaData, UserContext}
 
 object TypedSimpleAggregate {
@@ -143,7 +143,7 @@ class SimpleAggregateManager() extends TypedAggregateRootManager[SimpleAggregate
           eventHandler
         )
         .receiveSignal {
-          case (state, b: RecoveryCompleted) => {
+          case (state, _: RecoveryCompleted) => {
             logger.debug("Received RecoveryCompleted for actor with state {}", state)
             replayed = true
           }

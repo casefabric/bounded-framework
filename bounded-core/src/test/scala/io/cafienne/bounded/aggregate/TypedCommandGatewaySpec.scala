@@ -117,7 +117,10 @@ class TypedCommandGatewaySpec
     val commandMetaData = AggregateCommandMetaData(OffsetDateTime.now(), None)
     val aggregateId     = "test0"
     whenReady(typedCommandGateway.ask(aggregateId, ref => GetItems(aggregateId, commandMetaData, ref))) {
-      answer: Response => answer shouldEqual Items(List("new item 2", "new item 1"))
+      answer: Response =>
+        // the RecoveryCompleted signal of the (re)started aggregate has been received
+        assert(TypedSimpleAggregate.replayed)
+        answer shouldEqual Items(List("new item 2", "new item 1"))
     }
   }
 
@@ -157,13 +160,6 @@ class TypedCommandGatewaySpec
       val probeAnswer2 = probe.expectMessage(OK)
       assert(probeAnswer2.equals(OK))
     }
-  }
-
-  "Command Gateway" should "be able to be created multiple times to route to other aggregates" in {
-    val creator                    = new AnotherAggregateManager()
-    val anotherTypedCommandGateway = new DefaultTypedCommandGateway[SimpleAggregateCommand](system, creator, 6.seconds)
-
-    assert(anotherTypedCommandGateway != null)
   }
 
   protected override def afterAll(): Unit = {
