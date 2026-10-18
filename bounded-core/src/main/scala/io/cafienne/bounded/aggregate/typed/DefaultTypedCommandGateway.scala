@@ -5,7 +5,7 @@
 package io.cafienne.bounded.aggregate.typed
 
 import org.apache.pekko.actor.typed.{ActorRef, ActorSystem, Behavior, PostStop, Scheduler, Terminated}
-import org.apache.pekko.actor.typed.scaladsl.{Behaviors, TimerScheduler}
+import org.apache.pekko.actor.typed.scaladsl.{ActorContext, Behaviors, TimerScheduler}
 import org.apache.pekko.util.Timeout
 import io.cafienne.bounded.aggregate.{CommandValidator, DomainCommand, ValidateableCommand}
 import scala.concurrent.duration._
@@ -54,30 +54,49 @@ class DefaultTypedCommandGateway[Cmd <: DomainCommand](
 
     val aggregates = collection.mutable.Map[String, ActorRef[Cmd]]()
 
+    // Aggregates being stopped, with the spawn requests for them that arrived since. Those requests are
+    // answered with a fresh actor once the old one has stopped, instead of with the stopping one.
+    private val stopping = collection.mutable.Map[String, Vector[ActorRef[ActorRef[Cmd]]]]()
+
     def apply(): Behavior[AggregateControl] =
       Behaviors
         .setup[AggregateControl] { context => Behaviors.withTimers { timers => behaviors(timers) } }
+
+    private def findOrCreate(
+      context: ActorContext[AggregateControl],
+      timers: TimerScheduler[AggregateControl],
+      aggregateId: String
+    ): ActorRef[Cmd] = {
+      val ref = aggregates.getOrElseUpdate(
+        aggregateId, {
+          val ref = context.spawn(aggregateRootCreator.behavior(aggregateId), name = aggregateId)
+          context.watchWith(ref, AggregateTerminated(aggregateId))
+          ref
+        }
+      )
+      // Note that the timer will be overwritten, so the last message sent will set the timer.
+      timers.startTimerWithFixedDelay(aggregateId, StopAggregate(aggregateId), aggregateMayIdleFor)
+      ref
+    }
 
     def behaviors(timers: TimerScheduler[AggregateControl]): Behavior[CommandGatewayGuardian.AggregateControl] =
       Behaviors
         .receive[AggregateControl] { (context, message) =>
           message match {
+            case SpawnAggregate(aggregateId, replyTo) if stopping.contains(aggregateId) =>
+              context.log.debug("Aggregate {} is stopping, it is created again once it has stopped", aggregateId)
+              stopping += aggregateId -> (stopping(aggregateId) :+ replyTo)
+              Behaviors.same
             case SpawnAggregate(aggregateId, replyTo) =>
               context.log.debug("Find or create aggregate {}", aggregateId)
-              val ref = aggregates.getOrElseUpdate(
-                aggregateId, {
-                  val ref = context.spawn(aggregateRootCreator.behavior(aggregateId), name = aggregateId)
-                  context.watchWith(ref, AggregateTerminated(aggregateId))
-                  ref
-                }
-              )
-              // Note that the timer will be overwritten, so the last message sent will set the timer.
-              timers.startTimerWithFixedDelay(aggregateId, StopAggregate(aggregateId), aggregateMayIdleFor)
-              replyTo ! ref
+              replyTo ! findOrCreate(context, timers, aggregateId)
               Behaviors.same
             case StopAggregate(aggregateId) =>
               context.log.debug("Aggregate {} needs to stop", aggregateId)
-              aggregates.get(aggregateId).foreach(aggregateActorRef => context.stop(aggregateActorRef))
+              aggregates.get(aggregateId).filterNot(_ => stopping.contains(aggregateId)).foreach { aggregateActorRef =>
+                stopping += aggregateId -> Vector.empty
+                context.stop(aggregateActorRef)
+              }
               Behaviors.same
             case GracefulShutdown =>
               context.log.info("Initiating graceful shutdown...")
@@ -87,6 +106,10 @@ class DefaultTypedCommandGateway[Cmd <: DomainCommand](
               context.log.debug("Aggregate {} terminated", aggregateId)
               timers.cancel(aggregateId)
               aggregates.-=(aggregateId)
+              stopping.remove(aggregateId).filter(_.nonEmpty).foreach { waiting =>
+                val ref = findOrCreate(context, timers, aggregateId)
+                waiting.foreach(_ ! ref)
+              }
               Behaviors.same
           }
         }

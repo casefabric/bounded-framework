@@ -6,7 +6,7 @@ package io.cafienne.bounded.aggregate
 
 import org.apache.pekko.actor._
 import org.apache.pekko.persistence.{PersistentActor, RecoveryCompleted, SnapshotOffer}
-import io.cafienne.bounded.aggregate.AggregateRootActor.GetState
+import io.cafienne.bounded.aggregate.AggregateRootActor.{GetState, Passivate}
 
 trait AggregateRootCreator {
   def props(idToCreate: String): Props
@@ -88,6 +88,10 @@ trait AggregateRootActor[A <: AggregateState[A]]
 
     case _: GetState.type =>
       sender() ! state
+
+    // Handled like a command, so after the commands before it, including those stashed during a persist.
+    case Passivate =>
+      context.stop(self)
   }
 
   /**
@@ -136,4 +140,9 @@ trait AggregateRootActor[A <: AggregateState[A]]
 
 object AggregateRootActor {
   case object GetState
+
+  /**
+    * Asks the aggregate to stop once it has handled the commands it received before.
+    */
+  case object Passivate
 }
