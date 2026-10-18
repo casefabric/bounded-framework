@@ -1,27 +1,37 @@
 /*
- * Copyright (C) 2016-2023 Batav B.V. <https://www.cafienne.io/bounded>
+ * Copyright (C) 2016-2026 Batav B.V. <https://www.cafienne.io/bounded>
  */
 
 package io.cafienne.bounded.test.typed
 
+import com.typesafe.config.ConfigFactory
+
 import java.util.concurrent.atomic.AtomicInteger
-import akka.actor.{ActorSystem, typed}
-import akka.actor.testkit.typed.scaladsl.ActorTestKit
-import akka.actor.typed.eventstream.EventStream.Subscribe
-import akka.actor.typed.{Behavior, ChildFailed, SupervisorStrategy}
-import akka.actor.typed.scaladsl.Behaviors
-import io.cafienne.bounded.test.typed.TestableAggregateRoot.*
+import org.apache.pekko.actor.{ActorSystem, typed}
+import org.apache.pekko.actor.testkit.typed.scaladsl.ActorTestKit
+import org.apache.pekko.actor.typed.eventstream.EventStream.Subscribe
+import org.apache.pekko.actor.typed.{Behavior, ChildFailed, SupervisorStrategy}
+import org.apache.pekko.actor.typed.scaladsl.Behaviors
+import io.cafienne.bounded.test.typed.TestableAggregateRoot._
 
 import scala.reflect.ClassTag
-import akka.util.Timeout
+import org.apache.pekko.util.Timeout
 import io.cafienne.bounded.aggregate.{DomainCommand, DomainEvent, HandlingFailure}
-import io.cafienne.bounded.aggregate.typed.*
+import io.cafienne.bounded.aggregate.typed._
 
 import scala.concurrent.duration.Duration
-import akka.actor.typed.scaladsl.adapter.*
-import akka.persistence.testkit.scaladsl.PersistenceTestKit
+import org.apache.pekko.actor.typed.scaladsl.adapter._
+import org.apache.pekko.persistence.testkit.{
+  JournalOperation,
+  PersistenceTestKitPlugin,
+  ProcessingPolicy,
+  ProcessingResult,
+  ProcessingSuccess
+}
+import org.apache.pekko.persistence.testkit.scaladsl.PersistenceTestKit
 
 import scala.collection.immutable
+import scala.concurrent.{Await, Promise}
 
 /**
   * Allows to test an aggregate root in isolation by creation of the aggregate root and the historic events in order
@@ -67,7 +77,7 @@ object TestableAggregateRoot {
     creator: TypedAggregateRootManager[A],
     id: String,
     evt: B*
-  )(implicit system: ActorSystem, timeout: Timeout, ctag: reflect.ClassTag[A]): TestableAggregateRoot[A, B, C] = {
+  )(implicit timeout: Timeout, ctag: reflect.ClassTag[A]): TestableAggregateRoot[A, B, C] = {
     new TestableAggregateRoot[A, B, C](creator, id, immutable.Seq.concat(evt))
   }
 
@@ -81,7 +91,7 @@ object TestableAggregateRoot {
   def given[A <: DomainCommand, B <: DomainEvent, C: ClassTag](
     creator: TypedAggregateRootManager[A],
     id: String
-  )(implicit system: ActorSystem, timeout: Timeout, ctag: reflect.ClassTag[A]): TestableAggregateRoot[A, B, C] = {
+  )(implicit timeout: Timeout, ctag: reflect.ClassTag[A]): TestableAggregateRoot[A, B, C] = {
     new TestableAggregateRoot[A, B, C](creator, id, immutable.Seq.empty[B])
   }
 
@@ -97,8 +107,6 @@ object TestableAggregateRoot {
   *       @see io.cafienne.bounded.aggregate.typed.TypedAggregateRootManager for more details
   * @param id The aggregate root ID that is used for testing
   * @param evt Seqence of events that need to be in the eventstore *before* the aggregate is started. Will trigger replay of the state for these events.
-  * @param persistenceIdSeparator Typed actors use a persistenceId that contains the typehint and the id of the actor seperated by a
-  *                               seperator. Default is use in Lagom, scaladsl.PersistentEntity
   * @param system actor system to use for the tests
   * @param timeout call timeout
   * @param ctag Classtag
@@ -109,13 +117,19 @@ object TestableAggregateRoot {
 class TestableAggregateRoot[A <: DomainCommand, B <: DomainEvent, C: ClassTag] private (
   manager: TypedAggregateRootManager[A],
   id: String,
-  evt: immutable.Seq[B],
-  persistenceIdSeparator: String = "|"
+  evt: immutable.Seq[B]
 )(
-  implicit system: ActorSystem,
-  timeout: Timeout,
+  implicit timeout: Timeout,
   ctag: reflect.ClassTag[A]
 ) {
+  implicit val system: ActorSystem =
+    ActorSystem(
+      "TestSystem",
+      PersistenceTestKitPlugin.config
+        .withFallback(ConfigFactory.parseString("pekko.actor.allow-java-serialization=on"))
+        .withFallback(ConfigFactory.defaultApplication())
+        .resolve()
+    )
 
   implicit val typedActorSystem: typed.ActorSystem[Nothing] = system.toTyped
   val testKit: ActorTestKit                                 = ActorTestKit(system.toTyped)
@@ -128,7 +142,26 @@ class TestableAggregateRoot[A <: DomainCommand, B <: DomainEvent, C: ClassTag] p
 
   import TestableAggregateRoot.testId
   private final val arTestId = testId(id)
-  if (evt != null && evt.nonEmpty) persistenceTestKit.persistForRecovery(arTestId, evt)
+  private val persistenceId  = recoveredPersistenceId()
+  if (evt != null && evt.nonEmpty) persistenceTestKit.persistForRecovery(persistenceId, evt)
+
+  // The behavior picks its own persistence id (PersistenceId(typeName, id), PersistenceId.ofUniqueId(id), ...). Run
+  // it once on the still empty journal and take the persistence id that it recovers from.
+  private def recoveredPersistenceId(): String = {
+    val recovered = Promise[String]()
+    persistenceTestKit.withPolicy(new ProcessingPolicy[JournalOperation] {
+      override def tryProcess(persistenceId: String, processingUnit: JournalOperation): ProcessingResult = {
+        recovered.trySuccess(persistenceId)
+        ProcessingSuccess
+      }
+    })
+    val instance = testKit.spawn(manager.behavior(arTestId), s"persistence-id-$arTestId")
+    try Await.result(recovered.future, timeout.duration)
+    finally {
+      testKit.stop(instance, timeout.duration)
+      persistenceTestKit.resetPolicy()
+    }
+  }
 
   def supervise: Behavior[A] =
     Behaviors.supervise(handler).onFailure(SupervisorStrategy.stop)
@@ -169,7 +202,9 @@ class TestableAggregateRoot[A <: DomainCommand, B <: DomainEvent, C: ClassTag] p
     if (command.aggregateRootId != id) throw MisdirectedCommand(id, command)
     wrappedActor.tell(command)
     lastCommand = Some(command)
-    Thread.sleep(1000)
+    val msgs = eventProbe.receiveMessages(1)
+    system.log.debug(s"found $msgs")
+    Thread.sleep(500)
     this
   }
 
@@ -181,7 +216,7 @@ class TestableAggregateRoot[A <: DomainCommand, B <: DomainEvent, C: ClassTag] p
   def events: List[DomainEvent] = {
     if (lastCommand.isEmpty) throw NoCommandsIssued
     val unwanted = givenEvents.toSet
-    persistenceTestKit.persistedInStorage(arTestId).map(_.asInstanceOf[B]).toList.filterNot(unwanted)
+    persistenceTestKit.persistedInStorage(persistenceId).map(_.asInstanceOf[B]).toList.filterNot(unwanted)
   }
 
   /** Last known command handling failure */

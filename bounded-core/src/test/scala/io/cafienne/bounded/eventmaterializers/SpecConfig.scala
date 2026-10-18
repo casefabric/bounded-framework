@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016-2023 Batav B.V. <https://www.cafienne.io/bounded>
+ * Copyright (C) 2016-2026 Batav B.V. <https://www.cafienne.io/bounded>
  */
 
 package io.cafienne.bounded.eventmaterializers
@@ -8,20 +8,12 @@ import com.typesafe.config.ConfigFactory
 
 object SpecConfig {
 
-  /*
-  PLEASE NOTE:
-  Currently the https://github.com/dnvriend/akka-persistence-inmemory is NOT working for Aggregate Root tests
-  because it is not possible to use a separate instance writing the events that should be in the event store
-  before you actually create the aggregate root (should replay those stored events) to check execution of a new
-  command.
-  A new configuration that uses the akka bundled inmem storage is added to create a working situation.
-   */
   val testConfig = ConfigFactory.parseString(
     """
-      |      akka {
+      |      pekko {
       |        loglevel = "DEBUG"
       |        stdout-loglevel = "DEBUG"
-      |        loggers = ["akka.testkit.TestEventListener"]
+      |        loggers = ["org.apache.pekko.testkit.TestEventListener"]
       |        actor {
       |          default-dispatcher {
       |            executor = "fork-join-executor"
@@ -33,6 +25,7 @@ object SpecConfig {
       |          }
       |          serialize-creators = off
       |          serialize-messages = off
+      |          allow-java-serialization = on
       |          serializers {
       |            //serializer = "io.cafienne.bounded.cargosample.persistence.CargoPersistersSerializer"
       |          }

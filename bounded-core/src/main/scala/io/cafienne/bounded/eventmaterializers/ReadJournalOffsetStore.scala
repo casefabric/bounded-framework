@@ -1,52 +1,48 @@
 /*
- * Copyright (C) 2016-2023 Batav B.V. <https://www.cafienne.io/bounded>
+ * Copyright (C) 2016-2026 Batav B.V. <https://www.cafienne.io/bounded>
  */
 
 package io.cafienne.bounded.eventmaterializers
 
 import java.util.concurrent.TimeUnit
-
-import akka.persistence.cassandra.query.scaladsl.CassandraReadJournal
-import akka.persistence.query.Offset
+import org.apache.pekko.persistence.cassandra.query.scaladsl.CassandraReadJournal
+import org.apache.pekko.persistence.query.Offset
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
-import io.cafienne.bounded.akka.ActorSystemProvider
-import io.cafienne.bounded.akka.persistence.ReadJournalProvider
+import io.cafienne.bounded.pekko.ActorSystemProvider
+import io.cafienne.bounded.pekko.persistence.ReadJournalProvider
 import io.cafienne.bounded.eventmaterializers.offsetstores._
 import slick.basic.DatabaseConfig
 
 import scala.concurrent.Future
 import scala.concurrent.duration._
 
+/**
+  * Keeps the offsets in the store that belongs to the configured journal. There is no branch for the R2DBC journal:
+  * it has no queries by tag, so `ReadJournalProvider` already fails the materializer before its store is made.
+  * `R2dbcOffsetStore` can be created directly.
+  */
 trait ReadJournalOffsetStore extends OffsetStore {
   this: ReadJournalProvider with ActorSystemProvider =>
 
   val store: OffsetStore = {
 
-    if (configuredJournal.endsWith("cassandra.journal")) {
-      val keyspace = system.settings.config.getString("cassandra.journal.keyspace")
+    if (configuredJournal.endsWith("cassandra.journal") || configuredJournal.endsWith("cassandra-journal")) {
       new CassandraOffsetStore(
         readJournal.asInstanceOf[CassandraReadJournal],
         cassandraCreateTableTimeout,
-        keyspace = keyspace
-      )
-    } else if (configuredJournal.endsWith("cassandra-journal")) {
-      val keyspace = system.settings.config.getString("cassandra-journal.keyspace")
-      new CassandraOffsetStore(
-        readJournal.asInstanceOf[CassandraReadJournal],
-        cassandraCreateTableTimeout,
-        keyspace = keyspace
+        keyspace = CassandraOffsetStore.keyspace(system.settings.config, configuredJournal)
       )
     } else if (configuredJournal.endsWith("inmemory-journal")) {
       new InMemoryBasedOffsetStore()
     } else if (configuredJournal.endsWith("leveldb")) {
-      val levelDbDir = system.settings.config.getString("akka.persistence.journal.leveldb.dir")
+      val levelDbDir = system.settings.config.getString("pekko.persistence.journal.leveldb.dir")
       val c          = ConfigFactory.empty().withValue("path", ConfigValueFactory.fromAnyRef(levelDbDir + "/lmdb_offsets"))
       LmdbOffsetStore(new LmdbConfig(c))
     } else if (configuredJournal.endsWith("jdbc-journal")) {
       new JdbcOffsetStore(
         DatabaseConfig.forConfig(
           config = system.settings.config,
-          path = system.settings.config.getString("akka.persistence.offset.jdbc.store")
+          path = JdbcOffsetStore.databaseConfigPath(system.settings.config, configuredJournal)
         )
       )
     } else {

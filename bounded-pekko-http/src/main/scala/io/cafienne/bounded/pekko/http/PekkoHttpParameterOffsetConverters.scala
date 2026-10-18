@@ -1,0 +1,42 @@
+/*
+ * Copyright (C) 2016-2026 Batav B.V. <https://www.cafienne.io/bounded>
+ */
+
+package io.cafienne.bounded.pekko.http
+
+import java.util.UUID
+
+import org.apache.pekko.http.scaladsl.unmarshalling._
+import org.apache.pekko.persistence.query.Offset
+import io.cafienne.bounded.config.Configured
+
+/**
+  * Actually Deserializers that allow you to get a query parameter (with the parameters directive)
+  * and convert it to 'param.as[Offset]
+  */
+trait PekkoHttpParameterOffsetConverters extends Configured {
+
+  private val configuredJournal =
+    config.getString("pekko.persistence.journal.plugin")
+
+  implicit val string2OffsetUnmarshaller: FromStringUnmarshaller[Offset] = {
+    Unmarshaller.strict[String, Offset] { string =>
+      try {
+        configuredJournal match { //depending on the journal a specific kind of Offset is required, parse according to that.
+          case journal if journal.endsWith("cassandra-journal") || journal.endsWith("cassandra.journal") =>
+            Offset.timeBasedUUID(UUID.fromString(string))
+          case journal if journal.endsWith("inmemory-journal") => Offset.sequence(string.toLong)
+          case other @ _ =>
+            throw new IllegalArgumentException(
+              s"value $string cannot be transformed to an offset for journal $configuredJournal"
+            )
+        }
+      } catch {
+        case ex: Exception =>
+          throw new IllegalArgumentException(
+            s"Unmarshalling query parameter $string for $configuredJournal got error " + ex.getMessage
+          )
+      }
+    }
+  }
+}

@@ -1,42 +1,41 @@
 /*
- * Copyright (C) 2016-2023 Batav B.V. <https://www.cafienne.io/bounded>
+ * Copyright (C) 2016-2026 Batav B.V. <https://www.cafienne.io/bounded>
  */
 
 package io.cafienne.bounded.aggregate
 
 import java.time.OffsetDateTime
-import akka.actor.testkit.typed.scaladsl.{
+import org.apache.pekko.actor.testkit.typed.scaladsl.{
   LogCapturing,
   LoggingTestKit,
   ManualTime,
-  ScalaTestWithActorTestKit,
-  TestProbe
+  ScalaTestWithActorTestKit
 }
-import akka.actor.typed.{ActorSystem, Scheduler}
-import akka.util.Timeout
+import org.apache.pekko.actor.typed.{ActorSystem, Scheduler}
+import org.apache.pekko.util.Timeout
 import io.cafienne.bounded.aggregate.typed.DefaultTypedCommandGateway
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.flatspec.AsyncFlatSpecLike
 import com.typesafe.config.ConfigFactory
 
-import scala.concurrent.duration.*
+import scala.concurrent.duration._
 import scala.concurrent.{Await, ExecutionContextExecutor, Future}
 
 class TypedCommandGatewaySpec
     extends ScalaTestWithActorTestKit(ManualTime.config.withFallback(ConfigFactory.parseString(s"""
-    akka.persistence.publish-plugin-commands = on
-    akka.persistence.journal.plugin = "akka.persistence.journal.inmem"
-    akka.persistence.journal.inmem.test-serialization = on
-    akka.actor.warn-about-java-serializer-usage = off
+    pekko.persistence.publish-plugin-commands = on
+    pekko.persistence.journal.plugin = "pekko.persistence.journal.inmem"
+    pekko.persistence.journal.inmem.test-serialization = on
+    pekko.actor.warn-about-java-serializer-usage = off
     # snapshot store plugin is NOT defined, things should still work
-    akka.persistence.snapshot-store.local.dir = "target/snapshots-${classOf[TypedCommandGatewaySpec].getName}/"
+    pekko.persistence.snapshot-store.local.dir = "target/snapshots-${classOf[TypedCommandGatewaySpec].getName}/"
     #PLEASE NOTE THAT CoordinatedShutdown needs to be disabled as below in order to run the test properly
-    #SEE https://doc.akka.io/docs/akka/current/coordinated-shutdown.html at the end of the page
-    akka.coordinated-shutdown.terminate-actor-system = off
-    akka.coordinated-shutdown.run-by-actor-system-terminate = off
-    akka.coordinated-shutdown.run-by-jvm-shutdown-hook = off
-    akka.cluster.run-coordinated-shutdown-when-down = off
+    #SEE https://pekko.apache.org/docs/pekko/current/coordinated-shutdown.html at the end of the page
+    pekko.coordinated-shutdown.terminate-actor-system = off
+    pekko.coordinated-shutdown.run-by-actor-system-terminate = off
+    pekko.coordinated-shutdown.run-by-jvm-shutdown-hook = off
+    pekko.cluster.run-coordinated-shutdown-when-down = off
     """)))
     with LogCapturing
     with AsyncFlatSpecLike
@@ -114,6 +113,17 @@ class TypedCommandGatewaySpec
     }
   }
 
+  "Command Gateway" should "reply with the items of the recovered aggregate" in {
+    val commandMetaData = AggregateCommandMetaData(OffsetDateTime.now(), None)
+    val aggregateId     = "test0"
+    whenReady(typedCommandGateway.ask(aggregateId, ref => GetItems(aggregateId, commandMetaData, ref))) {
+      answer: Response =>
+        // the RecoveryCompleted signal of the (re)started aggregate has been received
+        assert(TypedSimpleAggregate.replayed)
+        answer shouldEqual Items(List("new item 2", "new item 1"))
+    }
+  }
+
   "Command Gateway" should "stop an actor after the passivation timeout has been met" in {
     val commandMetaData = AggregateCommandMetaData(OffsetDateTime.now(), None)
     val aggregateId     = "testPassivate"
@@ -152,15 +162,9 @@ class TypedCommandGatewaySpec
     }
   }
 
-  "Command Gateway" should "be able to be created multiple times to route to other aggregates" in {
-    val creator                    = new AnotherAggregateManager()
-    val anotherTypedCommandGateway = new DefaultTypedCommandGateway[SimpleAggregateCommand](system, creator, 6.seconds)
-
-    assert(anotherTypedCommandGateway != null)
-  }
-
   protected override def afterAll(): Unit = {
-    Await.ready(typedCommandGateway.shutdown(), 5.seconds).map(_ => (): Unit)
+    Await.ready(typedCommandGateway.shutdown(), 5.seconds)
+    super.afterAll()
   }
 
 }

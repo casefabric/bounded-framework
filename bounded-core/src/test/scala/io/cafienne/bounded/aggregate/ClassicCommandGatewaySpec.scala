@@ -1,20 +1,20 @@
 /*
- * Copyright (C) 2016-2023 Batav B.V. <https://www.cafienne.io/bounded>
+ * Copyright (C) 2016-2026 Batav B.V. <https://www.cafienne.io/bounded>
  */
 
 package io.cafienne.bounded.aggregate
 
-import akka.actor.ActorSystem
-import akka.testkit.{EventFilter, TestKit}
-import akka.util.Timeout
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.testkit.{EventFilter, TestKit}
+import org.apache.pekko.util.Timeout
 import com.typesafe.config.ConfigFactory
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.flatspec.AsyncFlatSpecLike
 import org.scalatest.matchers.should.Matchers
 
-import scala.concurrent.{Await, ExecutionContext, ExecutionContextExecutor, Future}
-import scala.concurrent.duration.*
+import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
+import scala.concurrent.duration._
 import org.scalatest.time.{Millis, Seconds, Span}
 
 class ClassicCommandGatewaySpec
@@ -22,19 +22,19 @@ class ClassicCommandGatewaySpec
       ActorSystem(
         "ClassicCommandGatewaySpec",
         ConfigFactory.parseString(s"""
-    akka.persistence.publish-plugin-commands = on
-    akka.persistence.journal.plugin = "akka.persistence.journal.inmem"
-    akka.persistence.journal.inmem.test-serialization = on
-    akka.actor.warn-about-java-serializer-usage = off
+    pekko.persistence.publish-plugin-commands = on
+    pekko.persistence.journal.plugin = "pekko.persistence.journal.inmem"
+    pekko.persistence.journal.inmem.test-serialization = on
+    pekko.actor.warn-about-java-serializer-usage = off
     # snapshot store plugin is NOT defined, things should still work
-    akka.persistence.snapshot-store.local.dir = "target/snapshots-${classOf[TypedCommandGatewaySpec].getName}/"
+    pekko.persistence.snapshot-store.local.dir = "target/snapshots-${classOf[TypedCommandGatewaySpec].getName}/"
     #PLEASE NOTE THAT CoordinatedShutdown needs to be disabled as below in order to run the test properly
-    #SEE https://doc.akka.io/docs/akka/current/coordinated-shutdown.html at the end of the page
-    akka.coordinated-shutdown.terminate-actor-system = off
-    akka.coordinated-shutdown.run-by-actor-system-terminate = off
-    akka.coordinated-shutdown.run-by-jvm-shutdown-hook = off
-    akka.cluster.run-coordinated-shutdown-when-down = off
-    akka.loggers = ["akka.testkit.TestEventListener"]
+    #SEE https://pekko.apache.org/docs/pekko/current/coordinated-shutdown.html at the end of the page
+    pekko.coordinated-shutdown.terminate-actor-system = off
+    pekko.coordinated-shutdown.run-by-actor-system-terminate = off
+    pekko.coordinated-shutdown.run-by-jvm-shutdown-hook = off
+    pekko.cluster.run-coordinated-shutdown-when-down = off
+    pekko.loggers = ["org.apache.pekko.testkit.TestEventListener"]
     """)
       )
     )
@@ -53,7 +53,7 @@ class ClassicCommandGatewaySpec
   val commandGateway: RouterCommandGateway[ClassicSimpleAggregateCreator] =
     new RouterCommandGateway(system, 2.seconds, classicSimpleCreator)
 
-  import akka.pattern.ask
+  import org.apache.pekko.pattern.ask
   import ClassicSimpleAggregate._
 
   //All commands are valid in this test

@@ -1,23 +1,23 @@
 /*
- * Copyright (C) 2016-2023 Batav B.V. <https://www.cafienne.io/bounded>
+ * Copyright (C) 2016-2026 Batav B.V. <https://www.cafienne.io/bounded>
  */
 
 package io.cafienne.bounded.aggregate
 
 import java.time.OffsetDateTime
-import akka.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
+import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
 import org.scalatest.flatspec.AsyncFlatSpecLike
 
 import scala.concurrent.{ExecutionContextExecutor, Future}
 
 class TypedClusteredSpec extends ScalaTestWithActorTestKit(s"""
-    //akka.actor.provider = "cluster"
-    //akka.cluster.seed-nodes = ["akka://TypedClusteredSpec@127.0.0.1:2552"]
-    akka.persistence.publish-plugin-commands = on
-    akka.persistence.journal.plugin = "akka.persistence.journal.inmem"
-    akka.persistence.journal.inmem.test-serialization = on
+    //pekko.actor.provider = "cluster"
+    //pekko.cluster.seed-nodes = ["pekko://TypedClusteredSpec@127.0.0.1:2552"]
+    pekko.persistence.publish-plugin-commands = on
+    pekko.persistence.journal.plugin = "pekko.persistence.journal.inmem"
+    pekko.persistence.journal.inmem.test-serialization = on
     # snapshot store plugin is NOT defined, things should still work
-    akka.persistence.snapshot-store.local.dir = "target/snapshots-${classOf[TypedClusteredSpec].getName}/"
+    pekko.persistence.snapshot-store.local.dir = "target/snapshots-${classOf[TypedClusteredSpec].getName}/"
     """) with AsyncFlatSpecLike {
   //NOTE: Be aware that the config of the TestKit contains the name of the Cluster based on the name of this Spec (TypedClusteredSpec).
   //      When you copy this for your own use, change the name of the cluser.seed-nodes.

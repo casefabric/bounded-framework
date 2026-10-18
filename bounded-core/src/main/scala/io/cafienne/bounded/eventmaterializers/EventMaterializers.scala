@@ -1,10 +1,10 @@
 /*
- * Copyright (C) 2016-2023 Batav B.V. <https://www.cafienne.io/bounded>
+ * Copyright (C) 2016-2026 Batav B.V. <https://www.cafienne.io/bounded>
  */
 
 package io.cafienne.bounded.eventmaterializers
 
-import akka.persistence.query.{Offset}
+import org.apache.pekko.persistence.query.{Offset}
 import com.typesafe.scalalogging.Logger
 import org.slf4j.LoggerFactory
 
@@ -44,8 +44,8 @@ class EventMaterializers(replayables: List[Resumable]) {
         .onComplete({
           case Success(msg) =>
             logger.info("Listener {} is done msg: {}", replayed.viewMaterializer, msg)
-          case Failure(msg) =>
-            logger.error("Listener {} stopped with a failure: {}", replayed.viewMaterializer, msg)
+          case Failure(cause) =>
+            logger.error(s"Listener ${replayed.viewMaterializer} stopped with a failure", cause)
         })
     }
     replayed

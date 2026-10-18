@@ -1,10 +1,10 @@
 /*
- * Copyright (C) 2016-2023 Batav B.V. <https://www.cafienne.io/bounded>
+ * Copyright (C) 2016-2026 Batav B.V. <https://www.cafienne.io/bounded>
  */
 
 package io.cafienne.bounded.aggregate
 
-import akka.actor.{ActorSystem, Props}
+import org.apache.pekko.actor.{ActorSystem, Props}
 import scala.collection.immutable.Seq
 import ClassicSimpleAggregate._
 
@@ -28,6 +28,8 @@ class ClassicSimpleAggregate(aggregateRootId: String) extends AggregateRootActor
             )
           )
         )
+      case AddItems(aggregateRootId, newItems) =>
+        Ok(newItems.map(ItemAdded(aggregateRootId, _)))
       case GetItems(aggregateRootId) =>
         aggregateState.fold(Ko(Items(Seq.empty)))(state => Ko(Items(state.items.toSeq)))
       case other => Ko(new UnexpectedCommand(other))
@@ -58,6 +60,10 @@ object ClassicSimpleAggregate {
   final case class AddItem(
     aggregateRootId: String,
     item: String
+  ) extends SimpleCommand
+  final case class AddItems(
+    aggregateRootId: String,
+    items: Seq[String]
   ) extends SimpleCommand
   final case class GetItems(aggregateRootId: String) extends SimpleCommand
 

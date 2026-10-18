@@ -1,16 +1,16 @@
 /*
- * Copyright (C) 2016-2023 Batav B.V. <https://www.cafienne.io/bounded>
+ * Copyright (C) 2016-2026 Batav B.V. <https://www.cafienne.io/bounded>
  */
 
 package io.cafienne.bounded.test
 
-import akka.Done
+import org.apache.pekko.Done
 
 import java.util.UUID
-import akka.actor._
-import akka.persistence.inmemory.extension.{InMemoryJournalStorage, InMemorySnapshotStorage, StorageExtension}
-import akka.testkit.TestProbe
-import akka.util.Timeout
+import org.apache.pekko.actor._
+//import org.apache.pekko.persistence.inmemory.extension.{InMemoryJournalStorage, InMemorySnapshotStorage, StorageExtension}
+import org.apache.pekko.testkit.TestProbe
+import org.apache.pekko.util.Timeout
 import io.cafienne.bounded.aggregate._
 import io.cafienne.bounded.eventmaterializers.{
   AbstractEventMaterializer,
@@ -21,7 +21,6 @@ import io.cafienne.bounded.eventmaterializers.{
 
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future}
-import akka.persistence.testkit.scaladsl.PersistenceTestKit
 
 object TestableProjection {
 
@@ -31,10 +30,10 @@ object TestableProjection {
   )(implicit system: ActorSystem, timeout: Timeout = 2.seconds): TestableProjection = {
     //Cleanup the store before this test is ran.
     val tp = TestProbe()
-    tp.send(StorageExtension(system).journalStorage, InMemoryJournalStorage.ClearJournal)
-    tp.expectMsg(akka.actor.Status.Success(""))
-    tp.send(StorageExtension(system).snapshotStorage, InMemorySnapshotStorage.ClearSnapshots)
-    tp.expectMsg(akka.actor.Status.Success(""))
+//    tp.send(StorageExtension(system).journalStorage, InMemoryJournalStorage.ClearJournal)
+//    tp.expectMsg(org.apache.pekko.actor.Status.Success(""))
+//    tp.send(StorageExtension(system).snapshotStorage, InMemorySnapshotStorage.ClearSnapshots)
+//    tp.expectMsg(org.apache.pekko.actor.Status.Success(""))
 
     val testedProjection = new TestableProjection(system, timeout, tags)
     OffsetStoreProvider.getInMemoryStore().clear()

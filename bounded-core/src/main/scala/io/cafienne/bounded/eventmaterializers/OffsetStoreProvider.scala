@@ -1,13 +1,13 @@
 /*
- * Copyright (C) 2016-2023 Batav B.V. <https://www.cafienne.io/bounded>
+ * Copyright (C) 2016-2026 Batav B.V. <https://www.cafienne.io/bounded>
  */
 
 package io.cafienne.bounded.eventmaterializers
 
-import akka.Done
-import akka.persistence.query.Offset
+import org.apache.pekko.Done
+import org.apache.pekko.persistence.query.Offset
 import com.typesafe.config.Config
-import io.cafienne.bounded.akka.ActorSystemProvider
+import io.cafienne.bounded.pekko.ActorSystemProvider
 import io.cafienne.bounded.eventmaterializers.offsetstores.{
   InMemoryBasedOffsetStore,
   LmdbConfig,
@@ -43,7 +43,9 @@ object OffsetStoreProvider {
 
   private val store = mutable.Map.empty[String, OffsetStore]
 
-  def getStore(offsetStoreConfig: Config): OffsetStore = {
+  // The registry is used from the constructors of materializers on any thread; synchronized so a store is
+  // created only once (an LMDB environment must be opened only once per process).
+  def getStore(offsetStoreConfig: Config): OffsetStore = synchronized {
     offsetStoreConfig.getString("type") match {
       case LmdbStoreName     => getLmdbStore(offsetStoreConfig)
       case ImMemoryStoreName => getInMemoryStore()
@@ -51,7 +53,7 @@ object OffsetStoreProvider {
     }
   }
 
-  def getInMemoryStore(): OffsetStore = {
+  def getInMemoryStore(): OffsetStore = synchronized {
     store.getOrElse(ImMemoryStoreName, {
       val inmemOffsetStore = new InMemoryBasedOffsetStore()
       store.put(ImMemoryStoreName, inmemOffsetStore)
@@ -59,7 +61,7 @@ object OffsetStoreProvider {
     })
   }
 
-  def getLmdbStore(offsetStoreConfig: Config): OffsetStore = {
+  def getLmdbStore(offsetStoreConfig: Config): OffsetStore = synchronized {
     store.getOrElse(
       LmdbStoreName, {
         val lmdbConfig      = new LmdbConfig(offsetStoreConfig)

@@ -1,10 +1,10 @@
 /*
- * Copyright (C) 2016-2023 Batav B.V. <https://www.cafienne.io/bounded>
+ * Copyright (C) 2016-2026 Batav B.V. <https://www.cafienne.io/bounded>
  */
 
 package io.cafienne.bounded.test
 
-import akka.actor.{ActorSystem, Props}
+import org.apache.pekko.actor.{ActorSystem, Props}
 import io.cafienne.bounded.aggregate._
 import io.cafienne.bounded.test.DomainProtocol.StateUpdated
 import io.cafienne.bounded.test.TestAggregateRoot.TestAggregateRootState
@@ -101,4 +101,8 @@ class TestAggregateRootCreator(system: ActorSystem) extends AggregateRootCreator
     )
   }
 
+}
+
+class PrefixedTestAggregateRoot(aggregateRootId: String) extends TestAggregateRoot(aggregateRootId) {
+  override def persistenceIdPrefix: String = "test|"
 }
