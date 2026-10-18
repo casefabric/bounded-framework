@@ -91,7 +91,7 @@ abstract class AbstractEventMaterializer(
     logger.info(s"Registering listener with killswitch $viewIdentifier")
 
     runListener(
-      offset => journal.eventsByTag(tagName, offset),
+      offset => journal.eventsByTag(tagName, offset).map(PositionedEvent(_)),
       listenStartOffset(maybeStartOffset),
       keepCurrentOffset,
       materialzerEventFilter

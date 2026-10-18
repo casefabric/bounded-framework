@@ -49,7 +49,7 @@ abstract class AbstractReplayableEventMaterializer(
       .currentEventsByTag(tagName, targetOffset)
       .runFoldAsync(targetOffset) { (_, eventEnvelope) =>
         val processed = processEvent(
-          eventEnvelope,
+          PositionedEvent(eventEnvelope),
           materializerEventFilter,
           handleReplayEvent,
           publish = false,

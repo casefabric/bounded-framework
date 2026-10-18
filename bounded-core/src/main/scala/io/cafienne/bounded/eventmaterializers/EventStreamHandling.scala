@@ -66,20 +66,21 @@ private[eventmaterializers] trait EventStreamHandling extends ActorSystemProvide
     maybeStartOffset.getOrElse(Await.result(getOffset(viewIdentifier), 10.seconds))
 
   /**
-    * Handles one event, then saves the offset when `keepOffset` is set and publishes an EventProcessed when
-    * `publish` is set. The offset is saved only after the handler is done, and a failing handler or offset
-    * save fails the returned future. An event the filter rejects is not handled or published, but its
-    * offset is saved, so a stretch of filtered events is not read again.
+    * Handles one event, then saves the position after it when `keepOffset` is set and publishes an
+    * EventProcessed when `publish` is set. The position is saved only after the handler is done, and a
+    * failing handler or save fails the returned future. An event the filter rejects is not handled or
+    * published, but its position is saved, so a stretch of filtered events is not read again.
     *
-    * @return the offset of the event, once it is handled and saved
+    * @return the position after the event, once it is handled and saved
     */
   protected def processEvent(
-    eventEnvelope: EventEnvelope,
+    event: PositionedEvent,
     filter: MaterializerEventFilter,
     handler: Any => Future[Done],
     publish: Boolean,
     keepOffset: Boolean
   ): Future[Offset] = {
+    val eventEnvelope = event.envelope
     val evtOffset     = eventEnvelope.offset
     val persistenceId = eventEnvelope.persistenceId
     val sequenceNo    = eventEnvelope.sequenceNr
@@ -90,28 +91,28 @@ private[eventmaterializers] trait EventStreamHandling extends ActorSystemProvide
     )
     for {
       _ <- if (accepted) handler(evt) else Future.successful(Done)
-      _ <- if (keepOffset) saveOffset(viewIdentifier, evtOffset) else Future.unit
+      _ <- if (keepOffset) saveOffset(viewIdentifier, event.position) else Future.unit
     } yield {
       if (publish && accepted) {
         system.eventStream.publish(EventProcessed(materializerId, evtOffset, persistenceId, sequenceNo, evt))
       }
       logger.debug(s"$matMappingName: Completed processing of event: $evt")
-      evtOffset
+      event.position
     }
   }
 
   /**
     * Handles the live events one by one until the stream is stopped with the kill switch. After a failure
-    * the stream restarts with backoff from the last event handled (and saved) in this JVM.
+    * the stream restarts with backoff from the position after the last event handled (and saved) in this JVM.
     *
-    * @param events the live events after a given offset
-    * @param startOffset the offset to start from
+    * @param events the live events after a given position
+    * @param startOffset the position to start from
     * @param filter the events to handle
-    * @return the kill switch, and the offset of the last handled event (the start offset when none was) once
-    *         the stream has stopped. The future fails when the restarts are used up.
+    * @return the kill switch, and the position after the last handled event (the start position when none
+    *         was) once the stream has stopped. The future fails when the restarts are used up.
     */
   protected def runListener(
-    events: Offset => Source[EventEnvelope, NotUsed],
+    events: Offset => Source[PositionedEvent, NotUsed],
     startOffset: Offset,
     keepOffset: Boolean,
     filter: MaterializerEventFilter
@@ -155,6 +156,16 @@ private[eventmaterializers] trait EventStreamHandling extends ActorSystemProvide
       settings.randomFactor
     )(executionContext, system.scheduler)
   }
+}
+
+/**
+  * An event and the position of the materializer once the event is processed. For a materializer that reads
+  * one tag the position is the event's offset; for a saga it is the offset per tag.
+  */
+private[eventmaterializers] final case class PositionedEvent(envelope: EventEnvelope, position: Offset)
+
+private[eventmaterializers] object PositionedEvent {
+  def apply(envelope: EventEnvelope): PositionedEvent = PositionedEvent(envelope, envelope.offset)
 }
 
 private[eventmaterializers] object EventStreamHandling {

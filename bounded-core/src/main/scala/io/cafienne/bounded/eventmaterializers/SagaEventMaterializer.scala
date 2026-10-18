@@ -12,8 +12,8 @@ import org.apache.pekko.persistence.query.scaladsl.{
   EventsByTagQuery,
   ReadJournal
 }
-import org.apache.pekko.persistence.query.{EventEnvelope, Offset}
-import org.apache.pekko.stream.scaladsl.{Merge, Source}
+import org.apache.pekko.persistence.query.{NoOffset, Offset}
+import org.apache.pekko.stream.scaladsl.Source
 import org.apache.pekko.stream.UniqueKillSwitch
 import org.apache.pekko.{Done, NotUsed}
 import com.typesafe.scalalogging.Logger
@@ -60,7 +60,7 @@ abstract class SagaEventMaterializer(
     readJournal
 
   /**
-    * Tagname used to identify eventstream to listen to
+    * Tagnames used to identify the eventstreams to listen to. The saga keeps its offset per tag.
     */
   val tagNames: List[String]
 
@@ -96,13 +96,41 @@ abstract class SagaEventMaterializer(
   }
 
   def registerListenerWithKillSwitch(maybeStartOffset: Option[Offset]): (UniqueKillSwitch, Future[Offset]) = {
+    require(tagNames.nonEmpty, s"Saga $viewIdentifier must listen to at least one tag")
     logger.info(s"Registering saga with killswitch $viewIdentifier")
 
-    def events(offset: Offset): Source[EventEnvelope, NotUsed] = {
-      val sources = tagNames.map(tag => journal.eventsByTag(tag, offset))
-      Source.combine(sources(0), sources(1))(Merge(_))
-    }
-
-    runListener(events, listenStartOffset(maybeStartOffset), keepCurrentOffset, materialzerEventFilter)
+    val startPosition = SagaEventMaterializer.tagOffsets(tagNames, listenStartOffset(maybeStartOffset))
+    runListener(events, startPosition, keepCurrentOffset, materialzerEventFilter)
   }
+
+  /**
+    * The events of all tags after the given position, each with the position per tag once it is processed.
+    */
+  private def events(position: Offset): Source[PositionedEvent, NotUsed] = {
+    val start = SagaEventMaterializer.tagOffsets(tagNames, position)
+    Source(tagNames)
+      .flatMapMerge(tagNames.size, tag => journal.eventsByTag(tag, start.offsets(tag)).map(tag -> _))
+      .statefulMap(() => start)(
+        (positions, taggedEnvelope) => {
+          val (tag, envelope) = taggedEnvelope
+          val next            = TagOffsets(positions.offsets.updated(tag, envelope.offset))
+          (next, PositionedEvent(envelope, next))
+        },
+        _ => None
+      )
+  }
+}
+
+object SagaEventMaterializer {
+
+  /**
+    * The position per tag of a saga. A stored TagOffsets gives each tag its own offset (a tag without one
+    * starts from the beginning, a tag no longer listened to is dropped). A plain offset, stored by an older
+    * version of Bounded or given to registerListener, is the start offset of every tag.
+    */
+  private[eventmaterializers] def tagOffsets(tagNames: List[String], position: Offset): TagOffsets =
+    position match {
+      case TagOffsets(offsets) => TagOffsets(tagNames.map(tag => tag -> offsets.getOrElse(tag, NoOffset)).toMap)
+      case plain               => TagOffsets(tagNames.map(tag => tag -> plain).toMap)
+    }
 }
