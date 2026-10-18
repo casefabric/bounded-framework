@@ -52,13 +52,12 @@ private[eventmaterializers] trait EventStreamHandling extends ActorSystemProvide
     EventStreamHandling.restartSettings(system.settings.config.getConfig("bounded.eventmaterializers.restart"))
 
   /**
-    * The events accepted by the filter.
+    * Whether the filter accepts the event. The filter only judges domain events; any other event is accepted.
     */
-  protected def filtered(
-    events: Source[EventEnvelope, NotUsed],
-    filter: MaterializerEventFilter
-  ): Source[EventEnvelope, NotUsed] =
-    events.filter(eventEnvelope => filter.filter(eventEnvelope.event.asInstanceOf[DomainEvent]))
+  protected def accepts(filter: MaterializerEventFilter, evt: Any): Boolean = evt match {
+    case domainEvent: DomainEvent => filter.filter(domainEvent)
+    case _                        => true
+  }
 
   /**
     * The offset to start listening from: the given one, otherwise the stored one.
@@ -69,12 +68,14 @@ private[eventmaterializers] trait EventStreamHandling extends ActorSystemProvide
   /**
     * Handles one event, then saves the offset when `keepOffset` is set and publishes an EventProcessed when
     * `publish` is set. The offset is saved only after the handler is done, and a failing handler or offset
-    * save fails the returned future.
+    * save fails the returned future. An event the filter rejects is not handled or published, but its
+    * offset is saved, so a stretch of filtered events is not read again.
     *
     * @return the offset of the event, once it is handled and saved
     */
   protected def processEvent(
     eventEnvelope: EventEnvelope,
+    filter: MaterializerEventFilter,
     handler: Any => Future[Done],
     publish: Boolean,
     keepOffset: Boolean
@@ -83,14 +84,15 @@ private[eventmaterializers] trait EventStreamHandling extends ActorSystemProvide
     val persistenceId = eventEnvelope.persistenceId
     val sequenceNo    = eventEnvelope.sequenceNr
     val evt           = eventEnvelope.event
+    val accepted      = accepts(filter, evt)
     logger.debug(
-      s"$matMappingName: Received event: $evt(offset: $evtOffset, persistenceId: $persistenceId, sequenceNo: $sequenceNo)"
+      s"$matMappingName: Received event: $evt(offset: $evtOffset, persistenceId: $persistenceId, sequenceNo: $sequenceNo, filtered out: ${!accepted})"
     )
     for {
-      _ <- handler(evt)
+      _ <- if (accepted) handler(evt) else Future.successful(Done)
       _ <- if (keepOffset) saveOffset(viewIdentifier, evtOffset) else Future.unit
     } yield {
-      if (publish) {
+      if (publish && accepted) {
         system.eventStream.publish(EventProcessed(materializerId, evtOffset, persistenceId, sequenceNo, evt))
       }
       logger.debug(s"$matMappingName: Completed processing of event: $evt")
@@ -104,20 +106,22 @@ private[eventmaterializers] trait EventStreamHandling extends ActorSystemProvide
     *
     * @param events the live events after a given offset
     * @param startOffset the offset to start from
+    * @param filter the events to handle
     * @return the kill switch, and the offset of the last handled event (the start offset when none was) once
     *         the stream has stopped. The future fails when the restarts are used up.
     */
   protected def runListener(
     events: Offset => Source[EventEnvelope, NotUsed],
     startOffset: Offset,
-    keepOffset: Boolean
+    keepOffset: Boolean,
+    filter: MaterializerEventFilter
   ): (UniqueKillSwitch, Future[Offset]) = {
     val resumeFrom = new AtomicReference[Offset](startOffset)
     RestartSource
       .onFailuresWithBackoff(restartSettings) { () =>
         logger.debug(s"$viewIdentifier: listening for events after offset ${resumeFrom.get}")
         events(resumeFrom.get)
-          .mapAsync(1)(processEvent(_, handleEvent, isPublishRequired, keepOffset))
+          .mapAsync(1)(processEvent(_, filter, handleEvent, isPublishRequired, keepOffset))
           .map { offset =>
             resumeFrom.set(offset)
             offset

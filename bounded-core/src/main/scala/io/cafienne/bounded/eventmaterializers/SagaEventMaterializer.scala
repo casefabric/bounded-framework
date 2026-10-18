@@ -99,10 +99,10 @@ abstract class SagaEventMaterializer(
     logger.info(s"Registering saga with killswitch $viewIdentifier")
 
     def events(offset: Offset): Source[EventEnvelope, NotUsed] = {
-      val sources = tagNames.map(tag => filtered(journal.eventsByTag(tag, offset), materialzerEventFilter))
+      val sources = tagNames.map(tag => journal.eventsByTag(tag, offset))
       Source.combine(sources(0), sources(1))(Merge(_))
     }
 
-    runListener(events, listenStartOffset(maybeStartOffset), keepCurrentOffset)
+    runListener(events, listenStartOffset(maybeStartOffset), keepCurrentOffset, materialzerEventFilter)
   }
 }

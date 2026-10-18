@@ -104,7 +104,8 @@ class ReplayableEventMaterializerOffsetSpec
       testProbe.expectMsgType[Tagged]
     }
     storeEventsActor ! PoisonPill
-    testProbe.expectTerminated(storeEventsActor)
+    testProbe.expectTerminated(storeEventsActor).existenceConfirmed shouldBe true
+    ()
   }
 
   override def beforeAll(): Unit = {

@@ -45,9 +45,17 @@ abstract class AbstractReplayableEventMaterializer(
     logger.info(s"Start replay existing events for $viewIdentifier from offset $targetOffset")
 
     var eventsReplayed = 0
-    filtered(journal.currentEventsByTag(tagName, targetOffset), materializerEventFilter)
+    journal
+      .currentEventsByTag(tagName, targetOffset)
       .runFoldAsync(targetOffset) { (_, eventEnvelope) =>
-        processEvent(eventEnvelope, handleReplayEvent, publish = false, keepOffset = withPartialReplay) map { offset =>
+        val processed = processEvent(
+          eventEnvelope,
+          materializerEventFilter,
+          handleReplayEvent,
+          publish = false,
+          keepOffset = withPartialReplay
+        )
+        processed map { offset =>
           replayedUpTo.set(offset)
           eventsReplayed += 1
           if (eventsReplayed % 100 == 0) {
