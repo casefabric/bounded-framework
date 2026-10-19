@@ -6,7 +6,10 @@ package io.cafienne.bounded.aggregate
 
 import org.apache.pekko.actor._
 import org.apache.pekko.persistence.{PersistentActor, RecoveryCompleted, SnapshotOffer}
+import org.apache.pekko.persistence.journal.Tagged
 import io.cafienne.bounded.aggregate.AggregateRootActor.{GetState, Passivate}
+
+import scala.annotation.unused
 
 trait AggregateRootCreator {
   def props(idToCreate: String): Props
@@ -43,6 +46,18 @@ trait AggregateRootActor[A <: AggregateState[A]]
     */
   def handleCommand(command: DomainCommand, state: Option[A]): Reply
 
+  /**
+    * The tags to store an event with, so event materializers can read it by tag. With no tags (the default) the
+    * event is stored as is, and tags can still come from an event adapter configured on the journal.
+    *
+    * A tagged event reaches the journal wrapped in `Tagged`, so an event adapter bound to the event's class is not
+    * applied to it.
+    *
+    * @param event an event returned by handleCommand
+    * @return the tags for the event
+    */
+  def tags(@unused event: DomainEvent): Set[String] = Set.empty
+
   // Below this line is the internal implementation of the Aggregate Root Actor.
   private var internalState: Option[A] = None
 
@@ -70,8 +85,10 @@ trait AggregateRootActor[A <: AggregateState[A]]
           // Reply only when the last event is stored, so the caller never gets Ok for events that are not.
           val lastEventSequenceNr = lastSequenceNr + events.size
           persistingFor = Some(originalSender)
-          persistAll(events) { evt =>
-            updateState(evt)
+          // persistAll runs the handler once per event, in order
+          val persisting = events.iterator
+          persistAll(events.map(withTags)) { _ =>
+            updateState(persisting.next())
             if (snapShotInterval.isDefined) {
               if (lastSequenceNr % snapShotInterval.get == 0 && lastSequenceNr != 0) {
                 saveSnapshot(state)
@@ -94,6 +111,16 @@ trait AggregateRootActor[A <: AggregateState[A]]
       context.stop(self)
   }
 
+  private def withTags(event: DomainEvent): Any = {
+    val eventTags = tags(event)
+    if (eventTags.isEmpty) event else Tagged(event, eventTags)
+  }
+
+  private def withoutTags(persisted: Any): Any = persisted match {
+    case Tagged(event, _) => event
+    case event            => event
+  }
+
   /**
     * The journal reported a failure; the events may or may not have been stored. Pekko stops the actor after this call.
     */
@@ -101,7 +128,7 @@ trait AggregateRootActor[A <: AggregateState[A]]
     log.error(
       cause,
       "Failed to persist event {} with sequence number {} for persistenceId {}",
-      event.getClass.getName,
+      withoutTags(event).getClass.getName,
       seqNr,
       persistenceId
     )
@@ -114,7 +141,7 @@ trait AggregateRootActor[A <: AggregateState[A]]
   override protected def onPersistRejected(cause: Throwable, event: Any, seqNr: Long): Unit = {
     log.warning(
       "Rejected to persist event {} with sequence number {} for persistenceId {}, reason: {}",
-      event.getClass.getName,
+      withoutTags(event).getClass.getName,
       seqNr,
       persistenceId,
       cause.getMessage
@@ -132,6 +159,8 @@ trait AggregateRootActor[A <: AggregateState[A]]
     case _: RecoveryCompleted                  => // initialize further processing when required
     case SnapshotOffer(_, snapshot: Option[A]) => internalState = snapshot
     case evt: DomainEvent                      => updateState(evt)
+    // journals unwrap Tagged when they store an event; this covers one that does not
+    case Tagged(evt: DomainEvent, _) => updateState(evt)
 
     case other =>
       log.warning("Received unknown event {} during recovery", other)
