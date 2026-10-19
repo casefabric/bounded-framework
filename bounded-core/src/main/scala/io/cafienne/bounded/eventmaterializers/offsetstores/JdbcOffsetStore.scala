@@ -5,6 +5,7 @@
 package io.cafienne.bounded.eventmaterializers.offsetstores
 
 import org.apache.pekko.Done
+import com.typesafe.config.Config
 import slick.basic.DatabaseConfig
 import slick.jdbc.JdbcProfile
 import slick.lifted.ProvenShape
@@ -37,29 +38,44 @@ class JdbcOffsetStore(val dbConfig: DatabaseConfig[JdbcProfile]) extends OffsetS
   }
   lazy val OffsetStore = new TableQuery(tag => new OffsetTableRow(tag))
 
-  //Create the table if it does not exist on startup.
-  dbConfig.db.run(DBIO.seq(OffsetStore.schema.createIfNotExists))
+  // The table is created if it does not exist, before the first operation.
+  private val tableCreated = new CreateOnFirstUse(() => dbConfig.db.run(OffsetStore.schema.createIfNotExists))
+
+  private def run[R](action: DBIO[R]): Future[R] = tableCreated().flatMap(_ => dbConfig.db.run(action))
 
   override def saveOffset(viewIdentifier: String, offset: PersistenceOffset): Future[Unit] = {
     val encoded = OffsetCodec.encode(offset)
-    dbConfig.db.run(OffsetStore.insertOrUpdate((viewIdentifier, encoded.value, encoded.offsetType))).map(_ => ())
+    run(OffsetStore.insertOrUpdate((viewIdentifier, encoded.value, encoded.offsetType))).map(_ => ())
   }
 
   override def getOffset(viewIdentifier: String): Future[PersistenceOffset] = {
     val query = OffsetStore.filter(_.viewIdentifier === viewIdentifier)
-    dbConfig.db.run(query.result.headOption).map {
+    run(query.result.headOption).map {
       case Some((_, offset, offsetType)) => OffsetCodec.decode(offsetType, offset)
       case None                          => PersistenceNoOffset
     }
   }
 
-  override def clear(): Future[Done] = {
-    val query = OffsetStore.delete
-    dbConfig.db.run(query).map(_ => Done)
-  }
+  override def clear(): Future[Done] = run(OffsetStore.delete).map(_ => Done)
 
-  override def clear(viewIdentifier: String): Future[Done] = {
-    val query = OffsetStore.filter(_.viewIdentifier === viewIdentifier).delete
-    dbConfig.db.run(query).map(_ => Done)
-  }
+  override def clear(viewIdentifier: String): Future[Done] =
+    run(OffsetStore.filter(_.viewIdentifier === viewIdentifier).delete).map(_ => Done)
+}
+
+object JdbcOffsetStore {
+
+  val DatabaseConfigPath       = "bounded.eventmaterializers.jdbc-offsetstore.database-config"
+  val LegacyDatabaseConfigPath = "pekko.persistence.offset.r2dbc.store"
+
+  /**
+    * The config path of the Slick database config for the offset store: the one named at
+    * `bounded.eventmaterializers.jdbc-offsetstore.database-config`, else at the old key
+    * `pekko.persistence.offset.r2dbc.store`, else the `slick` config of the journal plugin.
+    *
+    * @param journalPluginPath config path of the journal plugin, e.g. `jdbc-journal`
+    */
+  def databaseConfigPath(config: Config, journalPluginPath: String): String =
+    if (config.hasPath(DatabaseConfigPath)) config.getString(DatabaseConfigPath)
+    else if (config.hasPath(LegacyDatabaseConfigPath)) config.getString(LegacyDatabaseConfigPath)
+    else s"$journalPluginPath.slick"
 }

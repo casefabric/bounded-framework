@@ -2,14 +2,27 @@ version: 2.1
 jobs:
   build:
     working_directory: ~/bounded-framework
-    docker:
-      - image: cimg/openjdk:25.0
+    # A machine executor, so that Testcontainers can start the Postgres and Cassandra containers of the
+    # offset store tests (the docker executor has no Docker daemon of its own)
+    machine:
+      image: ubuntu-2404:current
     environment:
       SBT_OPTS: "-XX:MaxMetaspaceSize=512m"
       JVM_OPTS: -Xmx3200m
       TERM: dumb
     steps:
       - run: echo 'export ARTIFACT_BUILD=$CIRCLE_PROJECT_REPONAME-$CIRCLE_BUILD_NUM.zip' >> $BASH_ENV
+      - run:
+          # The machine image has no JDK 25; install Temurin 25 from the Adoptium repository and select it
+          name: Install JDK 25
+          command: |
+            curl -sL https://packages.adoptium.net/artifactory/api/gpg/key/public | sudo gpg --dearmor -o /usr/share/keyrings/adoptium.gpg
+            echo "deb [signed-by=/usr/share/keyrings/adoptium.gpg] https://packages.adoptium.net/artifactory/deb $(. /etc/os-release && echo $VERSION_CODENAME) main" | sudo tee /etc/apt/sources.list.d/adoptium.list
+            sudo apt-get update
+            sudo apt-get install -y temurin-25-jdk
+            echo 'export JAVA_HOME=/usr/lib/jvm/temurin-25-jdk-amd64' >> $BASH_ENV
+            echo 'export PATH=$JAVA_HOME/bin:$PATH' >> $BASH_ENV
+      - run: java -version
       - run:
           # The image has no sbt; the installed launcher fetches the sbt version from project/build.properties
           name: Get sbt binary

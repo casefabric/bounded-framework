@@ -71,6 +71,18 @@ object Dependencies {
     ) ++ test
   }
 
+  /**
+   * Databases for the offset store tests: H2 in-process for JDBC, Postgres (R2DBC) and Cassandra in containers.
+   * H2 and the Postgres driver follow the case-engine versions.
+   */
+  val testcontainersVersion = "2.0.5"
+  val offsetStoreTestDeps = Seq(
+    "org.testcontainers" % "testcontainers-postgresql" % testcontainersVersion % Test,
+    "org.testcontainers" % "testcontainers-cassandra"  % testcontainersVersion % Test,
+    "org.postgresql"     % "postgresql"                % "42.7.13"             % Test,
+    "com.h2database"     % "h2"                        % "2.5.250"             % Test
+  )
+
   val persistenceLevelDBDeps = {
     baseDeps ++ Seq(
       "org.iq80.leveldb"            % "leveldb"        % "0.12",

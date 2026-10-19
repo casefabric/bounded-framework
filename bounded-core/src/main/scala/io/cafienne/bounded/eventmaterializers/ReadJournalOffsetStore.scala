@@ -33,11 +33,13 @@ trait ReadJournalOffsetStore extends OffsetStore {
       val levelDbDir = system.settings.config.getString("pekko.persistence.journal.leveldb.dir")
       val c          = ConfigFactory.empty().withValue("path", ConfigValueFactory.fromAnyRef(levelDbDir + "/lmdb_offsets"))
       LmdbOffsetStore(new LmdbConfig(c))
+    } else if (configuredJournal.endsWith("r2dbc.journal") || configuredJournal.endsWith("r2dbc-journal")) {
+      new R2dbcOffsetStore(system, R2dbcOffsetStore.connectionFactoryPath(system.settings.config))
     } else if (configuredJournal.endsWith("jdbc-journal")) {
       new JdbcOffsetStore(
         DatabaseConfig.forConfig(
           config = system.settings.config,
-          path = system.settings.config.getString("pekko.persistence.offset.r2dbc.store")
+          path = JdbcOffsetStore.databaseConfigPath(system.settings.config, configuredJournal)
         )
       )
     } else {
