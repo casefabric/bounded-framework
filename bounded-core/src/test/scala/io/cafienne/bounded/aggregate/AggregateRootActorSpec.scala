@@ -4,7 +4,7 @@
 
 package io.cafienne.bounded.aggregate
 
-import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.actor.{ActorSystem, Props}
 import org.apache.pekko.persistence.testkit.PersistenceTestKitPlugin
 import org.apache.pekko.persistence.testkit.scaladsl.PersistenceTestKit
 import org.apache.pekko.testkit.{ImplicitSender, TestKit, TestProbe}
@@ -106,7 +106,54 @@ class AggregateRootActorSpec
     expectMsg(Ko(Items(List("a", "b", "c"))))
   }
 
+  it should "use the aggregate id as persistence id without a prefix" in {
+    val aggregateRef = system.actorOf(creator.props("ar-no-prefix"))
+
+    aggregateRef ! AggregateRootActor.GetPersistenceId
+
+    expectMsg("ar-no-prefix")
+  }
+
+  it should "keep aggregate types with the same id apart through their persistence id prefix" in {
+    import AggregateRootActorSpec._
+    val id      = "ar-shared-id"
+    val order   = system.actorOf(Props(classOf[OrderAggregate], id))
+    val invoice = system.actorOf(Props(classOf[InvoiceAggregate], id))
+
+    order ! Create(id)
+    expectMsg(Ok(List(Created(id))))
+    order ! AddItem(id, "order item")
+    expectMsgType[Ok]
+    invoice ! Create(id)
+    expectMsg(Ok(List(Created(id))))
+    invoice ! AddItem(id, "invoice item")
+    expectMsgType[Ok]
+    persistenceTestKit.persistedInStorage(s"order|$id") should have size 2
+    persistenceTestKit.persistedInStorage(s"invoice|$id") should have size 2
+
+    val watcher = TestProbe()
+    Seq(order, invoice).foreach { ref =>
+      watcher.watch(ref)
+      system.stop(ref)
+      watcher.expectTerminated(ref)
+    }
+    system.actorOf(Props(classOf[OrderAggregate], id)) ! GetItems(id)
+    expectMsg(Ko(Items(Seq("order item"))))
+    system.actorOf(Props(classOf[InvoiceAggregate], id)) ! GetItems(id)
+    expectMsg(Ko(Items(Seq("invoice item"))))
+  }
+
   override protected def afterAll(): Unit = {
     TestKit.shutdownActorSystem(system, 30.seconds, verifySystemShutdown = true)
+  }
+}
+
+object AggregateRootActorSpec {
+  class OrderAggregate(id: String) extends ClassicSimpleAggregate(id) {
+    override def persistenceIdPrefix: String = "order|"
+  }
+
+  class InvoiceAggregate(id: String) extends ClassicSimpleAggregate(id) {
+    override def persistenceIdPrefix: String = "invoice|"
   }
 }

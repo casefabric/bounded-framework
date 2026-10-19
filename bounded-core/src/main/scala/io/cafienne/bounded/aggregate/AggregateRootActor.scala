@@ -7,7 +7,7 @@ package io.cafienne.bounded.aggregate
 import org.apache.pekko.actor._
 import org.apache.pekko.persistence.{PersistentActor, RecoveryCompleted, SnapshotOffer}
 import org.apache.pekko.persistence.journal.Tagged
-import io.cafienne.bounded.aggregate.AggregateRootActor.{GetState, Passivate}
+import io.cafienne.bounded.aggregate.AggregateRootActor.{GetPersistenceId, GetState, Passivate}
 
 import scala.annotation.unused
 
@@ -67,7 +67,14 @@ trait AggregateRootActor[A <: AggregateState[A]]
     internalState = internalState.fold(newState(evt))(_ update evt)
   }
 
-  override def persistenceId: String = aggregateId
+  /**
+    * Prefix of the persistence id, e.g. `"Order|"`. Two classic aggregate types whose ids can be equal must use
+    * different prefixes, or they share one journal stream and each recovers the other's events, failing or building
+    * wrong state. The default is no prefix, because changing it moves an existing aggregate to a new, empty stream.
+    */
+  def persistenceIdPrefix: String = ""
+
+  override def persistenceId: String = s"$persistenceIdPrefix$aggregateId"
 
   val snapShotInterval: Option[Int] = None
 
@@ -105,6 +112,9 @@ trait AggregateRootActor[A <: AggregateState[A]]
 
     case _: GetState.type =>
       sender() ! state
+
+    case GetPersistenceId =>
+      sender() ! persistenceId
 
     // Handled like a command, so after the commands before it, including those stashed during a persist.
     case Passivate =>
@@ -169,6 +179,11 @@ trait AggregateRootActor[A <: AggregateState[A]]
 
 object AggregateRootActor {
   case object GetState
+
+  /**
+    * Asks the aggregate for its persistence id; it replies with a String.
+    */
+  case object GetPersistenceId
 
   /**
     * Asks the aggregate to stop once it has handled the commands it received before.

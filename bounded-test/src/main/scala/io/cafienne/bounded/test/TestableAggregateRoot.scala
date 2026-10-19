@@ -15,7 +15,7 @@ import org.apache.pekko.pattern.ask
 import org.apache.pekko.persistence.testkit.scaladsl.PersistenceTestKit
 import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.Timeout
-import io.cafienne.bounded.aggregate.AggregateRootActor.GetState
+import io.cafienne.bounded.aggregate.AggregateRootActor.{GetPersistenceId, GetState}
 import io.cafienne.bounded.aggregate._
 import org.apache.pekko.persistence.testkit.PersistenceTestKitPlugin
 
@@ -120,8 +120,17 @@ class TestableAggregateRoot[A <: AggregateRootActor[B], B <: AggregateState[B]: 
   // Start the Aggregate Root and replay to initial state
   private val aggregateRootActor: ActorRef = system.actorOf(creator.props(arTestId), s"test-aggregate-$arTestId")
 
+  // The events belong under the aggregate's persistence id, which can differ from its id (persistenceIdPrefix). It is
+  // only known once the aggregate runs, so a first instance on the still empty stream is asked for it and stopped.
   private def storeEvents(evt: Seq[DomainEvent]): Unit = {
-    persistenceTestKit.persistForRecovery(arTestId, evt)
+    val probe    = TestProbe()
+    val instance = system.actorOf(creator.props(arTestId), s"persistence-id-$arTestId")
+    probe watch instance
+    probe.send(instance, GetPersistenceId)
+    val persistenceId = probe.expectMsgType[String](timeout.duration)
+    system.stop(instance)
+    probe.expectTerminated(instance, timeout.duration)
+    persistenceTestKit.persistForRecovery(persistenceId, evt)
   }
 
   /**

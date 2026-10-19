@@ -5,11 +5,12 @@
 package io.cafienne.bounded.test
 
 import java.time.OffsetDateTime
-import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.actor.{ActorSystem, Props}
 import org.apache.pekko.event.{Logging, LoggingAdapter}
 import org.apache.pekko.persistence.testkit.PersistenceTestKitPlugin
 import org.apache.pekko.testkit.TestKit
 import org.apache.pekko.util.Timeout
+import io.cafienne.bounded.aggregate.AggregateRootCreator
 import io.cafienne.bounded.test.TestableAggregateRoot._
 import io.cafienne.bounded.test.DomainProtocol._
 import io.cafienne.bounded.test.TestAggregateRoot.TestAggregateRootState
@@ -215,6 +216,22 @@ class TestableAggregateRootSpec extends AsyncWordSpecLike with Matchers with Sca
         ar.events should be("throwing an CommandHandlingFailed")
       }
 
+    }
+
+    "create initial state in given for an aggregate with a persistence id prefix" in {
+      val aggregateRootId = "5"
+      val prefixedCreator = new AggregateRootCreator {
+        override def props(id: String): Props = Props(classOf[PrefixedTestAggregateRoot], id)
+      }
+
+      val ar = TestableAggregateRoot
+        .given[PrefixedTestAggregateRoot, TestAggregateRootState](
+          prefixedCreator,
+          aggregateRootId,
+          InitialStateCreated(currentMeta, aggregateRootId, "new")
+        )
+
+      ar.currentState map { state => state shouldBe Some(TestAggregateRootState("new")) }
     }
 
   }

@@ -102,3 +102,7 @@ class TestAggregateRootCreator(system: ActorSystem) extends AggregateRootCreator
   }
 
 }
+
+class PrefixedTestAggregateRoot(aggregateRootId: String) extends TestAggregateRoot(aggregateRootId) {
+  override def persistenceIdPrefix: String = "test|"
+}
