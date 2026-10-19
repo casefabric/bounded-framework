@@ -6,10 +6,16 @@ package io.cafienne.bounded.aggregate.typed
 
 import org.apache.pekko.actor.typed.{ActorRef, ActorSystem, Behavior, PostStop, Scheduler, Terminated}
 import org.apache.pekko.actor.typed.scaladsl.{ActorContext, Behaviors, TimerScheduler}
+import org.apache.pekko.pattern.StatusReply
 import org.apache.pekko.util.Timeout
 import io.cafienne.bounded.aggregate.{CommandValidator, DomainCommand, ValidateableCommand}
+
+import java.net.URLEncoder
+import java.nio.charset.StandardCharsets
+import java.util.concurrent.atomic.AtomicInteger
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future}
+import scala.util.{Failure, Success, Try}
 
 trait TypedCommandGateway[T <: DomainCommand] {
   def ask[Res](aggregateRootId: String, replyTo: ActorRef[Res] => T)(
@@ -47,7 +53,8 @@ class DefaultTypedCommandGateway[Cmd <: DomainCommand](
   object CommandGatewayGuardian {
 
     sealed trait AggregateControl
-    final case class SpawnAggregate(aggregateId: String, replyTo: ActorRef[ActorRef[Cmd]]) extends AggregateControl
+    final case class SpawnAggregate(aggregateId: String, replyTo: ActorRef[StatusReply[ActorRef[Cmd]]])
+        extends AggregateControl
     final case class StopAggregate(aggregateId: String)                                    extends AggregateControl
     private case class AggregateTerminated(aggregateId: String)                            extends AggregateControl
     final case object GracefulShutdown                                                     extends AggregateControl
@@ -56,27 +63,36 @@ class DefaultTypedCommandGateway[Cmd <: DomainCommand](
 
     // Aggregates being stopped, with the spawn requests for them that arrived since. Those requests are
     // answered with a fresh actor once the old one has stopped, instead of with the stopping one.
-    private val stopping = collection.mutable.Map[String, Vector[ActorRef[ActorRef[Cmd]]]]()
+    private val stopping = collection.mutable.Map[String, Vector[ActorRef[StatusReply[ActorRef[Cmd]]]]]()
 
     def apply(): Behavior[AggregateControl] =
       Behaviors
         .setup[AggregateControl] { context => Behaviors.withTimers { timers => behaviors(timers) } }
 
+    // A failure to create the aggregate fails only the request for it: thrown here, it would stop the guardian and
+    // with it every aggregate of this gateway.
     private def findOrCreate(
       context: ActorContext[AggregateControl],
       timers: TimerScheduler[AggregateControl],
       aggregateId: String
-    ): ActorRef[Cmd] = {
-      val ref = aggregates.getOrElseUpdate(
-        aggregateId, {
-          val ref = context.spawn(aggregateRootCreator.behavior(aggregateId), name = aggregateId)
-          context.watchWith(ref, AggregateTerminated(aggregateId))
-          ref
-        }
-      )
-      // Note that the timer will be overwritten, so the last message sent will set the timer.
-      timers.startTimerWithFixedDelay(aggregateId, StopAggregate(aggregateId), aggregateMayIdleFor)
-      ref
+    ): StatusReply[ActorRef[Cmd]] = {
+      val created = aggregates.get(aggregateId).map(Success(_)).getOrElse {
+        Try(context.spawn(aggregateRootCreator.behavior(aggregateId), DefaultTypedCommandGateway.actorName(aggregateId)))
+          .map { ref =>
+            context.watchWith(ref, AggregateTerminated(aggregateId))
+            aggregates += aggregateId -> ref
+            ref
+          }
+      }
+      created match {
+        case Success(ref) =>
+          // Note that the timer will be overwritten, so the last message sent will set the timer.
+          timers.startTimerWithFixedDelay(aggregateId, StopAggregate(aggregateId), aggregateMayIdleFor)
+          StatusReply.success(ref)
+        case Failure(cause) =>
+          context.log.error(s"Cannot create aggregate $aggregateId", cause)
+          StatusReply.error(cause)
+      }
     }
 
     def behaviors(timers: TimerScheduler[AggregateControl]): Behavior[CommandGatewayGuardian.AggregateControl] =
@@ -107,8 +123,8 @@ class DefaultTypedCommandGateway[Cmd <: DomainCommand](
               timers.cancel(aggregateId)
               aggregates.-=(aggregateId)
               stopping.remove(aggregateId).filter(_.nonEmpty).foreach { waiting =>
-                val ref = findOrCreate(context, timers, aggregateId)
-                waiting.foreach(_ ! ref)
+                val reply = findOrCreate(context, timers, aggregateId)
+                waiting.foreach(_ ! reply)
               }
               Behaviors.same
           }
@@ -124,7 +140,10 @@ class DefaultTypedCommandGateway[Cmd <: DomainCommand](
   }
 
   val gateway =
-    system.systemActorOf(CommandGatewayGuardian(), "typedcommandgateway-" + aggregateRootCreator.getClass.getSimpleName)
+    system.systemActorOf(
+      CommandGatewayGuardian(),
+      s"typedcommandgateway-${aggregateRootCreator.getClass.getSimpleName}-${DefaultTypedCommandGateway.nextGatewayNumber()}"
+    )
 
   override def ask[Res](aggregateRootId: String, replyTo: ActorRef[Res] => Cmd)(
     implicit validator: ValidateableCommand[Cmd]
@@ -145,7 +164,7 @@ class DefaultTypedCommandGateway[Cmd <: DomainCommand](
   }
 
   private def spawnAggregateRoot(aggregateRootId: String): Future[ActorRef[Cmd]] = {
-    gateway.ask(CommandGatewayGuardian.SpawnAggregate(aggregateRootId, _))
+    gateway.askWithStatus(CommandGatewayGuardian.SpawnAggregate(aggregateRootId, _))
   }
 
   def shutdown(): Future[Unit] = {
@@ -153,4 +172,16 @@ class DefaultTypedCommandGateway[Cmd <: DomainCommand](
     Future.successful((): Unit)
   }
 
+}
+
+object DefaultTypedCommandGateway {
+  private val gatewayCount = new AtomicInteger()
+
+  // Gateways for the same manager class get their own guardian name.
+  private def nextGatewayNumber(): Int = gatewayCount.incrementAndGet()
+
+  // An aggregate id can hold characters that are not allowed in an actor name, such as '/' or a space, or start with
+  // '$'; URL encoding gives every id its own valid name.
+  private[bounded] def actorName(aggregateId: String): String =
+    URLEncoder.encode(aggregateId, StandardCharsets.UTF_8)
 }
