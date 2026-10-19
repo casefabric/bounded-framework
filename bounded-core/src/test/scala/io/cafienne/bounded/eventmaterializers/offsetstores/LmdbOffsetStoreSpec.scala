@@ -39,6 +39,20 @@ class LmdbOffsetStoreSpec extends AnyFlatSpec with Matchers with ScalaFutures {
     store.getOffset("view-many-tags").futureValue shouldBe manyTags
   }
 
+  it should "store an offset under a view identifier longer than 100 bytes" in {
+    val longView = "v" * 200
+
+    store.saveOffset(longView, Offset.sequence(9L)).futureValue
+    store.getOffset(longView).futureValue shouldBe Offset.sequence(9L)
+  }
+
+  it should "refuse a view identifier longer than LMDB's key limit with a clear error" in {
+    val tooLong = "v" * 600
+
+    store.saveOffset(tooLong, Offset.sequence(1L)).failed.futureValue.getMessage should include("LMDB offset store allows")
+    store.getOffset(tooLong).failed.futureValue shouldBe an[IllegalArgumentException]
+  }
+
   it should "read NoOffset for a view without a stored offset" in {
     store.getOffset("view-unknown").futureValue shouldBe NoOffset
   }

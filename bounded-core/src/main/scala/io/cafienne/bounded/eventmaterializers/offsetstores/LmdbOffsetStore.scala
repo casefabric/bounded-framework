@@ -14,6 +14,7 @@ import org.lmdbjava.{Dbi, DbiFlags, Env, EnvFlags}
 import org.slf4j.LoggerFactory
 
 import scala.concurrent.Future
+import scala.util.Try
 
 private class LmdbOffsetStore(lmdbConfig: LmdbConfig) extends OffsetStore {
 
@@ -27,40 +28,45 @@ private class LmdbOffsetStore(lmdbConfig: LmdbConfig) extends OffsetStore {
     .open(lmdbConfig.path, EnvFlags.MDB_NOSUBDIR)
   val dbi: Dbi[ByteBuffer] = env.openDbi(LmdbOffsetStore.DbName, DbiFlags.MDB_CREATE)
 
-  override def saveOffset(viewIdentifier: String, offset: Offset): Future[Unit] = {
-    val txn = env.txnWrite()
+  override def saveOffset(viewIdentifier: String, offset: Offset): Future[Unit] = Future.fromTry(Try {
+    val keyByteBuffer   = bytesBuffer(keyBytes(viewIdentifier))
+    val valueByteBuffer = bytesBuffer(OffsetCodec.encodeString(offset).getBytes(UTF_8))
+    val txn             = env.txnWrite()
     try {
-      val keyByteBuffer = allocateDirect(100)
-      keyByteBuffer.put(viewIdentifier.getBytes(UTF_8)).asInstanceOf[Buffer].flip
-
-      val valueBytes      = OffsetCodec.encodeString(offset).getBytes(UTF_8)
-      val valueByteBuffer = allocateDirect(valueBytes.length)
-      valueByteBuffer.put(valueBytes).asInstanceOf[Buffer].flip()
       dbi.put(txn, keyByteBuffer, valueByteBuffer)
       txn.commit()
     } finally {
       txn.close()
     }
-    Future.successful(())
-  }
+  })
 
-  override def getOffset(viewIdentifier: String): Future[Offset] = {
-    val txn = env.txnRead()
+  override def getOffset(viewIdentifier: String): Future[Offset] = Future.fromTry(Try {
+    val keyByteBuffer = bytesBuffer(keyBytes(viewIdentifier))
+    val txn           = env.txnRead()
     try {
-      val keyByteBuffer = allocateDirect(100)
-      keyByteBuffer.put(viewIdentifier.getBytes(UTF_8)).asInstanceOf[Buffer].flip
       val found = dbi.get(txn, keyByteBuffer)
-      if (found != null) {
-        val fetchedVal  = txn.`val`()
-        val offsetValue = UTF_8.decode(fetchedVal).toString()
-        val offset      = OffsetCodec.decodeString(offsetValue)
-        Future.successful(offset)
-      } else {
-        Future.successful(Offset.noOffset)
-      }
+      if (found != null) OffsetCodec.decodeString(UTF_8.decode(txn.`val`()).toString)
+      else Offset.noOffset
     } finally {
       txn.close()
     }
+  })
+
+  // LMDB limits the key size (511 bytes by default)
+  private def keyBytes(viewIdentifier: String): Array[Byte] = {
+    val bytes = viewIdentifier.getBytes(UTF_8)
+    if (bytes.length > env.getMaxKeySize) {
+      throw new IllegalArgumentException(
+        s"View identifier [$viewIdentifier] is ${bytes.length} bytes, the LMDB offset store allows ${env.getMaxKeySize}"
+      )
+    }
+    bytes
+  }
+
+  private def bytesBuffer(bytes: Array[Byte]): ByteBuffer = {
+    val buffer = allocateDirect(bytes.length)
+    buffer.put(bytes).asInstanceOf[Buffer].flip()
+    buffer
   }
 }
 
@@ -81,7 +87,8 @@ object LmdbOffsetStore {
 
   private val logger = LoggerFactory.getLogger("LmdbOffsetStore Singleton")
 
-  def apply(lmdbConfig: LmdbConfig): OffsetStore = {
+  // Synchronized: only one LMDB environment may be open for the file in this process.
+  def apply(lmdbConfig: LmdbConfig): OffsetStore = synchronized {
     if (store.isEmpty) {
       if (!lmdbConfig.path.exists()) {
         val parentFolder = new File(lmdbConfig.path.getParent)
