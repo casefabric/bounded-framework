@@ -76,7 +76,7 @@ class TestableProjectionSpec extends AsyncWordSpecLike with Matchers with ScalaF
 
 }
 
-class TestProjectionMaterializer(actorSystem: ActorSystem) extends AbstractReplayableEventMaterializer(actorSystem) {
+abstract class TestProjectionMaterializer(actorSystem: ActorSystem) extends AbstractReplayableEventMaterializer(actorSystem) {
 
   /**
     * Tagname used to identify eventstream to listen to

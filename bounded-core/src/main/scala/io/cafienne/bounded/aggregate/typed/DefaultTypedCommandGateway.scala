@@ -14,7 +14,7 @@ import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.atomic.AtomicInteger
 import scala.concurrent.duration._
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.util.{Failure, Success, Try}
 
 trait TypedCommandGateway[T <: DomainCommand] {
@@ -60,6 +60,9 @@ class DefaultTypedCommandGateway[Cmd <: DomainCommand](
     final case object GracefulShutdown                                                     extends AggregateControl
 
     val aggregates = collection.mutable.Map[String, ActorRef[Cmd]]()
+
+    // Completed when the guardian has stopped, which is after all its aggregates have stopped.
+    val stopped: Promise[Unit] = Promise()
 
     // Aggregates being stopped, with the spawn requests for them that arrived since. Those requests are
     // answered with a fresh actor once the old one has stopped, instead of with the stopping one.
@@ -132,6 +135,7 @@ class DefaultTypedCommandGateway[Cmd <: DomainCommand](
         .receiveSignal {
           case (context, PostStop) =>
             context.log.info("Typed Command Gateway Guardian stopped")
+            stopped.trySuccess(())
             Behaviors.same
           case (context, Terminated(ref)) =>
             context.log.debug("Terminated actor with ref {}", ref)
@@ -148,11 +152,23 @@ class DefaultTypedCommandGateway[Cmd <: DomainCommand](
   override def ask[Res](aggregateRootId: String, replyTo: ActorRef[Res] => Cmd)(
     implicit validator: ValidateableCommand[Cmd]
   ): Future[Res] = {
-    //TODO validation is only possible when the replyTo function is executed and that is in the ask.
-    //How to validate the command ?
-    spawnAggregateRoot(aggregateRootId).flatMap(ar => {
-      ar.ask[Res](replyTo)
-    })
+    // The command can only be built with the reply ref of an ask, and validation is asynchronous, so it cannot run
+    // inside the ask. The ask is made on the ignore ref just to get a reply ref: the reply to the command, sent
+    // after validation, completes it.
+    var command: Option[Cmd] = None
+    val response = system.ignoreRef[ActorRef[Res]].ask[Res] { replyRef =>
+      command = Some(replyTo(replyRef))
+      replyRef
+    }
+    command match {
+      case Some(cmd) =>
+        CommandValidator
+          .validate(cmd)
+          .flatMap(validatedCommand => spawnAggregateRoot(aggregateRootId).map(_ ! validatedCommand))
+          .flatMap(_ => response)
+      case None =>
+        Future.failed(new IllegalStateException(s"No command built for aggregate $aggregateRootId"))
+    }
   }
 
   override def tell(command: Cmd)(implicit validator: ValidateableCommand[Cmd]): Future[_] = {
@@ -167,9 +183,12 @@ class DefaultTypedCommandGateway[Cmd <: DomainCommand](
     gateway.askWithStatus(CommandGatewayGuardian.SpawnAggregate(aggregateRootId, _))
   }
 
+  /**
+    * Stops the gateway and its aggregates. The future completes when they have stopped.
+    */
   def shutdown(): Future[Unit] = {
     gateway ! CommandGatewayGuardian.GracefulShutdown
-    Future.successful((): Unit)
+    CommandGatewayGuardian.stopped.future
   }
 
 }

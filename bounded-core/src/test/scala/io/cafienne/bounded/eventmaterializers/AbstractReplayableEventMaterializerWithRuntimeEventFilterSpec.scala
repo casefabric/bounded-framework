@@ -7,10 +7,11 @@ package io.cafienne.bounded.eventmaterializers
 import java.time.OffsetDateTime
 import org.apache.pekko.Done
 import org.apache.pekko.actor.{ActorSystem, ExtendedActorSystem, PoisonPill, Props}
-import org.apache.pekko.persistence.query.Sequence
+import org.apache.pekko.persistence.query.{Offset, Sequence}
 import org.apache.pekko.testkit.TestProbe
 import com.typesafe.scalalogging.Logger
 import io.cafienne.bounded.aggregate.DomainEvent
+import io.cafienne.bounded.eventmaterializers.offsetstores.InMemoryBasedOffsetStore
 import org.apache.pekko.actor.testkit.typed.scaladsl.{LogCapturing, ScalaTestWithActorTestKit}
 import org.apache.pekko.projection.ProjectionId
 import org.apache.pekko.projection.testkit.scaladsl.{ProjectionTestKit, TestProjection, TestSourceProvider}
@@ -195,6 +196,13 @@ class AbstractReplayableEventMaterializerWithEventFilterSpec
     }
 
     override def handleReplayEvent(evt: Any): Future[Done] = handleEvent(evt)
+
+    private val offsets = new InMemoryBasedOffsetStore()
+
+    override def saveOffset(viewIdentifier: String, offset: Offset): Future[Unit] =
+      offsets.saveOffset(viewIdentifier, offset)
+
+    override def getOffset(viewIdentifier: String): Future[Offset] = offsets.getOffset(viewIdentifier)
 
     override def toString: String = s"TestMaterializer $tagName contains ${storedEvents.mkString(",")}"
   }
