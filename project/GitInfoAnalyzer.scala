@@ -76,7 +76,7 @@ object GitInfoAnalyzer {
     println(s" - found local changes:   $localChanges")
     println(s" - is snapshot:           $isSnapshot\n")
 
-    val version = Version(dashedVersions(0).split("[.]").map(_.toInt), isSnapshot)
+    val version = Version(dashedVersions(0).split("[.]").map(_.toInt).toSeq, isSnapshot)
 
     val description = {
       if (additionalCommits > 0) {
@@ -99,6 +99,6 @@ object GitInfoAnalyzer {
     println(" -  version:     " + version)
     println("")
 
-    Some(version + SPLITTER + description)
+    Some(s"$version$SPLITTER$description")
   }
 }

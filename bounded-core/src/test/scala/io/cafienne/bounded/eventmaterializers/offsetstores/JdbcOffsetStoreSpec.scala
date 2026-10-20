@@ -31,15 +31,14 @@ class JdbcOffsetStoreSpec extends AnyFlatSpec with Matchers with ScalaFutures {
     }
   """)
 
-  lazy val store = new JdbcOffsetStore(DatabaseConfig.forConfig[JdbcProfile]("offsetstore-h2", config))
+  final lazy val store = new JdbcOffsetStore(DatabaseConfig.forConfig[JdbcProfile]("offsetstore-h2", config))
 
   behavior of "JdbcOffsetStore"
 
   it should "create its table on first use and store and read back every offset type" in {
-    allOffsetTypes.zipWithIndex.foreach {
-      case (offset, i) =>
-        store.saveOffset(s"view-$i", offset).futureValue
-        store.getOffset(s"view-$i").futureValue shouldBe offset
+    allOffsetTypes.zipWithIndex.foreach { case (offset, i) =>
+      store.saveOffset(s"view-$i", offset).futureValue
+      store.getOffset(s"view-$i").futureValue shouldBe offset
     }
   }
 

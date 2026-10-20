@@ -37,9 +37,9 @@ object OffsetCodec {
   val TagsType      = "tags"
 
   def encode(offset: Offset): EncodedOffset = offset match {
-    case NoOffset         => EncodedOffset(NoOffsetType, "")
-    case Sequence(value)  => EncodedOffset(SequenceType, value.toString)
-    case TimeBasedUUID(v) => EncodedOffset(UuidType, v.toString)
+    case NoOffset           => EncodedOffset(NoOffsetType, "")
+    case Sequence(value)    => EncodedOffset(SequenceType, value.toString)
+    case TimeBasedUUID(v)   => EncodedOffset(UuidType, v.toString)
     case t: TimestampOffset =>
       EncodedOffset(TimestampType, (t.timestamp.toString +: t.seen.toSeq.map(pair)).mkString(";"))
     case TagOffsets(offsets) =>
@@ -54,7 +54,7 @@ object OffsetCodec {
   def decode(offsetType: String, value: String): Offset =
     Try(decodeOrFail(offsetType, value)) match {
       case Success(offset) => offset
-      case Failure(e) =>
+      case Failure(e)      =>
         logger.warn(
           s"Cannot read stored offset of type [$offsetType] with value [$value], using NoOffset: ${e.getMessage}"
         )
@@ -87,7 +87,7 @@ object OffsetCodec {
 
   private def decodeTimestamp(value: String): TimestampOffset = {
     val parts = value.split(";").toList
-    val seen = parts.tail.map { entry =>
+    val seen  = parts.tail.map { entry =>
       entry.split("=", 2) match {
         case Array(pid, seqNr) => unescape(pid) -> seqNr.toLong
         case _                 => throw new IllegalArgumentException(s"invalid seen entry [$entry]")

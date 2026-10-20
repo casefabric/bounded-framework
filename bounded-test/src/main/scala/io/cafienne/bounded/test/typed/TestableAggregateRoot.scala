@@ -43,7 +43,7 @@ import scala.concurrent.{Await, Promise}
   * @example
   * {{{
   * val ar = TestableAggregateRoot
-  *      .given[Cargo](cargoId2)
+  *      .givenEvents[Cargo](cargoId2)
   *      .when(PlanCargo(metaData, cargoId2, trackingId, routeSpecification))
   *
   *    ar.events should contain(CargoPlanned(metaData, cargoId2, trackingId, routeSpecification))
@@ -73,7 +73,7 @@ object TestableAggregateRoot {
     * @tparam A The Aggregate Root Type that is tested.
     * @return a TestableAggregateRoot instance that is initialized and available to give a DomainCommand to.
     */
-  def given[A <: DomainCommand, B <: DomainEvent, C: ClassTag](
+  def givenEvents[A <: DomainCommand, B <: DomainEvent, C](
     creator: TypedAggregateRootManager[A],
     id: String,
     evt: B*
@@ -88,14 +88,14 @@ object TestableAggregateRoot {
     * @tparam A The Aggregate Root Type that is tested.
     * @return a TestableAggregateRoot instance that is initialized and available to give a DomainCommand to.
     */
-  def given[A <: DomainCommand, B <: DomainEvent, C: ClassTag](
+  def givenEvents[A <: DomainCommand, B <: DomainEvent, C](
     creator: TypedAggregateRootManager[A],
     id: String
   )(implicit timeout: Timeout, ctag: reflect.ClassTag[A]): TestableAggregateRoot[A, B, C] = {
     new TestableAggregateRoot[A, B, C](creator, id, immutable.Seq.empty[B])
   }
 
-  //The tested aggregate root makes use of an additional counter in the id in order to prevent collision of parallel running tests.
+  // The tested aggregate root makes use of an additional counter in the id in order to prevent collision of parallel running tests.
   private val atomicCounter: AtomicInteger = new AtomicInteger()
   private def testId(id: String): String   = id + "-" + atomicCounter.getAndIncrement().toString
 
@@ -114,14 +114,11 @@ object TestableAggregateRoot {
   * @tparam B DomainEvent based events
   * @tparam C ClassTag
   */
-class TestableAggregateRoot[A <: DomainCommand, B <: DomainEvent, C: ClassTag] private (
+class TestableAggregateRoot[A <: DomainCommand, B <: DomainEvent, C] private (
   manager: TypedAggregateRootManager[A],
   id: String,
   evt: immutable.Seq[B]
-)(
-  implicit timeout: Timeout,
-  ctag: reflect.ClassTag[A]
-) {
+)(implicit timeout: Timeout, ctag: reflect.ClassTag[A]) {
   implicit val system: ActorSystem =
     ActorSystem(
       "TestSystem",
@@ -137,8 +134,9 @@ class TestableAggregateRoot[A <: DomainCommand, B <: DomainEvent, C: ClassTag] p
   implicit val duration: Duration                           = timeout.duration
   private val givenEvents: List[B]                          = evt.toList
 
-  private var lastFailure: Option[HandlingFailure] = Option.empty
-  private var lastCommand: Option[DomainCommand]   = Option.empty
+  // Set by the supervising actor, read by the test
+  @volatile private var lastFailure: Option[HandlingFailure] = Option.empty
+  private var lastCommand: Option[DomainCommand]             = Option.empty
 
   import TestableAggregateRoot.testId
   private final val arTestId = testId(id)
@@ -176,7 +174,7 @@ class TestableAggregateRoot[A <: DomainCommand, B <: DomainEvent, C: ClassTag] p
       }
       .receiveSignal(
         {
-          case (context, ChildFailed(ref, sig)) =>
+          case (context, ChildFailed(_, sig)) =>
             context.log.debug("behavior Failed " + sig.getMessage)
             lastFailure = Some(AggregateThrownException(sig))
             Behaviors.same
@@ -189,7 +187,7 @@ class TestableAggregateRoot[A <: DomainCommand, B <: DomainEvent, C: ClassTag] p
 
   private val wrappedActor = testKit.spawn(supervise, s"supervisor-$arTestId")
   private val eventProbe   = testKit.createTestProbe[Any]("EventStreamProbe")
-  testKit.internalSystem.eventStream.tell(Subscribe(eventProbe.ref))
+  testKit.internalSystem.eventStream.tell(Subscribe[Any](eventProbe.ref)(using ClassTag.Any))
 
   /**
     * After initialization of the aggregate root, the when allows to send a command and check thereafter what events are
@@ -202,7 +200,8 @@ class TestableAggregateRoot[A <: DomainCommand, B <: DomainEvent, C: ClassTag] p
     if (command.aggregateRootId != id) throw MisdirectedCommand(id, command)
     wrappedActor.tell(command)
     lastCommand = Some(command)
-    val msgs = eventProbe.receiveMessages(1)
+    // The first command also recovers the aggregate, so allow the caller's timeout instead of the probe default (3s)
+    val msgs = eventProbe.receiveMessages(1, timeout.duration)
     system.log.debug(s"found $msgs")
     Thread.sleep(500)
     this

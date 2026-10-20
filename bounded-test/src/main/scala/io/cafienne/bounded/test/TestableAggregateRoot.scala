@@ -9,7 +9,6 @@ import com.typesafe.config.ConfigFactory
 import java.util.concurrent.atomic.AtomicInteger
 import io.cafienne.bounded.test.TestableAggregateRoot._
 
-import scala.reflect.ClassTag
 import org.apache.pekko.actor._
 import org.apache.pekko.pattern.ask
 import org.apache.pekko.persistence.testkit.scaladsl.PersistenceTestKit
@@ -32,7 +31,7 @@ import scala.concurrent.duration.Duration
   * @example
   * {{{
   * val ar = TestableAggregateRoot
-  *      .given[Cargo](cargoId2)
+  *      .givenEvents[Cargo](cargoId2)
   *      .when(PlanCargo(metaData, cargoId2, trackingId, routeSpecification))
   *
   *    ar.events should contain(CargoPlanned(metaData, cargoId2, trackingId, routeSpecification))
@@ -60,7 +59,7 @@ object TestableAggregateRoot {
     * @tparam A The Aggregate Root Type that is tested.
     * @return a TestableAggregateRoot instance that is initialized and available to give a DomainCommand to.
     */
-  def given[A <: AggregateRootActor[B], B <: AggregateState[B]: ClassTag](
+  def givenEvents[A <: AggregateRootActor[B], B <: AggregateState[B]](
     creator: AggregateRootCreator,
     id: String,
     evt: DomainEvent*
@@ -75,7 +74,7 @@ object TestableAggregateRoot {
     * @tparam A The Aggregate Root Type that is tested.
     * @return a TestableAggregateRoot instance that is initialized and available to give a DomainCommand to.
     */
-  def given[A <: AggregateRootActor[B], B <: AggregateState[B]: ClassTag](
+  def givenEvents[A <: AggregateRootActor[B], B <: AggregateState[B]](
     creator: AggregateRootCreator,
     id: String
   )(implicit timeout: Timeout, ctag: reflect.ClassTag[A]): TestableAggregateRoot[A, B] = {
@@ -83,20 +82,17 @@ object TestableAggregateRoot {
     new TestableAggregateRoot[A, B](creator, id, Seq.empty[DomainEvent])
   }
 
-  //The tested aggregate root makes use of an additional counter in the id in order to prevent collision of parallel running tests.
+  // The tested aggregate root makes use of an additional counter in the id in order to prevent collision of parallel running tests.
   private val atomicCounter: AtomicInteger = new AtomicInteger()
   private def testId(id: String): String   = id + "-" + atomicCounter.getAndIncrement().toString
 
 }
 
-class TestableAggregateRoot[A <: AggregateRootActor[B], B <: AggregateState[B]: ClassTag] private (
+class TestableAggregateRoot[A <: AggregateRootActor[B], B <: AggregateState[B]] private (
   creator: AggregateRootCreator,
   id: String,
   evt: Seq[DomainEvent]
-)(
-  implicit timeout: Timeout,
-  ctag: reflect.ClassTag[A]
-) {
+)(implicit timeout: Timeout, ctag: reflect.ClassTag[A]) {
   implicit val system: ActorSystem =
     ActorSystem(
       "TestSystem",

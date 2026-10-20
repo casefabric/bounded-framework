@@ -57,10 +57,9 @@ class R2dbcOffsetStoreSpec extends AnyFlatSpec with Matchers with ScalaFutures w
 
   it should "create its table on first use and store and read back every offset type" in {
     assume(dockerAvailable, "Docker is not available")
-    allOffsetTypes.zipWithIndex.foreach {
-      case (offset, i) =>
-        store.saveOffset(s"view-$i", offset).futureValue
-        store.getOffset(s"view-$i").futureValue shouldBe offset
+    allOffsetTypes.zipWithIndex.foreach { case (offset, i) =>
+      store.saveOffset(s"view-$i", offset).futureValue
+      store.getOffset(s"view-$i").futureValue shouldBe offset
     }
   }
 
@@ -83,6 +82,15 @@ class R2dbcOffsetStoreSpec extends AnyFlatSpec with Matchers with ScalaFutures w
 
     store.clear().futureValue
     store.getOffset("view-clear-2").futureValue shouldBe NoOffset
+  }
+
+  it should "return its connections to the pool" in {
+    assume(dockerAvailable, "Docker is not available")
+    // Many more statements than the 20 connections of the default pool; a leaked connection makes one time out
+    (1 to 50).foreach { i =>
+      store.saveOffset("view-pool", Offset.sequence(i.toLong)).futureValue
+      store.getOffset("view-pool").futureValue shouldBe Offset.sequence(i.toLong)
+    }
   }
 
   "A materializer on the Pekko R2DBC journal" should "get a clear error for reading by tag" in {

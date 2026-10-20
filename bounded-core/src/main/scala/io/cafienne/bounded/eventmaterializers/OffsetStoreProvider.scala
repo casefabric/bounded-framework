@@ -49,16 +49,18 @@ object OffsetStoreProvider {
     offsetStoreConfig.getString("type") match {
       case LmdbStoreName     => getLmdbStore(offsetStoreConfig)
       case ImMemoryStoreName => getInMemoryStore()
-      case other             => throw new RuntimeException(s"Offsetstore $other is not supported by OffsetStoreProvider")
+      case other => throw new RuntimeException(s"Offsetstore $other is not supported by OffsetStoreProvider")
     }
   }
 
   def getInMemoryStore(): OffsetStore = synchronized {
-    store.getOrElse(ImMemoryStoreName, {
-      val inmemOffsetStore = new InMemoryBasedOffsetStore()
-      store.put(ImMemoryStoreName, inmemOffsetStore)
-      inmemOffsetStore
-    })
+    store.getOrElse(
+      ImMemoryStoreName, {
+        val inmemOffsetStore = new InMemoryBasedOffsetStore()
+        store.put(ImMemoryStoreName, inmemOffsetStore)
+        inmemOffsetStore
+      }
+    )
   }
 
   def getLmdbStore(offsetStoreConfig: Config): OffsetStore = synchronized {

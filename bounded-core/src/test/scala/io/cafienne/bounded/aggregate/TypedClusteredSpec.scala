@@ -10,7 +10,8 @@ import org.scalatest.flatspec.AsyncFlatSpecLike
 
 import scala.concurrent.{ExecutionContextExecutor, Future}
 
-class TypedClusteredSpec extends ScalaTestWithActorTestKit(s"""
+class TypedClusteredSpec
+    extends ScalaTestWithActorTestKit(s"""
     //pekko.actor.provider = "cluster"
     //pekko.cluster.seed-nodes = ["pekko://TypedClusteredSpec@127.0.0.1:2552"]
     pekko.persistence.publish-plugin-commands = on
@@ -18,8 +19,9 @@ class TypedClusteredSpec extends ScalaTestWithActorTestKit(s"""
     pekko.persistence.journal.inmem.test-serialization = on
     # snapshot store plugin is NOT defined, things should still work
     pekko.persistence.snapshot-store.local.dir = "target/snapshots-${classOf[TypedClusteredSpec].getName}/"
-    """) with AsyncFlatSpecLike {
-  //NOTE: Be aware that the config of the TestKit contains the name of the Cluster based on the name of this Spec (TypedClusteredSpec).
+    """)
+    with AsyncFlatSpecLike {
+  // NOTE: Be aware that the config of the TestKit contains the name of the Cluster based on the name of this Spec (TypedClusteredSpec).
   //      When you copy this for your own use, change the name of the cluser.seed-nodes.
 
   import TypedSimpleAggregate._

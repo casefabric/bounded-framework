@@ -92,8 +92,8 @@ class PlainActorAggregate(id: String) extends org.apache.pekko.actor.Actor {
 
   override def postStop(): Unit = AggregateLifecycles.onStop(id)
 
-  def receive: Receive = {
-    case Create(aggregateRootId) => sender() ! Ok(Seq(Created(aggregateRootId)))
+  def receive: Receive = { case Create(aggregateRootId) =>
+    sender() ! Ok(Seq(Created(aggregateRootId)))
   }
 }
 
@@ -121,10 +121,9 @@ object PassivationRaceSpec {
             replyTo ! "pong"
             Behaviors.same
         }
-        .receiveSignal {
-          case (_, PostStop) =>
-            AggregateLifecycles.onStop(id)
-            Behaviors.same
+        .receiveSignal { case (_, PostStop) =>
+          AggregateLifecycles.onStop(id)
+          Behaviors.same
         }
     }
 
@@ -157,9 +156,9 @@ class PassivationRaceSpec
   import ClassicSimpleAggregate._
   import PassivationRaceSpec._
 
-  implicit val timeout: Timeout     = Timeout(3.seconds)
-  implicit val ec: ExecutionContext = system.dispatcher
-  implicit val scheduler: Scheduler = system.toTyped.scheduler
+  implicit val timeout: Timeout         = Timeout(3.seconds)
+  implicit val ec: ExecutionContext     = system.dispatcher
+  implicit val scheduler: Scheduler     = system.toTyped.scheduler
   implicit val patience: PatienceConfig =
     PatienceConfig(timeout = Span(5, Seconds), interval = Span(50, Millis))
 
@@ -172,7 +171,7 @@ class PassivationRaceSpec
 
   "RouterCommandGateway" should "hand a command that arrives while the aggregate passivates to a fresh actor" in {
     val aggregateId = "classic-race"
-    val creator = new AggregateRootCreator {
+    val creator     = new AggregateRootCreator {
       override def props(id: String): Props = Props(classOf[SlowClassicAggregate], id)
     }
     val gateway = new RouterCommandGateway(system, IdleTime, creator)
@@ -190,7 +189,7 @@ class PassivationRaceSpec
 
   it should "stop an idle aggregate that is not an AggregateRootActor without waiting for the force stop" in {
     val aggregateId = "plain-actor"
-    val creator = new AggregateRootCreator {
+    val creator     = new AggregateRootCreator {
       override def props(id: String): Props = Props(new PlainActorAggregate(id))
     }
     val gateway = new RouterCommandGateway(system, IdleTime, creator)

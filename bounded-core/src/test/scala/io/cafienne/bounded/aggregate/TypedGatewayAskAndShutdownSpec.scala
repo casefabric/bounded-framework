@@ -29,11 +29,10 @@ object TypedGatewayAskAndShutdownSpec {
           ping.replyTo ! s"pong $id"
           Behaviors.same
         }
-        .receiveSignal {
-          case (_, PostStop) =>
-            Thread.sleep(300)
-            stopped.set(true)
-            Behaviors.same
+        .receiveSignal { case (_, PostStop) =>
+          Thread.sleep(300)
+          stopped.set(true)
+          Behaviors.same
         }
 
     override def entityTypeKey: EntityTypeKey[Ping] = EntityTypeKey[Ping]("slow-stopping")

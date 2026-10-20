@@ -30,8 +30,8 @@ trait TypedCommandGateway[T <: DomainCommand] {
   * it will keep a list of aggregate root actors and use those to ask or tell commands to
   * Typed aggregate roots.
   *
-  * TODO: Aggregate Root Actors are responsible for their own lifecycle
-  * TODO At this moment, a started AR will not be stopped.
+  * An aggregate root actor is started on its first command and stopped once it has been idle for
+  * `aggregateMayIdleFor`. An aggregate may also stop itself; the next command for it starts a new one.
   *
   * @param system A typed actorsystem
   * @param aggregateRootCreator The class that creates the specific type of aggregate root
@@ -57,7 +57,7 @@ class DefaultTypedCommandGateway[Cmd <: DomainCommand](
         extends AggregateControl
     final case class StopAggregate(aggregateId: String)         extends AggregateControl
     private case class AggregateTerminated(aggregateId: String) extends AggregateControl
-    final case object GracefulShutdown                          extends AggregateControl
+    case object GracefulShutdown                                extends AggregateControl
 
     val aggregates = collection.mutable.Map[String, ActorRef[Cmd]]()
 
@@ -70,7 +70,7 @@ class DefaultTypedCommandGateway[Cmd <: DomainCommand](
 
     def apply(): Behavior[AggregateControl] =
       Behaviors
-        .setup[AggregateControl] { context => Behaviors.withTimers { timers => behaviors(timers) } }
+        .setup[AggregateControl] { _ => Behaviors.withTimers { timers => behaviors(timers) } }
 
     // A failure to create the aggregate fails only the request for it: thrown here, it would stop the guardian and
     // with it every aggregate of this gateway.
@@ -83,10 +83,10 @@ class DefaultTypedCommandGateway[Cmd <: DomainCommand](
         Try(
           context.spawn(aggregateRootCreator.behavior(aggregateId), DefaultTypedCommandGateway.actorName(aggregateId))
         ).map { ref =>
-            context.watchWith(ref, AggregateTerminated(aggregateId))
-            aggregates += aggregateId -> ref
-            ref
-          }
+          context.watchWith(ref, AggregateTerminated(aggregateId))
+          aggregates += aggregateId -> ref
+          ref
+        }
       }
       created match {
         case Success(ref) =>
@@ -120,7 +120,7 @@ class DefaultTypedCommandGateway[Cmd <: DomainCommand](
               Behaviors.same
             case GracefulShutdown =>
               context.log.info("Initiating graceful shutdown...")
-              //Stopping the guardian will stop the aggregate root actors.
+              // Stopping the guardian will stop the aggregate root actors.
               Behaviors.stopped { () => context.log.debug("Stopped base on message {}", message) }
             case AggregateTerminated(aggregateId) =>
               context.log.debug("Aggregate {} terminated", aggregateId)
@@ -157,7 +157,7 @@ class DefaultTypedCommandGateway[Cmd <: DomainCommand](
     // inside the ask. The ask is made on the ignore ref just to get a reply ref: the reply to the command, sent
     // after validation, completes it.
     var command: Option[Cmd] = None
-    val response = system.ignoreRef[ActorRef[Res]].ask[Res] { replyRef =>
+    val response             = system.ignoreRef[ActorRef[Res]].ask[Res] { replyRef =>
       command = Some(replyTo(replyRef))
       replyRef
     }

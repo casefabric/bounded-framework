@@ -43,20 +43,20 @@ class ClassicCommandGatewaySpec
     with Matchers
     with BeforeAndAfterAll {
 
-  //Setup required supporting classes
-  implicit val timeout: Timeout = Timeout(10.seconds)
+  // Setup required supporting classes
+  implicit val timeout: Timeout                = Timeout(10.seconds)
   implicit val defaultPatience: PatienceConfig =
     PatienceConfig(timeout = Span(10, Seconds), interval = Span(100, Millis))
   implicit val ec: ExecutionContextExecutor = ExecutionContext.global
 
-  val classicSimpleCreator = new ClassicSimpleAggregateCreator(system)
+  val classicSimpleCreator                                                = new ClassicSimpleAggregateCreator(system)
   val commandGateway: RouterCommandGateway[ClassicSimpleAggregateCreator] =
     new RouterCommandGateway(system, 2.seconds, classicSimpleCreator)
 
   import org.apache.pekko.pattern.ask
   import ClassicSimpleAggregate._
 
-  //All commands are valid in this test
+  // All commands are valid in this test
   implicit val commandValidator: ValidateableCommand[Create] = new ValidateableCommand[Create] {
     override def validate(cmd: Create): Future[Create] =
       Future.successful(cmd)

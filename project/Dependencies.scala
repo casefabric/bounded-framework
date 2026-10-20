@@ -6,8 +6,8 @@ import sbt._
 
 object Dependencies {
 
-  val pekkoVersion = "1.7.0"
-  val pekkoHttpVersion = "1.4.0"
+  val pekkoVersion = "1.7.1"
+  val pekkoHttpVersion = "1.4.2"
   val pekkoProjectionSnapshotVersion = "1.1.0"
   val scalaTestVersion = "3.2.20"
   val slickVersion = "3.6.1"
@@ -40,8 +40,8 @@ object Dependencies {
   }
 
   val log = Seq(
-      "ch.qos.logback" % "logback-classic" % "1.6.3",
-      "net.logstash.logback" % "logstash-logback-encoder" % "8.1"
+      "ch.qos.logback" % "logback-classic" % "1.6.6",
+      "net.logstash.logback" % "logstash-logback-encoder" % "9.0"
     )
 
 
@@ -79,8 +79,10 @@ object Dependencies {
   val offsetStoreTestDeps = Seq(
     "org.testcontainers" % "testcontainers-postgresql" % testcontainersVersion % Test,
     "org.testcontainers" % "testcontainers-cassandra"  % testcontainersVersion % Test,
-    "org.postgresql"     % "postgresql"                % "42.7.13"             % Test,
-    "com.h2database"     % "h2"                        % "2.5.250"             % Test
+    "org.postgresql"     % "postgresql"                % "42.7.14"             % Test,
+    // pekko-persistence-r2dbc 1.1+ no longer brings a driver (it is a test dependency there); use the version it is tested with
+    "org.postgresql"     % "r2dbc-postgresql"          % "1.0.7.RELEASE"       % Test,
+    "com.h2database"     % "h2"                        % "2.5.252"             % Test
   )
 
   val persistenceLevelDBDeps = {
@@ -98,7 +100,7 @@ object Dependencies {
 
   val persistenceInMemoryDeps = {
     baseDeps ++ Seq(
-      "io.github.alstanchev" %% "pekko-persistence-inmemory" % "1.3.0" excludeAll ExclusionRule(organization = "org.apache.pekko")
+      ("io.github.alstanchev" %% "pekko-persistence-inmemory" % "1.3.0").excludeAll(ExclusionRule(organization = "org.apache.pekko"))
     )
   }
 
@@ -110,7 +112,7 @@ object Dependencies {
 
   val persistenceJdbcDeps = {
     baseDeps ++ Seq(
-      "org.apache.pekko"   %% "pekko-persistence-r2dbc" % "1.0.0",
+      "org.apache.pekko"   %% "pekko-persistence-r2dbc" % "1.2.0",
       "org.apache.pekko"   %% "pekko-persistence-jdbc"  % "1.3.0",
       "com.typesafe.slick" %% "slick"                   % slickVersion,
     )
