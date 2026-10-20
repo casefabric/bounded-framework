@@ -5,7 +5,16 @@
 package io.cafienne.bounded.aggregate
 
 import org.apache.pekko.actor._
-import org.apache.pekko.persistence.{PersistentActor, RecoveryCompleted, SnapshotOffer}
+import org.apache.pekko.persistence.{
+  DeleteSnapshotsFailure,
+  DeleteSnapshotsSuccess,
+  PersistentActor,
+  RecoveryCompleted,
+  SaveSnapshotFailure,
+  SaveSnapshotSuccess,
+  SnapshotOffer,
+  SnapshotSelectionCriteria
+}
 import org.apache.pekko.persistence.journal.Tagged
 import io.cafienne.bounded.aggregate.AggregateRootActor.{GetPersistenceId, GetState, Passivate}
 
@@ -76,7 +85,15 @@ trait AggregateRootActor[A <: AggregateState[A]]
 
   override def persistenceId: String = s"$persistenceIdPrefix$aggregateId"
 
+  /**
+    * Save a snapshot of the state every `n` events. None (the default) saves no snapshots.
+    */
   val snapShotInterval: Option[Int] = None
+
+  /**
+    * Delete the older snapshots of this aggregate when a new one is saved, so only the latest is kept.
+    */
+  val deleteOlderSnapshots: Boolean = true
 
   // Sender of the command whose events are being persisted. persistAll stashes new commands until all
   // its handlers ran, so there is at most one; it is needed when the journal reports a failure.
@@ -96,8 +113,8 @@ trait AggregateRootActor[A <: AggregateState[A]]
           val persisting = events.iterator
           persistAll(events.map(withTags)) { _ =>
             updateState(persisting.next())
-            if (snapShotInterval.isDefined) {
-              if (lastSequenceNr % snapShotInterval.get == 0 && lastSequenceNr != 0) {
+            snapShotInterval.foreach { interval =>
+              if (lastSequenceNr % interval == 0 && lastSequenceNr != 0) {
                 saveSnapshot(state)
               }
             }
@@ -119,6 +136,31 @@ trait AggregateRootActor[A <: AggregateState[A]]
     // Handled like a command, so after the commands before it, including those stashed during a persist.
     case Passivate =>
       context.stop(self)
+
+    case SaveSnapshotSuccess(metadata) =>
+      if (deleteOlderSnapshots && metadata.sequenceNr > 1) {
+        deleteSnapshots(SnapshotSelectionCriteria(maxSequenceNr = metadata.sequenceNr - 1))
+      }
+
+    // Recovery then replays more events, nothing is lost
+    case SaveSnapshotFailure(metadata, cause) =>
+      log.warning(
+        "Failed to save snapshot at sequence number {} for persistenceId {}, reason: {}",
+        metadata.sequenceNr,
+        persistenceId,
+        cause.getMessage
+      )
+
+    case DeleteSnapshotsSuccess(criteria) =>
+      log.debug("Deleted snapshots up to sequence number {} for persistenceId {}", criteria.maxSequenceNr, persistenceId)
+
+    case DeleteSnapshotsFailure(criteria, cause) =>
+      log.warning(
+        "Failed to delete snapshots up to sequence number {} for persistenceId {}, reason: {}",
+        criteria.maxSequenceNr,
+        persistenceId,
+        cause.getMessage
+      )
   }
 
   private def withTags(event: DomainEvent): Any = {
