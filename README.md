@@ -142,10 +142,13 @@ Check which version will be published with `sbt "show boundedCore/version"`.
 
 ```bash
 git checkout main && git pull
-git tag v0.4.0
-git push origin v0.4.0
+git tag v1.0.0
+git push origin v1.0.0
+sbt "show boundedCore/version"   # must print 1.0.0, without -SNAPSHOT
 sbt publishSigned sonaRelease
 ```
+
+Uncommitted changes to tracked files turn the build into a snapshot (untracked files do not), so commit or stash them before publishing a release.
 
 `publishSigned` signs the artifacts and stages them locally; `sonaRelease` uploads the bundle to Sonatype Central and releases it to Maven Central. Use `sonaUpload` instead of `sonaRelease` to upload only, and publish the deployment manually from the [Central Portal](https://central.sonatype.com/publishing/deployments).
 
