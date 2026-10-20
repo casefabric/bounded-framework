@@ -27,9 +27,10 @@ class CreateOnFirstUseSpec extends AnyFlatSpec with Matchers with ScalaFutures {
   }
 
   it should "succeed when a create loses the race with another store and fails once" in {
-    val creates   = new AtomicInteger()
+    val creates = new AtomicInteger()
     val firstLost = new CreateOnFirstUse(() => {
-      if (creates.incrementAndGet() == 1) Future.failed(new RuntimeException("duplicate key value violates unique constraint"))
+      if (creates.incrementAndGet() == 1)
+        Future.failed(new RuntimeException("duplicate key value violates unique constraint"))
       else Future.unit
     })
 

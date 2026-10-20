@@ -101,7 +101,8 @@ class MaterializerEventFilterSpec
     ()
   }
 
-  class FilteringMaterializer(view: String) extends AbstractReplayableEventMaterializer(classicSystem, true, KeepFilter) {
+  class FilteringMaterializer(view: String)
+      extends AbstractReplayableEventMaterializer(classicSystem, true, KeepFilter) {
     override val logger: Logger           = Logger(LoggerFactory.getLogger(classOf[FilteringMaterializer]))
     override val tagName: String          = tag
     override val matMappingName: String   = view

@@ -19,13 +19,15 @@ import scala.concurrent.{ExecutionContext, Future}
   * Aggregate ids that are not valid actor names, and gateways that share a manager class.
   */
 class TypedGatewayNamesSpec
-    extends ScalaTestWithActorTestKit(ConfigFactory.parseString("""
+    extends ScalaTestWithActorTestKit(
+      ConfigFactory.parseString("""
     pekko.persistence.journal.plugin = "pekko.persistence.journal.inmem"
     pekko.actor.warn-about-java-serializer-usage = off
     pekko.coordinated-shutdown.terminate-actor-system = off
     pekko.coordinated-shutdown.run-by-actor-system-terminate = off
     pekko.coordinated-shutdown.run-by-jvm-shutdown-hook = off
-    """))
+    """)
+    )
     with AnyFlatSpecLike
     with LogCapturing {
 
@@ -35,10 +37,10 @@ class TypedGatewayNamesSpec
     new ValidateableCommand[SimpleAggregateCommand] {
       override def validate(cmd: SimpleAggregateCommand): Future[SimpleAggregateCommand] = Future.successful(cmd)
     }
-  implicit val ec: ExecutionContext      = system.executionContext
-  implicit val scheduler: Scheduler      = system.scheduler
-  implicit val gatewayTimeout: Timeout   = Timeout(5.seconds)
-  private val commandMetaData            = AggregateCommandMetaData(OffsetDateTime.now(), None)
+  implicit val ec: ExecutionContext    = system.executionContext
+  implicit val scheduler: Scheduler    = system.scheduler
+  implicit val gatewayTimeout: Timeout = Timeout(5.seconds)
+  private val commandMetaData          = AggregateCommandMetaData(OffsetDateTime.now(), None)
 
   private def create(gateway: DefaultTypedCommandGateway[SimpleAggregateCommand], id: String): Future[Response] =
     gateway.ask[Response](id, ref => Create(id, commandMetaData, ref))

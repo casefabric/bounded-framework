@@ -49,9 +49,7 @@ class OffsetCodecSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "read back every offset type it writes as a single string" in {
-    allOffsetTypes.foreach { offset =>
-      OffsetCodec.decodeString(OffsetCodec.encodeString(offset)) shouldBe offset
-    }
+    allOffsetTypes.foreach { offset => OffsetCodec.decodeString(OffsetCodec.encodeString(offset)) shouldBe offset }
   }
 
   it should "read the records CassandraOffsetStore used to write" in {

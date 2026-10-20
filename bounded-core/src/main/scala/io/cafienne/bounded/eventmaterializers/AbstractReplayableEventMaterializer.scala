@@ -47,9 +47,8 @@ abstract class AbstractReplayableEventMaterializer(
     var eventsReplayed = 0
     journal
       .currentEventsByTag(tagName, targetOffset)
-      .mapAsync(1)(
-        eventEnvelope =>
-          processEvent(PositionedEvent(eventEnvelope), materializerEventFilter, handleReplayEvent, publish = false)
+      .mapAsync(1)(eventEnvelope =>
+        processEvent(PositionedEvent(eventEnvelope), materializerEventFilter, handleReplayEvent, publish = false)
       )
       .map { offset =>
         replayedUpTo.set(offset)

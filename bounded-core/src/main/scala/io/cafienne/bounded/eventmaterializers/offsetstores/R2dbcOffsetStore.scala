@@ -45,11 +45,10 @@ class R2dbcOffsetStore(system: ActorSystem, connectionFactoryPath: String) exten
 
   override def getOffset(viewIdentifier: String): Future[Offset] =
     tableCreated()
-      .flatMap(
-        _ =>
-          query(Select, viewIdentifier) { (row, _) =>
-            OffsetCodec.decode(row.get("offset_type", classOf[String]), row.get("offset_value", classOf[String]))
-          }
+      .flatMap(_ =>
+        query(Select, viewIdentifier) { (row, _) =>
+          OffsetCodec.decode(row.get("offset_type", classOf[String]), row.get("offset_value", classOf[String]))
+        }
       )
       .map(_.headOption.getOrElse(NoOffset))
 
@@ -63,9 +62,11 @@ class R2dbcOffsetStore(system: ActorSystem, connectionFactoryPath: String) exten
     run(sql, binds)(result => result.getRowsUpdated).map(_.map(_.longValue))
 
   private def query[T](sql: String, binds: String*)(read: (Row, RowMetadata) => T): Future[Seq[T]] =
-    run(sql, binds)(result => result.map(new BiFunction[Row, RowMetadata, T] {
-      override def apply(row: Row, metadata: RowMetadata): T = read(row, metadata)
-    }))
+    run(sql, binds)(result =>
+      result.map(new BiFunction[Row, RowMetadata, T] {
+        override def apply(row: Row, metadata: RowMetadata): T = read(row, metadata)
+      })
+    )
 
   // Runs one statement on a connection from the pool and closes the connection, also when the statement fails.
   private def run[T](sql: String, binds: Seq[String])(read: Result => Publisher[T]): Future[Seq[T]] =
@@ -101,7 +102,7 @@ object R2dbcOffsetStore {
 
   val Upsert: String =
     "INSERT INTO bounded_offset_store (view_identifier, offset_type, offset_value) VALUES ($1, $2, $3) " +
-    "ON CONFLICT (view_identifier) DO UPDATE SET offset_type = excluded.offset_type, offset_value = excluded.offset_value"
+      "ON CONFLICT (view_identifier) DO UPDATE SET offset_type = excluded.offset_type, offset_value = excluded.offset_value"
 
   val Select: String = "SELECT offset_type, offset_value FROM bounded_offset_store WHERE view_identifier = $1"
 

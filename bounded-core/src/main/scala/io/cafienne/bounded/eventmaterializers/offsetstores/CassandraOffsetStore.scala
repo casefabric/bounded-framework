@@ -68,7 +68,9 @@ object CassandraOffsetStore {
       LegacyKeyspaceConfigPaths.find(config.hasPath) match {
         case Some(legacyPath) =>
           val keyspace = config.getString(legacyPath)
-          logger.warn(s"Offset store keyspace $keyspace is read from the old key $legacyPath, set $KeyspaceConfigPath instead")
+          logger.warn(
+            s"Offset store keyspace $keyspace is read from the old key $legacyPath, set $KeyspaceConfigPath instead"
+          )
           keyspace
         case None => config.getString(s"$journalPluginPath.keyspace")
       }

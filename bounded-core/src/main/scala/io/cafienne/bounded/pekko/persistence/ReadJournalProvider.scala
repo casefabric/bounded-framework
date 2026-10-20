@@ -38,7 +38,7 @@ trait ReadJournalProvider { systemProvider: ActorSystemProvider =>
     if (configuredJournal.endsWith("r2dbc.journal") || configuredJournal.endsWith("r2dbc-journal")) {
       throw new UnsupportedOperationException(
         s"Event materializers read events by tag, which the R2DBC journal $configuredJournal does not support " +
-        "(it only offers eventsBySlices)"
+          "(it only offers eventsBySlices)"
       )
     }
     if (configuredJournal.endsWith("jdbc-journal")) {

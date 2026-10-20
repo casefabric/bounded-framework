@@ -134,7 +134,7 @@ private[eventmaterializers] trait EventStreamHandling extends ActorSystemProvide
       .onFailuresWithBackoff(restartSettings) { () =>
         logger.debug(s"$viewIdentifier: listening for events after offset ${resumeFrom.get}")
         events(resumeFrom.get)
-          // resumeFrom is set as soon as the event is handled, also when a failing save tears the stream down meanwhile
+        // resumeFrom is set as soon as the event is handled, also when a failing save tears the stream down meanwhile
           .mapAsync(1)(processEvent(_, filter, handleEvent, isPublishRequired).map { offset =>
             resumeFrom.set(offset)
             offset
@@ -191,7 +191,12 @@ private[eventmaterializers] object EventStreamHandling {
       config.getDouble("random-factor")
     ).withMaxRestarts(config.getInt("max-restarts"), duration(config, "max-restarts-within"))
 
-  final case class RetrySettings(attempts: Int, minBackoff: FiniteDuration, maxBackoff: FiniteDuration, randomFactor: Double)
+  final case class RetrySettings(
+    attempts: Int,
+    minBackoff: FiniteDuration,
+    maxBackoff: FiniteDuration,
+    randomFactor: Double
+  )
 
   object RetrySettings {
     // RetrySupport counts the retries after the first attempt, which matches maxRestarts

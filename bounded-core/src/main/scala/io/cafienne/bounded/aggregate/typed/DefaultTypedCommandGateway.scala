@@ -55,9 +55,9 @@ class DefaultTypedCommandGateway[Cmd <: DomainCommand](
     sealed trait AggregateControl
     final case class SpawnAggregate(aggregateId: String, replyTo: ActorRef[StatusReply[ActorRef[Cmd]]])
         extends AggregateControl
-    final case class StopAggregate(aggregateId: String)                                    extends AggregateControl
-    private case class AggregateTerminated(aggregateId: String)                            extends AggregateControl
-    final case object GracefulShutdown                                                     extends AggregateControl
+    final case class StopAggregate(aggregateId: String)         extends AggregateControl
+    private case class AggregateTerminated(aggregateId: String) extends AggregateControl
+    final case object GracefulShutdown                          extends AggregateControl
 
     val aggregates = collection.mutable.Map[String, ActorRef[Cmd]]()
 
@@ -80,8 +80,9 @@ class DefaultTypedCommandGateway[Cmd <: DomainCommand](
       aggregateId: String
     ): StatusReply[ActorRef[Cmd]] = {
       val created = aggregates.get(aggregateId).map(Success(_)).getOrElse {
-        Try(context.spawn(aggregateRootCreator.behavior(aggregateId), DefaultTypedCommandGateway.actorName(aggregateId)))
-          .map { ref =>
+        Try(
+          context.spawn(aggregateRootCreator.behavior(aggregateId), DefaultTypedCommandGateway.actorName(aggregateId))
+        ).map { ref =>
             context.watchWith(ref, AggregateTerminated(aggregateId))
             aggregates += aggregateId -> ref
             ref

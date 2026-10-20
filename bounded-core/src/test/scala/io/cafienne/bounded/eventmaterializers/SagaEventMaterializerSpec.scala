@@ -49,7 +49,7 @@ class SagaEventMaterializerSpec
   "The Saga Event Materializer" must {
 
     "handle the events of both tags, publish them and save an offset" in {
-      val saga                      = new TestSaga("saga-both-tags")
+      val saga                     = new TestSaga("saga-both-tags")
       val (killSwitch, lastOffset) = saga.registerListenerWithKillSwitch(None)
 
       eventually {
@@ -88,7 +88,7 @@ class SagaEventMaterializerSpec
     }
 
     "handle events that are added while it is listening" in {
-      val saga                      = new TestSaga("saga-live")
+      val saga                     = new TestSaga("saga-live")
       val (killSwitch, lastOffset) = saga.registerListenerWithKillSwitch(None)
       eventually(saga.handledEvents should have size initialEvents.size.toLong)
 

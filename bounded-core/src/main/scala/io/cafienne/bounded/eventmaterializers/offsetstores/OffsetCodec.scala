@@ -43,7 +43,10 @@ object OffsetCodec {
     case t: TimestampOffset =>
       EncodedOffset(TimestampType, (t.timestamp.toString +: t.seen.toSeq.map(pair)).mkString(";"))
     case TagOffsets(offsets) =>
-      EncodedOffset(TagsType, offsets.map { case (tag, o) => escape(tag) + "=" + escape(encodeString(o)) }.mkString("&"))
+      EncodedOffset(
+        TagsType,
+        offsets.map { case (tag, o) => escape(tag) + "=" + escape(encodeString(o)) }.mkString("&")
+      )
     case other =>
       throw new IllegalArgumentException(s"Offset type ${other.getClass.getName} cannot be stored")
   }
@@ -52,7 +55,9 @@ object OffsetCodec {
     Try(decodeOrFail(offsetType, value)) match {
       case Success(offset) => offset
       case Failure(e) =>
-        logger.warn(s"Cannot read stored offset of type [$offsetType] with value [$value], using NoOffset: ${e.getMessage}")
+        logger.warn(
+          s"Cannot read stored offset of type [$offsetType] with value [$value], using NoOffset: ${e.getMessage}"
+        )
         NoOffset
     }
 

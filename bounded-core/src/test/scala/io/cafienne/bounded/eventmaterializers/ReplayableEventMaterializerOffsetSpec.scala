@@ -36,11 +36,11 @@ class ReplayableEventMaterializerOffsetSpec
 
   implicit val classicSystem: ActorSystem = system.classicSystem
 
-  val tag            = "replay-offset-tag"
-  val persistenceId  = "replay-offset-ar"
-  val initialEvents  = (1 to 4).map(i => ReplayTestEvent(persistenceId, s"e$i"))
-  val sharedOffsets  = new InMemoryBasedOffsetStore()
-  val viewId         = "replay-offset-view"
+  val tag           = "replay-offset-tag"
+  val persistenceId = "replay-offset-ar"
+  val initialEvents = (1 to 4).map(i => ReplayTestEvent(persistenceId, s"e$i"))
+  val sharedOffsets = new InMemoryBasedOffsetStore()
+  val viewId        = "replay-offset-view"
 
   "A replayable event materializer with partial replay" must {
 
@@ -96,7 +96,10 @@ class ReplayableEventMaterializerOffsetSpec
   private def storeEvents(events: Seq[DomainEvent]): Unit = {
     val storeEventsActor = classicSystem
       .asInstanceOf[ExtendedActorSystem]
-      .systemActorOf(Props(classOf[CreateEventsInStoreActor], persistenceId), s"create-events-${storeCounter.incrementAndGet()}")
+      .systemActorOf(
+        Props(classOf[CreateEventsInStoreActor], persistenceId),
+        s"create-events-${storeCounter.incrementAndGet()}"
+      )
     val testProbe = TestProbe()
     testProbe watch storeEventsActor
     events foreach { event =>

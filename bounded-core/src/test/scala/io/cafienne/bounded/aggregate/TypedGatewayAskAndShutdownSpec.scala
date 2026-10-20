@@ -41,13 +41,15 @@ object TypedGatewayAskAndShutdownSpec {
 }
 
 class TypedGatewayAskAndShutdownSpec
-    extends ScalaTestWithActorTestKit(ConfigFactory.parseString("""
+    extends ScalaTestWithActorTestKit(
+      ConfigFactory.parseString("""
     pekko.persistence.journal.plugin = "pekko.persistence.journal.inmem"
     pekko.actor.warn-about-java-serializer-usage = off
     pekko.coordinated-shutdown.terminate-actor-system = off
     pekko.coordinated-shutdown.run-by-actor-system-terminate = off
     pekko.coordinated-shutdown.run-by-jvm-shutdown-hook = off
-    """))
+    """)
+    )
     with AnyFlatSpecLike
     with LogCapturing {
 

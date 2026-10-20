@@ -49,7 +49,9 @@ class LmdbOffsetStoreSpec extends AnyFlatSpec with Matchers with ScalaFutures {
   it should "refuse a view identifier longer than LMDB's key limit with a clear error" in {
     val tooLong = "v" * 600
 
-    store.saveOffset(tooLong, Offset.sequence(1L)).failed.futureValue.getMessage should include("LMDB offset store allows")
+    store.saveOffset(tooLong, Offset.sequence(1L)).failed.futureValue.getMessage should include(
+      "LMDB offset store allows"
+    )
     store.getOffset(tooLong).failed.futureValue shouldBe an[IllegalArgumentException]
   }
 

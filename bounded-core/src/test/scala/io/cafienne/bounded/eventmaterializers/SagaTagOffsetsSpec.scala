@@ -66,7 +66,7 @@ class SagaTagOffsetsSpec
       eventually(first.handled should contain theSameElementsAs Seq("a1", "a2", "a3", "a4", "a5", "b1", "c1"))
       eventually {
         offsets.getOffset(first.viewIdentifier).futureValue shouldBe
-        TagOffsets(Map(tagA -> Sequence(5L), tagB -> Sequence(1L), tagC -> Sequence(1L)))
+          TagOffsets(Map(tagA -> Sequence(5L), tagB -> Sequence(1L), tagC -> Sequence(1L)))
       }
       killSwitch.shutdown()
 
@@ -106,7 +106,7 @@ class SagaTagOffsetsSpec
       eventually(saga.handled should contain theSameElementsAs Seq("a2", "b2"))
       eventually {
         offsets.getOffset(saga.viewIdentifier).futureValue shouldBe
-        TagOffsets(Map(tagA -> Sequence(2L), tagB -> Sequence(2L)))
+          TagOffsets(Map(tagA -> Sequence(2L), tagB -> Sequence(2L)))
       }
       killSwitch.shutdown()
     }
@@ -158,7 +158,7 @@ class SagaTagOffsetsSpec
     private val handledEvents           = new ConcurrentLinkedQueue[String]()
     private val handlingAttempts        = new ConcurrentHashMap[String, AtomicInteger]()
 
-    def handled: Seq[String]          = handledEvents.asScala.toSeq
+    def handled: Seq[String]        = handledEvents.asScala.toSeq
     def attempts(text: String): Int = Option(handlingAttempts.get(text)).fold(0)(_.get)
 
     override def handleEvent(evt: Any): Future[Done] = {

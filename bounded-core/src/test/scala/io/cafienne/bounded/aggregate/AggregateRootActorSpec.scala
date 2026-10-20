@@ -19,7 +19,8 @@ class AggregateRootActorSpec
     extends TestKit(
       ActorSystem(
         "AggregateRootActorSpec",
-        PersistenceTestKitPlugin.config.withFallback(ConfigFactory.parseString("""
+        PersistenceTestKitPlugin.config
+          .withFallback(ConfigFactory.parseString("""
     pekko.actor.warn-about-java-serializer-usage = off
     pekko.coordinated-shutdown.terminate-actor-system = off
     pekko.coordinated-shutdown.run-by-actor-system-terminate = off

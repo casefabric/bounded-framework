@@ -28,29 +28,31 @@ private class LmdbOffsetStore(lmdbConfig: LmdbConfig) extends OffsetStore {
     .open(lmdbConfig.path, EnvFlags.MDB_NOSUBDIR)
   val dbi: Dbi[ByteBuffer] = env.openDbi(LmdbOffsetStore.DbName, DbiFlags.MDB_CREATE)
 
-  override def saveOffset(viewIdentifier: String, offset: Offset): Future[Unit] = Future.fromTry(Try {
-    val keyByteBuffer   = bytesBuffer(keyBytes(viewIdentifier))
-    val valueByteBuffer = bytesBuffer(OffsetCodec.encodeString(offset).getBytes(UTF_8))
-    val txn             = env.txnWrite()
-    try {
-      dbi.put(txn, keyByteBuffer, valueByteBuffer)
-      txn.commit()
-    } finally {
-      txn.close()
-    }
-  })
+  override def saveOffset(viewIdentifier: String, offset: Offset): Future[Unit] =
+    Future.fromTry(Try {
+      val keyByteBuffer   = bytesBuffer(keyBytes(viewIdentifier))
+      val valueByteBuffer = bytesBuffer(OffsetCodec.encodeString(offset).getBytes(UTF_8))
+      val txn             = env.txnWrite()
+      try {
+        dbi.put(txn, keyByteBuffer, valueByteBuffer)
+        txn.commit()
+      } finally {
+        txn.close()
+      }
+    })
 
-  override def getOffset(viewIdentifier: String): Future[Offset] = Future.fromTry(Try {
-    val keyByteBuffer = bytesBuffer(keyBytes(viewIdentifier))
-    val txn           = env.txnRead()
-    try {
-      val found = dbi.get(txn, keyByteBuffer)
-      if (found != null) OffsetCodec.decodeString(UTF_8.decode(txn.`val`()).toString)
-      else Offset.noOffset
-    } finally {
-      txn.close()
-    }
-  })
+  override def getOffset(viewIdentifier: String): Future[Offset] =
+    Future.fromTry(Try {
+      val keyByteBuffer = bytesBuffer(keyBytes(viewIdentifier))
+      val txn           = env.txnRead()
+      try {
+        val found = dbi.get(txn, keyByteBuffer)
+        if (found != null) OffsetCodec.decodeString(UTF_8.decode(txn.`val`()).toString)
+        else Offset.noOffset
+      } finally {
+        txn.close()
+      }
+    })
 
   // LMDB limits the key size (511 bytes by default)
   private def keyBytes(viewIdentifier: String): Array[Byte] = {

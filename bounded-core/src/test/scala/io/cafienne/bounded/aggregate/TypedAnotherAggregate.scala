@@ -44,8 +44,8 @@ object TypedAnotherAggregate {
       extends AnotherAggregateCommand
 
   // Event Type
-  sealed trait AnotherAggregateEvent                                       extends DomainEvent
-  final case class AnotherCreated(id: String, metaData: MetaData)               extends AnotherAggregateEvent
+  sealed trait AnotherAggregateEvent                                          extends DomainEvent
+  final case class AnotherCreated(id: String, metaData: MetaData)             extends AnotherAggregateEvent
   final case class AnotherAdded(id: String, metaData: MetaData, item: String) extends AnotherAggregateEvent
 
   // State Type

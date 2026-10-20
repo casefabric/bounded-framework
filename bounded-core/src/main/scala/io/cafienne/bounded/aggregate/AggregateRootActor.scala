@@ -152,7 +152,11 @@ trait AggregateRootActor[A <: AggregateState[A]]
       )
 
     case DeleteSnapshotsSuccess(criteria) =>
-      log.debug("Deleted snapshots up to sequence number {} for persistenceId {}", criteria.maxSequenceNr, persistenceId)
+      log.debug(
+        "Deleted snapshots up to sequence number {} for persistenceId {}",
+        criteria.maxSequenceNr,
+        persistenceId
+      )
 
     case DeleteSnapshotsFailure(criteria, cause) =>
       log.warning(

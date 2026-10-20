@@ -65,8 +65,9 @@ class EventMaterializerRestartSpec
     }
 
     "restart after a failing offset save and resume after the last handled event" in {
-      val tag          = storeSixEvents()
-      val materializer = new FlakyMaterializer(tag, failSave = (offset, attempt) => offset == Sequence(3L) && attempt == 1)
+      val tag = storeSixEvents()
+      val materializer =
+        new FlakyMaterializer(tag, failSave = (offset, attempt) => offset == Sequence(3L) && attempt == 1)
 
       val (killSwitch, _) = materializer.registerListenerWithKillSwitch(Some(NoOffset))
 
@@ -175,7 +176,7 @@ class EventMaterializerRestartSpec
     private val handlingAttempts          = new ConcurrentHashMap[String, AtomicInteger]()
     private val saveAttempts              = new ConcurrentHashMap[Offset, AtomicInteger]()
 
-    def handled: Seq[String]          = handledEvents.asScala.toSeq
+    def handled: Seq[String]        = handledEvents.asScala.toSeq
     def attempts(text: String): Int = Option(handlingAttempts.get(text)).fold(0)(_.get)
 
     override def handleEvent(evt: Any): Future[Done] = {

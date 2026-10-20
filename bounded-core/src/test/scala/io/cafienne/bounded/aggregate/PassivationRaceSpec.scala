@@ -103,7 +103,7 @@ object PassivationRaceSpec {
 
   final case class Slow(aggregateRootId: String) extends DomainCommand
 
-  sealed trait TypedCommand                                                    extends DomainCommand
+  sealed trait TypedCommand                                                      extends DomainCommand
   final case class TypedSlow(aggregateRootId: String, replyTo: ActorRef[String]) extends TypedCommand
   final case class TypedPing(aggregateRootId: String, replyTo: ActorRef[String]) extends TypedCommand
 
@@ -140,7 +140,8 @@ class PassivationRaceSpec
     extends TestKit(
       ActorSystem(
         "PassivationRaceSpec",
-        PersistenceTestKitPlugin.config.withFallback(ConfigFactory.parseString("""
+        PersistenceTestKitPlugin.config
+          .withFallback(ConfigFactory.parseString("""
     pekko.actor.warn-about-java-serializer-usage = off
     pekko.coordinated-shutdown.terminate-actor-system = off
     pekko.coordinated-shutdown.run-by-actor-system-terminate = off
@@ -165,8 +166,8 @@ class PassivationRaceSpec
   private def valid[T]: ValidateableCommand[T] = new ValidateableCommand[T] {
     override def validate(cmd: T): Future[T] = Future.successful(cmd)
   }
-  implicit val slowValidator: ValidateableCommand[Slow]           = valid
-  implicit val createValidator: ValidateableCommand[Create]       = valid
+  implicit val slowValidator: ValidateableCommand[Slow]          = valid
+  implicit val createValidator: ValidateableCommand[Create]      = valid
   implicit val typedValidator: ValidateableCommand[TypedCommand] = valid
 
   "RouterCommandGateway" should "hand a command that arrives while the aggregate passivates to a fresh actor" in {

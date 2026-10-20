@@ -64,7 +64,8 @@ class JdbcOffsetStoreSpec extends AnyFlatSpec with Matchers with ScalaFutures {
     store.saveOffset("view-names-2", Offset.sequence(3L)).futureValue
     store.saveOffset("view-names-3", Offset.timeBasedUUID(timeBasedUuid)).futureValue
 
-    val types = store.OffsetStore.filter(_.viewIdentifier.like("view-names-%")).sortBy(_.viewIdentifier).map(_.offsetType)
+    val types =
+      store.OffsetStore.filter(_.viewIdentifier.like("view-names-%")).sortBy(_.viewIdentifier).map(_.offsetType)
     store.dbConfig.db.run(types.result).futureValue shouldBe Seq("NoOffset", "Sequence", "TimeBasedUUID")
   }
 
