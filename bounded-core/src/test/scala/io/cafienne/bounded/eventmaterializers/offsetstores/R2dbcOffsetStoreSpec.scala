@@ -8,7 +8,6 @@ import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.persistence.query.{NoOffset, Offset}
 import org.apache.pekko.testkit.TestKit
 import com.typesafe.config.ConfigFactory
-import io.cafienne.bounded.eventmaterializers.ReadJournalOffsetStore
 import io.cafienne.bounded.pekko.ActorSystemProvider
 import io.cafienne.bounded.pekko.persistence.ReadJournalProvider
 import org.scalatest.BeforeAndAfterAll
@@ -86,17 +85,14 @@ class R2dbcOffsetStoreSpec extends AnyFlatSpec with Matchers with ScalaFutures w
     store.getOffset("view-clear-2").futureValue shouldBe NoOffset
   }
 
-  "A materializer on the Pekko R2DBC journal" should "get the R2DBC offset store, and a clear error for reading by tag" in {
+  "A materializer on the Pekko R2DBC journal" should "get a clear error for reading by tag" in {
     assume(dockerAvailable, "Docker is not available")
-    val provider = new ActorSystemProvider with ReadJournalProvider with ReadJournalOffsetStore {
+    val provider = new ActorSystemProvider with ReadJournalProvider {
       override implicit def system: ActorSystem = R2dbcOffsetStoreSpec.this.system
     }
 
     val error = the[UnsupportedOperationException] thrownBy provider.readJournal
     error.getMessage should include("does not support")
-    provider.store shouldBe an[R2dbcOffsetStore]
-    provider.saveOffset("view-provider", Offset.sequence(7L)).futureValue
-    provider.getOffset("view-provider").futureValue shouldBe Offset.sequence(7L)
   }
 
   override protected def afterAll(): Unit = {

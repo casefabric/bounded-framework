@@ -84,6 +84,19 @@ class SlowClassicAggregate(id: String) extends AggregateRootActor[ClassicSimpleA
     Some(ClassicSimpleAggregateState(List.empty))
 }
 
+/** An aggregate that is not an AggregateRootActor, so it does not know Passivate. */
+class PlainActorAggregate(id: String) extends org.apache.pekko.actor.Actor {
+  import ClassicSimpleAggregate._
+
+  override def preStart(): Unit = AggregateLifecycles.onStart(id)
+
+  override def postStop(): Unit = AggregateLifecycles.onStop(id)
+
+  def receive: Receive = {
+    case Create(aggregateRootId) => sender() ! Ok(Seq(Created(aggregateRootId)))
+  }
+}
+
 object PassivationRaceSpec {
   val IdleTime: FiniteDuration = 300.millis
   val BusyFor: FiniteDuration  = 800.millis
@@ -172,6 +185,23 @@ class PassivationRaceSpec
     createReply.futureValue shouldBe Ok(Seq(Created(aggregateId)))
     AggregateLifecycles.starts(aggregateId) shouldBe 2
     AggregateLifecycles.maxAlive(aggregateId) shouldBe 1
+  }
+
+  it should "stop an idle aggregate that is not an AggregateRootActor without waiting for the force stop" in {
+    val aggregateId = "plain-actor"
+    val creator = new AggregateRootCreator {
+      override def props(id: String): Props = Props(new PlainActorAggregate(id))
+    }
+    val gateway = new RouterCommandGateway(system, IdleTime, creator)
+
+    gateway.sendAndAsk(Create(aggregateId)).futureValue shouldBe Ok(Seq(Created(aggregateId)))
+    Thread.sleep((IdleTime * 3).toMillis)
+    AggregateLifecycles.starts(aggregateId) shouldBe 1
+    AggregateLifecycles.maxAlive(aggregateId) shouldBe 1
+
+    // the PoisonPill stopped it well within the force stop time, so the next command starts a fresh actor at once
+    gateway.sendAndAsk(Create(aggregateId)).futureValue shouldBe Ok(Seq(Created(aggregateId)))
+    AggregateLifecycles.starts(aggregateId) shouldBe 2
   }
 
   "DefaultTypedCommandGateway" should "answer a command that arrives while the aggregate stops from a fresh actor" in {

@@ -6,6 +6,7 @@ package io.cafienne.bounded.eventmaterializers.offsetstores
 
 import org.apache.pekko.persistence.query.{NoOffset, Offset}
 import com.typesafe.config.ConfigFactory
+import io.cafienne.bounded.eventmaterializers.TagOffsets
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
@@ -55,6 +56,22 @@ class JdbcOffsetStoreSpec extends AnyFlatSpec with Matchers with ScalaFutures {
     store.dbConfig.db.run(store.OffsetStore += (("view-legacy", "42", "Sequence"))).futureValue
 
     store.getOffset("view-legacy").futureValue shouldBe Offset.sequence(42L)
+  }
+
+  it should "write the type names that older versions read" in {
+    import store.dbConfig.profile.api._
+    store.saveOffset("view-names-1", NoOffset).futureValue
+    store.saveOffset("view-names-2", Offset.sequence(3L)).futureValue
+    store.saveOffset("view-names-3", Offset.timeBasedUUID(timeBasedUuid)).futureValue
+
+    val types = store.OffsetStore.filter(_.viewIdentifier.like("view-names-%")).sortBy(_.viewIdentifier).map(_.offsetType)
+    store.dbConfig.db.run(types.result).futureValue shouldBe Seq("NoOffset", "Sequence", "TimeBasedUUID")
+  }
+
+  it should "fail the save of an offset that does not fit the column" in {
+    val tooLong = TagOffsets((1 to 400).map(i => s"tag-with-a-long-name-$i" -> Offset.sequence(i.toLong)).toMap)
+
+    store.saveOffset("view-too-long", tooLong).failed.futureValue shouldBe an[IllegalArgumentException]
   }
 
   it should "clear the offset of one view and of all views" in {

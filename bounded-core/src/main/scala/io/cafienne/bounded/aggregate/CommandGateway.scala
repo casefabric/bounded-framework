@@ -4,7 +4,7 @@
 
 package io.cafienne.bounded.aggregate
 
-import org.apache.pekko.actor.{Actor, ActorRef, ActorSystem, Props, Timers}
+import org.apache.pekko.actor.{Actor, ActorRef, ActorSystem, PoisonPill, Props, Timers}
 import org.apache.pekko.event.{Logging, LoggingAdapter}
 import org.apache.pekko.routing.{NoRoutee, Routee, RoutingLogic}
 import org.apache.pekko.util.Timeout
@@ -18,9 +18,13 @@ trait CommandGateway {
 }
 
 /**
-  * Kept for compatibility: it now is a RouterCommandGateway that passivates aggregates after 6 idle minutes.
-  * It used to keep its aggregates in a map updated from several threads, which could start two actors for one
-  * aggregate, never stopped idle aggregates and kept routing to aggregates that had stopped.
+  * Kept so that existing code compiles: it now is a RouterCommandGateway that passivates aggregates after 6 idle
+  * minutes. It used to keep its aggregates in a map updated from several threads, which could start two actors for
+  * one aggregate, never stopped idle aggregates and kept routing to aggregates that had stopped.
+  *
+  * Breaking change in 0.4.0: its public `aggregateRootInstanceActors` map is removed. The aggregates are now
+  * children of the gateway's router actor and are not exposed; code that read the map to inspect live aggregates
+  * has no replacement.
   */
 @deprecated("Use RouterCommandGateway, which lets you choose the idle time of aggregates", "0.4.0")
 class DefaultCommandGateway[A <: AggregateRootCreator](system: ActorSystem, aggregateRootCreator: A)(
@@ -66,6 +70,9 @@ private class AggregateGatewayRouter[A <: AggregateRootCreator](aggregateRootCre
   import AggregateRoutingLogic._
   val routeeMap = collection.mutable.Map[String, ActorRef]()
 
+  // The aggregates that are an AggregateRootActor and so passivate on Passivate; any other one gets a PoisonPill.
+  private val passivating = collection.mutable.Set[ActorRef]()
+
   // Aggregates asked to passivate that have not stopped yet, with the commands for them that arrived since.
   private val stopping = collection.mutable.Map[String, Stopping]()
 
@@ -102,8 +109,10 @@ private class AggregateGatewayRouter[A <: AggregateRootCreator](aggregateRootCre
   private def ensureAggregateIsRunning(aggregateRootId: String): Unit = {
     routeeMap.getOrElseUpdate(
       aggregateRootId, {
-        val aggregate = context.actorOf(aggregateRootCreator.props(aggregateRootId))
+        val props     = aggregateRootCreator.props(aggregateRootId)
+        val aggregate = context.actorOf(props)
         context.watchWith(aggregate, AggregateTerminated(aggregateRootId, aggregate))
+        if (classOf[AggregateRootActor[_]].isAssignableFrom(props.actorClass())) passivating += aggregate
         aggregate
       }
     )
@@ -113,6 +122,7 @@ private class AggregateGatewayRouter[A <: AggregateRootCreator](aggregateRootCre
   /**
     * Passivates an idle aggregate. It stops after the commands it already has; commands that arrive before it
     * has stopped are buffered and handed to a fresh actor, so there are never two actors for one aggregate.
+    * An aggregate that is not an AggregateRootActor does not know Passivate and gets a PoisonPill instead.
     */
   private def stopAggregate(aggregateId: String): Unit = {
     routeeMap.get(aggregateId).foreach { actorRef =>
@@ -120,8 +130,8 @@ private class AggregateGatewayRouter[A <: AggregateRootCreator](aggregateRootCre
       router = router.removeRoutee(actorRef)
       routeeMap -= aggregateId
       stopping += aggregateId -> Stopping(actorRef, Vector.empty)
-      actorRef ! AggregateRootActor.Passivate
-      timers.startSingleTimer(s"force-stop-$aggregateId", ForceStop(aggregateId, actorRef), ForceStopAfter)
+      if (passivating.contains(actorRef)) actorRef ! AggregateRootActor.Passivate else actorRef ! PoisonPill
+      timers.startSingleTimer(ForceStopTimer(aggregateId), ForceStop(aggregateId, actorRef), ForceStopAfter)
     }
   }
 
@@ -130,9 +140,10 @@ private class AggregateGatewayRouter[A <: AggregateRootCreator](aggregateRootCre
     * the next command for it starts a fresh actor that recovers, and hand that actor the buffered commands.
     */
   private def removeTerminated(aggregateId: String, aggregate: ActorRef): Unit = {
+    passivating -= aggregate
     stopping.get(aggregateId) match {
       case Some(Stopping(stopped, buffered)) if stopped == aggregate =>
-        timers.cancel(s"force-stop-$aggregateId")
+        timers.cancel(ForceStopTimer(aggregateId))
         stopping -= aggregateId
         buffered.foreach { case (command, replyTo) => route(command, replyTo) }
       case _ if routeeMap.get(aggregateId).contains(aggregate) =>
@@ -162,8 +173,10 @@ object AggregateRoutingLogic {
   private[aggregate] final case class AggregateTerminated(aggregateId: String, aggregate: ActorRef)
       extends AggregateControl
   private[aggregate] final case class ForceStop(aggregateId: String, aggregate: ActorRef) extends AggregateControl
+  // Key of the force-stop timer; the idle timers are keyed by the aggregate id itself, so this cannot collide.
+  private[aggregate] final case class ForceStopTimer(aggregateId: String)
   private[aggregate] final case class Stopping(aggregate: ActorRef, buffered: Vector[(DomainCommand, ActorRef)])
 
-  // An aggregate that does not stop on Passivate (it is not an AggregateRootActor) is stopped after this time.
+  // An aggregate that has not stopped this long after it was asked to passivate is stopped.
   private[aggregate] val ForceStopAfter: FiniteDuration = 10.seconds
 }

@@ -41,6 +41,14 @@ class CassandraOffsetStoreSpec extends AnyFlatSpec with Matchers {
     CassandraOffsetStore.keyspace(config, "cassandra-journal") shouldBe "legacy"
   }
 
+  it should "keep the keyspace of the old top-level key over the one of the journal plugin" in {
+    val config = ConfigFactory
+      .parseString("""cassandra.journal.keyspace = "akka"""")
+      .withFallback(ConfigFactory.load())
+
+    CassandraOffsetStore.keyspace(config, pekkoJournalPlugin) shouldBe "akka"
+  }
+
   behavior of "CassandraOffsetStore statements"
 
   they should "all use the same keyspace" in {

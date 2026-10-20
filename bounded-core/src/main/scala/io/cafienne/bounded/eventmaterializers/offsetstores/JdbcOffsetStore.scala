@@ -26,13 +26,20 @@ object OffsetStoreExecutionContext {
 }
 // Use this execution context for IO instead of scala execution context.
 
+/**
+  * Offset store in the table `OFFSET`. Its `OFFSET` column is created as VARCHAR(4000), so the offsets of a saga
+  * over many tags fit. A table created by an older version keeps the column it has: on databases that give an
+  * unsized string column a bounded type (Oracle, SQL Server and Derby make it VARCHAR(254)), widen it by hand
+  * before running sagas with many or long tags. An offset that does not fit fails its save.
+  */
 class JdbcOffsetStore(val dbConfig: DatabaseConfig[JdbcProfile]) extends OffsetStore {
   import dbConfig.profile.api._
   import OffsetStoreExecutionContext.ioThreadPool
+  import JdbcOffsetStore._
 
   class OffsetTableRow(tag: Tag) extends Table[(String, String, String)](tag, "OFFSET") {
     def viewIdentifier: Rep[String]               = column[String]("VIEW_IDENTIFIER", O.PrimaryKey)
-    def offset: Rep[String]                       = column[String]("OFFSET")
+    def offset: Rep[String]                       = column[String]("OFFSET", O.Length(MaxOffsetLength))
     def offsetType: Rep[String]                   = column[String]("OFFSET_TYPE")
     def * : ProvenShape[(String, String, String)] = (viewIdentifier, offset, offsetType)
   }
@@ -45,7 +52,16 @@ class JdbcOffsetStore(val dbConfig: DatabaseConfig[JdbcProfile]) extends OffsetS
 
   override def saveOffset(viewIdentifier: String, offset: PersistenceOffset): Future[Unit] = {
     val encoded = OffsetCodec.encode(offset)
-    run(OffsetStore.insertOrUpdate((viewIdentifier, encoded.value, encoded.offsetType))).map(_ => ())
+    if (encoded.value.length > MaxOffsetLength) {
+      Future.failed(
+        new IllegalArgumentException(
+          s"Offset of $viewIdentifier is ${encoded.value.length} characters, the OFFSET column holds $MaxOffsetLength"
+        )
+      )
+    } else {
+      val offsetType = LegacyTypeNames.getOrElse(encoded.offsetType, encoded.offsetType)
+      run(OffsetStore.insertOrUpdate((viewIdentifier, encoded.value, offsetType))).map(_ => ())
+    }
   }
 
   override def getOffset(viewIdentifier: String): Future[PersistenceOffset] = {
@@ -63,6 +79,15 @@ class JdbcOffsetStore(val dbConfig: DatabaseConfig[JdbcProfile]) extends OffsetS
 }
 
 object JdbcOffsetStore {
+
+  val MaxOffsetLength = 4000
+
+  // The type names older versions wrote and read, kept so that they can read the offsets this version writes.
+  private val LegacyTypeNames = Map(
+    OffsetCodec.NoOffsetType -> "NoOffset",
+    OffsetCodec.SequenceType -> "Sequence",
+    OffsetCodec.UuidType     -> "TimeBasedUUID"
+  )
 
   val DatabaseConfigPath       = "bounded.eventmaterializers.jdbc-offsetstore.database-config"
   val LegacyDatabaseConfigPath = "pekko.persistence.offset.r2dbc.store"

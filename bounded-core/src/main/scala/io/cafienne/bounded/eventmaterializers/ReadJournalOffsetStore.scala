@@ -16,6 +16,11 @@ import slick.basic.DatabaseConfig
 import scala.concurrent.Future
 import scala.concurrent.duration._
 
+/**
+  * Keeps the offsets in the store that belongs to the configured journal. There is no branch for the R2DBC journal:
+  * it has no queries by tag, so `ReadJournalProvider` already fails the materializer before its store is made.
+  * `R2dbcOffsetStore` can be created directly.
+  */
 trait ReadJournalOffsetStore extends OffsetStore {
   this: ReadJournalProvider with ActorSystemProvider =>
 
@@ -33,8 +38,6 @@ trait ReadJournalOffsetStore extends OffsetStore {
       val levelDbDir = system.settings.config.getString("pekko.persistence.journal.leveldb.dir")
       val c          = ConfigFactory.empty().withValue("path", ConfigValueFactory.fromAnyRef(levelDbDir + "/lmdb_offsets"))
       LmdbOffsetStore(new LmdbConfig(c))
-    } else if (configuredJournal.endsWith("r2dbc.journal") || configuredJournal.endsWith("r2dbc-journal")) {
-      new R2dbcOffsetStore(system, R2dbcOffsetStore.connectionFactoryPath(system.settings.config))
     } else if (configuredJournal.endsWith("jdbc-journal")) {
       new JdbcOffsetStore(
         DatabaseConfig.forConfig(

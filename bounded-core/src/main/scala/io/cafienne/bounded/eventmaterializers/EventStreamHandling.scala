@@ -11,7 +11,7 @@ import org.apache.pekko.{Done, NotUsed}
 import org.apache.pekko.pattern.RetrySupport
 import org.apache.pekko.persistence.query.{EventEnvelope, Offset}
 import org.apache.pekko.stream.{KillSwitches, RestartSettings, UniqueKillSwitch}
-import org.apache.pekko.stream.scaladsl.{Keep, RestartSource, Sink, Source}
+import org.apache.pekko.stream.scaladsl.{Flow, Keep, RestartSource, Sink, Source}
 import com.typesafe.config.Config
 import com.typesafe.scalalogging.Logger
 import io.cafienne.bounded.aggregate.DomainEvent
@@ -25,9 +25,10 @@ import scala.concurrent.duration._
   * The event stream steps shared by the event materializers, for replay as well as live listening:
   * filtering the events, handling an event, saving its offset and publishing that it was processed.
   *
-  * A failing event stream is restarted with backoff and resumes after the last event that was handled (and,
-  * when offsets are kept, saved). Events are therefore handled at least once: after a restart a handler can
-  * see the event it failed on again, so handlers must be idempotent.
+  * A failing event stream is restarted with backoff and resumes after the last event that was handled. The
+  * saved offset can lag behind that (see `savePositions`). Events are therefore handled at least once: after a
+  * restart a handler can see the event it failed on again, and after a new start the events after the saved
+  * offset, so handlers must be idempotent.
   */
 private[eventmaterializers] trait EventStreamHandling extends ActorSystemProvider with OffsetStore {
 
@@ -66,19 +67,17 @@ private[eventmaterializers] trait EventStreamHandling extends ActorSystemProvide
     maybeStartOffset.getOrElse(Await.result(getOffset(viewIdentifier), 10.seconds))
 
   /**
-    * Handles one event, then saves the position after it when `keepOffset` is set and publishes an
-    * EventProcessed when `publish` is set. The position is saved only after the handler is done, and a
-    * failing handler or save fails the returned future. An event the filter rejects is not handled or
-    * published, but its position is saved, so a stretch of filtered events is not read again.
+    * Handles one event and publishes an EventProcessed when `publish` is set. A failing handler fails the
+    * returned future. An event the filter rejects is not handled or published, but its position is still
+    * returned, so that `savePositions` can save it and a stretch of filtered events is not read again.
     *
-    * @return the position after the event, once it is handled and saved
+    * @return the position after the event, once it is handled
     */
   protected def processEvent(
     event: PositionedEvent,
     filter: MaterializerEventFilter,
     handler: Any => Future[Done],
-    publish: Boolean,
-    keepOffset: Boolean
+    publish: Boolean
   ): Future[Offset] = {
     val eventEnvelope = event.envelope
     val evtOffset     = eventEnvelope.offset
@@ -89,10 +88,7 @@ private[eventmaterializers] trait EventStreamHandling extends ActorSystemProvide
     logger.debug(
       s"$matMappingName: Received event: $evt(offset: $evtOffset, persistenceId: $persistenceId, sequenceNo: $sequenceNo, filtered out: ${!accepted})"
     )
-    for {
-      _ <- if (accepted) handler(evt) else Future.successful(Done)
-      _ <- if (keepOffset) saveOffset(viewIdentifier, event.position) else Future.unit
-    } yield {
+    (if (accepted) handler(evt) else Future.successful(Done)).map { _ =>
       if (publish && accepted) {
         system.eventStream.publish(EventProcessed(materializerId, evtOffset, persistenceId, sequenceNo, evt))
       }
@@ -102,8 +98,24 @@ private[eventmaterializers] trait EventStreamHandling extends ActorSystemProvide
   }
 
   /**
+    * Saves the positions of handled events when `keepOffset` is set, one save at a time. While a save runs, the
+    * positions handled meanwhile are collapsed into the latest one, so handling does not wait for the offset store
+    * and a run of filtered events costs about one save. A position is saved only after its event is handled; on a
+    * stop, positions not saved yet are handled again after the next start (handlers are at-least-once anyway).
+    * A failing save fails the stream.
+    *
+    * @return the positions as they are saved
+    */
+  protected def savePositions(keepOffset: Boolean): Flow[Offset, Offset, NotUsed] =
+    if (!keepOffset) Flow[Offset]
+    else
+      Flow[Offset]
+        .conflate((_, latest) => latest)
+        .mapAsync(1)(position => saveOffset(viewIdentifier, position).map(_ => position))
+
+  /**
     * Handles the live events one by one until the stream is stopped with the kill switch. After a failure
-    * the stream restarts with backoff from the position after the last event handled (and saved) in this JVM.
+    * the stream restarts with backoff from the position after the last event handled in this JVM.
     *
     * @param events the live events after a given position
     * @param startOffset the position to start from
@@ -122,11 +134,12 @@ private[eventmaterializers] trait EventStreamHandling extends ActorSystemProvide
       .onFailuresWithBackoff(restartSettings) { () =>
         logger.debug(s"$viewIdentifier: listening for events after offset ${resumeFrom.get}")
         events(resumeFrom.get)
-          .mapAsync(1)(processEvent(_, filter, handleEvent, isPublishRequired, keepOffset))
-          .map { offset =>
+          // resumeFrom is set as soon as the event is handled, also when a failing save tears the stream down meanwhile
+          .mapAsync(1)(processEvent(_, filter, handleEvent, isPublishRequired).map { offset =>
             resumeFrom.set(offset)
             offset
-          }
+          })
+          .via(savePositions(keepOffset))
           .mapError {
             case e =>
               logger.warn(s"$viewIdentifier: event stream failed after offset ${resumeFrom.get}", e)
@@ -139,21 +152,22 @@ private[eventmaterializers] trait EventStreamHandling extends ActorSystemProvide
   }
 
   /**
-    * Retries a failing attempt with the backoff and the number of restarts of the restart settings.
+    * Retries a failing attempt with the backoff and the number of restarts of the restart settings. Settings
+    * that RestartSource accepts but RetrySupport does not are mapped: a negative max-restarts retries without a
+    * limit, like it restarts without one, and the backoff and random factor are brought into RetrySupport's range.
     */
   protected def retryWithBackoff[T](attempt: () => Future[T]): Future[T] = {
-    val settings = restartSettings
-    // RetrySupport counts the retries after the first attempt, which matches maxRestarts
+    val retry = EventStreamHandling.RetrySettings(restartSettings)
     RetrySupport.retry(
       () => {
         val result = attempt()
         result.failed.foreach(e => logger.warn(s"$viewIdentifier: event stream failed", e))
         result
       },
-      settings.maxRestarts,
-      settings.minBackoff,
-      settings.maxBackoff,
-      settings.randomFactor
+      retry.attempts,
+      retry.minBackoff,
+      retry.maxBackoff,
+      retry.randomFactor
     )(executionContext, system.scheduler)
   }
 }
@@ -176,6 +190,21 @@ private[eventmaterializers] object EventStreamHandling {
       duration(config, "max-backoff"),
       config.getDouble("random-factor")
     ).withMaxRestarts(config.getInt("max-restarts"), duration(config, "max-restarts-within"))
+
+  final case class RetrySettings(attempts: Int, minBackoff: FiniteDuration, maxBackoff: FiniteDuration, randomFactor: Double)
+
+  object RetrySettings {
+    // RetrySupport counts the retries after the first attempt, which matches maxRestarts
+    def apply(settings: RestartSettings): RetrySettings = {
+      val minBackoff = settings.minBackoff.max(1.millisecond)
+      RetrySettings(
+        if (settings.maxRestarts < 0) Int.MaxValue else settings.maxRestarts,
+        minBackoff,
+        settings.maxBackoff.max(minBackoff),
+        settings.randomFactor.max(0.0).min(1.0)
+      )
+    }
+  }
 
   private def duration(config: Config, path: String): FiniteDuration =
     FiniteDuration(config.getDuration(path).toNanos, TimeUnit.NANOSECONDS)

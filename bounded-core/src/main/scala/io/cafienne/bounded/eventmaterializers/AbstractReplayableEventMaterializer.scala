@@ -47,22 +47,19 @@ abstract class AbstractReplayableEventMaterializer(
     var eventsReplayed = 0
     journal
       .currentEventsByTag(tagName, targetOffset)
-      .runFoldAsync(targetOffset) { (_, eventEnvelope) =>
-        val processed = processEvent(
-          PositionedEvent(eventEnvelope),
-          materializerEventFilter,
-          handleReplayEvent,
-          publish = false,
-          keepOffset = withPartialReplay
-        )
-        processed map { offset =>
-          replayedUpTo.set(offset)
-          eventsReplayed += 1
-          if (eventsReplayed % 100 == 0) {
-            logger.info(s"$viewIdentifier: [$tagName] events replayed: $eventsReplayed")
-          }
-          offset
+      .mapAsync(1)(
+        eventEnvelope =>
+          processEvent(PositionedEvent(eventEnvelope), materializerEventFilter, handleReplayEvent, publish = false)
+      )
+      .map { offset =>
+        replayedUpTo.set(offset)
+        eventsReplayed += 1
+        if (eventsReplayed % 100 == 0) {
+          logger.info(s"$viewIdentifier: [$tagName] events replayed: $eventsReplayed")
         }
+        offset
       }
+      .via(savePositions(withPartialReplay))
+      .runFold(targetOffset)((_, offset) => offset)
   }
 }
