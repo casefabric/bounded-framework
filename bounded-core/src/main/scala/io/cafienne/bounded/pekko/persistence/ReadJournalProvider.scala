@@ -10,7 +10,6 @@ import org.apache.pekko.persistence.query.journal.leveldb.scaladsl.LeveldbReadJo
 import org.apache.pekko.persistence.query.scaladsl._
 import io.cafienne.bounded.pekko.ActorSystemProvider
 import org.apache.pekko.persistence.jdbc.query.scaladsl.JdbcReadJournal
-import org.apache.pekko.persistence.r2dbc.query.scaladsl.R2dbcReadJournal
 import io.github.alstanchev.pekko.persistence.inmemory.query.scaladsl.InMemoryReadJournal
 
 /**
@@ -34,12 +33,13 @@ trait ReadJournalProvider { systemProvider: ActorSystemProvider =>
       return PersistenceQuery(system)
         .readJournalFor[CassandraReadJournal](CassandraReadJournal.Identifier)
     }
-    if (configuredJournal.endsWith("r2dbc-journal")) {
-      return PersistenceQuery(system)
-        .readJournalFor[R2dbcReadJournal](R2dbcReadJournal.Identifier)
-        .asInstanceOf[
-          ReadJournal with CurrentPersistenceIdsQuery with CurrentEventsByPersistenceIdQuery with CurrentEventsByTagQuery with EventsByPersistenceIdQuery with EventsByTagQuery
-        ]
+    // The Pekko plugin is pekko.persistence.r2dbc.journal. Its read journal offers eventsBySlices but no
+    // queries by tag, which the event materializers are built on.
+    if (configuredJournal.endsWith("r2dbc.journal") || configuredJournal.endsWith("r2dbc-journal")) {
+      throw new UnsupportedOperationException(
+        s"Event materializers read events by tag, which the R2DBC journal $configuredJournal does not support " +
+          "(it only offers eventsBySlices)"
+      )
     }
     if (configuredJournal.endsWith("jdbc-journal")) {
       return PersistenceQuery(system)

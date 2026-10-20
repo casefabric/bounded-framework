@@ -4,7 +4,7 @@
 
 package io.cafienne.bounded.aggregate
 
-import org.apache.pekko.actor.{Actor, ActorRef, ActorSystem, Props, Terminated, Timers}
+import org.apache.pekko.actor.{Actor, ActorRef, ActorSystem, PoisonPill, Props, Timers}
 import org.apache.pekko.event.{Logging, LoggingAdapter}
 import org.apache.pekko.routing.{NoRoutee, Routee, RoutingLogic}
 import org.apache.pekko.util.Timeout
@@ -17,48 +17,20 @@ trait CommandGateway {
   def send[T <: DomainCommand](command: T)(implicit validator: ValidateableCommand[T]): Future[Unit]
 }
 
+/**
+  * Kept so that existing code compiles: it now is a RouterCommandGateway that passivates aggregates after 6 idle
+  * minutes. It used to keep its aggregates in a map updated from several threads, which could start two actors for
+  * one aggregate, never stopped idle aggregates and kept routing to aggregates that had stopped.
+  *
+  * Breaking change in 0.4.0: its public `aggregateRootInstanceActors` map is removed. The aggregates are now
+  * children of the gateway's router actor and are not exposed; code that read the map to inspect live aggregates
+  * has no replacement.
+  */
+@deprecated("Use RouterCommandGateway, which lets you choose the idle time of aggregates", "0.4.0")
 class DefaultCommandGateway[A <: AggregateRootCreator](system: ActorSystem, aggregateRootCreator: A)(
   implicit timeout: Timeout,
   ec: ExecutionContext
-) extends CommandGateway {
-  import org.apache.pekko.pattern.ask
-
-  implicit val actorSystem: ActorSystem = system
-  val logger: LoggingAdapter            = Logging(system, getClass)
-
-  //TODO normal Routee functionality + sleep of actors that were not used for a while
-  val aggregateRootInstanceActors =
-    collection.mutable.Map[String, ActorRef]()
-
-  private def getAggregateRoot(c: DomainCommand)(implicit system: ActorSystem): ActorRef = {
-    aggregateRootInstanceActors.getOrElseUpdate(
-      c.aggregateRootId,
-      system.actorOf(aggregateRootCreator.props(c.aggregateRootId))
-    )
-  }
-
-  override def sendAndAsk[T <: DomainCommand](command: T)(implicit validator: ValidateableCommand[T]): Future[_] = {
-//    getAggregateRoot(command).ask(command)
-    CommandValidator
-      .validate(command)
-      .flatMap(validatedCommand => {
-        val foundAr = getAggregateRoot(command)
-        logger.debug("sendAndAsk cmd {} to {} ", validatedCommand.getClass.getSimpleName, foundAr)
-        foundAr ? validatedCommand
-      })
-  }
-
-  override def send[T <: DomainCommand](command: T)(implicit validator: ValidateableCommand[T]): Future[Unit] = {
-    CommandValidator
-      .validate(command)
-      .map(validatedCommand => {
-        val foundAr = getAggregateRoot(command)
-        logger.debug("send cmd {} to {} ", validatedCommand.getClass.getSimpleName, foundAr)
-        foundAr ! validatedCommand
-      })
-  }
-
-}
+) extends RouterCommandGateway[A](system, 6.minutes, aggregateRootCreator)
 
 class RouterCommandGateway[A <: AggregateRootCreator](
   system: ActorSystem,
@@ -98,39 +70,88 @@ private class AggregateGatewayRouter[A <: AggregateRootCreator](aggregateRootCre
   import AggregateRoutingLogic._
   val routeeMap = collection.mutable.Map[String, ActorRef]()
 
+  // The aggregates that are an AggregateRootActor and so passivate on Passivate; any other one gets a PoisonPill.
+  private val passivating = collection.mutable.Set[ActorRef]()
+
+  // Aggregates asked to passivate that have not stopped yet, with the commands for them that arrived since.
+  private val stopping = collection.mutable.Map[String, Stopping]()
+
   val aggregateRouter = new AggregateRoutingLogic(routeeMap)
   var router          = Router(aggregateRouter, Vector.empty)
 
   def receive: Receive = {
+    case w: DomainCommand if stopping.contains(w.aggregateRootId) =>
+      context.system.log.debug("Buffer message {} until its aggregate has stopped", w)
+      val aggregateStopping = stopping(w.aggregateRootId)
+      stopping += w.aggregateRootId -> aggregateStopping.copy(buffered = aggregateStopping.buffered :+ (w -> sender()))
     case w: DomainCommand =>
       context.system.log.debug("Route message {}", w)
-      //Aggregate is created when it does not exist, required to ensure that it will be in the map used
-      //in the routing logic.
-      ensureAggregateIsRunning(w.aggregateRootId)
-      router.route(w, sender())
-    case Terminated(a) =>
-      context.system.log.debug("Received Terminated for {}", a)
+      route(w, sender())
+    case AggregateTerminated(aggregateId, aggregate) =>
+      context.system.log.debug("Received Terminated for {}", aggregate)
+      removeTerminated(aggregateId, aggregate)
     case StopAggregate(aggregateId) =>
       context.system.log.debug("Received StopAggregate for {}", aggregateId)
       stopAggregate(aggregateId)
+    case ForceStop(aggregateId, aggregate) =>
+      if (stopping.get(aggregateId).exists(_.aggregate == aggregate)) {
+        context.system.log.warning("Aggregate {} did not passivate within {}, stopping it", aggregateId, ForceStopAfter)
+        context.stop(aggregate)
+      }
+  }
+
+  // The aggregate is created when it does not exist, so that it is in the map used by the routing logic.
+  private def route(command: DomainCommand, replyTo: ActorRef): Unit = {
+    ensureAggregateIsRunning(command.aggregateRootId)
+    router.route(command, replyTo)
   }
 
   private def ensureAggregateIsRunning(aggregateRootId: String): Unit = {
-    val foundAggregate = routeeMap.getOrElseUpdate(
-      aggregateRootId,
-      context.actorOf(aggregateRootCreator.props(aggregateRootId))
+    routeeMap.getOrElseUpdate(
+      aggregateRootId, {
+        val props     = aggregateRootCreator.props(aggregateRootId)
+        val aggregate = context.actorOf(props)
+        context.watchWith(aggregate, AggregateTerminated(aggregateRootId, aggregate))
+        if (classOf[AggregateRootActor[_]].isAssignableFrom(props.actorClass())) passivating += aggregate
+        aggregate
+      }
     )
-    context.watch(foundAggregate)
     timers.startTimerWithFixedDelay(aggregateRootId, StopAggregate(aggregateRootId), idleTime)
   }
 
+  /**
+    * Passivates an idle aggregate. It stops after the commands it already has; commands that arrive before it
+    * has stopped are buffered and handed to a fresh actor, so there are never two actors for one aggregate.
+    * An aggregate that is not an AggregateRootActor does not know Passivate and gets a PoisonPill instead.
+    */
   private def stopAggregate(aggregateId: String): Unit = {
     routeeMap.get(aggregateId).foreach { actorRef =>
       timers.cancel(aggregateId)
       router = router.removeRoutee(actorRef)
-      context.stop(actorRef)
+      routeeMap -= aggregateId
+      stopping += aggregateId -> Stopping(actorRef, Vector.empty)
+      if (passivating.contains(actorRef)) actorRef ! AggregateRootActor.Passivate else actorRef ! PoisonPill
+      timers.startSingleTimer(ForceStopTimer(aggregateId), ForceStop(aggregateId, actorRef), ForceStopAfter)
     }
-    routeeMap.remove(aggregateId)
+  }
+
+  /**
+    * An aggregate stopped: after passivating, or by itself (e.g. a failed recovery or persist). Forget it, so
+    * the next command for it starts a fresh actor that recovers, and hand that actor the buffered commands.
+    */
+  private def removeTerminated(aggregateId: String, aggregate: ActorRef): Unit = {
+    passivating -= aggregate
+    stopping.get(aggregateId) match {
+      case Some(Stopping(stopped, buffered)) if stopped == aggregate =>
+        timers.cancel(ForceStopTimer(aggregateId))
+        stopping -= aggregateId
+        buffered.foreach { case (command, replyTo) => route(command, replyTo) }
+      case _ if routeeMap.get(aggregateId).contains(aggregate) =>
+        timers.cancel(aggregateId)
+        router = router.removeRoutee(aggregate)
+        routeeMap -= aggregateId
+      case _ => ()
+    }
   }
 }
 
@@ -140,7 +161,7 @@ private final class AggregateRoutingLogic(routeeMap: collection.mutable.Map[Stri
     message match {
       case msg: DomainCommand =>
         routeeMap.get(msg.aggregateRootId).fold[Routee](NoRoutee)(foundRef => ActorRefRoutee(foundRef))
-      case other =>
+      case _ =>
         NoRoutee
     }
   }
@@ -149,4 +170,13 @@ private final class AggregateRoutingLogic(routeeMap: collection.mutable.Map[Stri
 object AggregateRoutingLogic {
   trait AggregateControl
   final case class StopAggregate(aggregateId: String) extends AggregateControl
+  private[aggregate] final case class AggregateTerminated(aggregateId: String, aggregate: ActorRef)
+      extends AggregateControl
+  private[aggregate] final case class ForceStop(aggregateId: String, aggregate: ActorRef) extends AggregateControl
+  // Key of the force-stop timer; the idle timers are keyed by the aggregate id itself, so this cannot collide.
+  private[aggregate] final case class ForceStopTimer(aggregateId: String)
+  private[aggregate] final case class Stopping(aggregate: ActorRef, buffered: Vector[(DomainCommand, ActorRef)])
+
+  // An aggregate that has not stopped this long after it was asked to passivate is stopped.
+  private[aggregate] val ForceStopAfter: FiniteDuration = 10.seconds
 }

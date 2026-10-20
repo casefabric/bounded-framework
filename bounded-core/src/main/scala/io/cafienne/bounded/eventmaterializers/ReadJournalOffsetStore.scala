@@ -16,24 +16,21 @@ import slick.basic.DatabaseConfig
 import scala.concurrent.Future
 import scala.concurrent.duration._
 
+/**
+  * Keeps the offsets in the store that belongs to the configured journal. There is no branch for the R2DBC journal:
+  * it has no queries by tag, so `ReadJournalProvider` already fails the materializer before its store is made.
+  * `R2dbcOffsetStore` can be created directly.
+  */
 trait ReadJournalOffsetStore extends OffsetStore {
   this: ReadJournalProvider with ActorSystemProvider =>
 
   val store: OffsetStore = {
 
-    if (configuredJournal.endsWith("cassandra.journal")) {
-      val keyspace = system.settings.config.getString("cassandra.journal.keyspace")
+    if (configuredJournal.endsWith("cassandra.journal") || configuredJournal.endsWith("cassandra-journal")) {
       new CassandraOffsetStore(
         readJournal.asInstanceOf[CassandraReadJournal],
         cassandraCreateTableTimeout,
-        keyspace = keyspace
-      )
-    } else if (configuredJournal.endsWith("cassandra-journal")) {
-      val keyspace = system.settings.config.getString("cassandra-journal.keyspace")
-      new CassandraOffsetStore(
-        readJournal.asInstanceOf[CassandraReadJournal],
-        cassandraCreateTableTimeout,
-        keyspace = keyspace
+        keyspace = CassandraOffsetStore.keyspace(system.settings.config, configuredJournal)
       )
     } else if (configuredJournal.endsWith("inmemory-journal")) {
       new InMemoryBasedOffsetStore()
@@ -45,7 +42,7 @@ trait ReadJournalOffsetStore extends OffsetStore {
       new JdbcOffsetStore(
         DatabaseConfig.forConfig(
           config = system.settings.config,
-          path = system.settings.config.getString("pekko.persistence.offset.r2dbc.store")
+          path = JdbcOffsetStore.databaseConfigPath(system.settings.config, configuredJournal)
         )
       )
     } else {

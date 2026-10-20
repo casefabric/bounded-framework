@@ -21,10 +21,17 @@ import io.cafienne.bounded.aggregate.typed._
 
 import scala.concurrent.duration.Duration
 import org.apache.pekko.actor.typed.scaladsl.adapter._
-import org.apache.pekko.persistence.testkit.PersistenceTestKitPlugin
+import org.apache.pekko.persistence.testkit.{
+  JournalOperation,
+  PersistenceTestKitPlugin,
+  ProcessingPolicy,
+  ProcessingResult,
+  ProcessingSuccess
+}
 import org.apache.pekko.persistence.testkit.scaladsl.PersistenceTestKit
 
 import scala.collection.immutable
+import scala.concurrent.{Await, Promise}
 
 /**
   * Allows to test an aggregate root in isolation by creation of the aggregate root and the historic events in order
@@ -100,8 +107,6 @@ object TestableAggregateRoot {
   *       @see io.cafienne.bounded.aggregate.typed.TypedAggregateRootManager for more details
   * @param id The aggregate root ID that is used for testing
   * @param evt Seqence of events that need to be in the eventstore *before* the aggregate is started. Will trigger replay of the state for these events.
-  * @param persistenceIdSeparator Typed actors use a persistenceId that contains the typehint and the id of the actor seperated by a
-  *                               seperator. Default is use in Lagom, scaladsl.PersistentEntity
   * @param system actor system to use for the tests
   * @param timeout call timeout
   * @param ctag Classtag
@@ -112,8 +117,7 @@ object TestableAggregateRoot {
 class TestableAggregateRoot[A <: DomainCommand, B <: DomainEvent, C: ClassTag] private (
   manager: TypedAggregateRootManager[A],
   id: String,
-  evt: immutable.Seq[B],
-  persistenceIdSeparator: String = "|"
+  evt: immutable.Seq[B]
 )(
   implicit timeout: Timeout,
   ctag: reflect.ClassTag[A]
@@ -138,7 +142,26 @@ class TestableAggregateRoot[A <: DomainCommand, B <: DomainEvent, C: ClassTag] p
 
   import TestableAggregateRoot.testId
   private final val arTestId = testId(id)
-  if (evt != null && evt.nonEmpty) persistenceTestKit.persistForRecovery(arTestId, evt)
+  private val persistenceId  = recoveredPersistenceId()
+  if (evt != null && evt.nonEmpty) persistenceTestKit.persistForRecovery(persistenceId, evt)
+
+  // The behavior picks its own persistence id (PersistenceId(typeName, id), PersistenceId.ofUniqueId(id), ...). Run
+  // it once on the still empty journal and take the persistence id that it recovers from.
+  private def recoveredPersistenceId(): String = {
+    val recovered = Promise[String]()
+    persistenceTestKit.withPolicy(new ProcessingPolicy[JournalOperation] {
+      override def tryProcess(persistenceId: String, processingUnit: JournalOperation): ProcessingResult = {
+        recovered.trySuccess(persistenceId)
+        ProcessingSuccess
+      }
+    })
+    val instance = testKit.spawn(manager.behavior(arTestId), s"persistence-id-$arTestId")
+    try Await.result(recovered.future, timeout.duration)
+    finally {
+      testKit.stop(instance, timeout.duration)
+      persistenceTestKit.resetPolicy()
+    }
+  }
 
   def supervise: Behavior[A] =
     Behaviors.supervise(handler).onFailure(SupervisorStrategy.stop)
@@ -193,7 +216,7 @@ class TestableAggregateRoot[A <: DomainCommand, B <: DomainEvent, C: ClassTag] p
   def events: List[DomainEvent] = {
     if (lastCommand.isEmpty) throw NoCommandsIssued
     val unwanted = givenEvents.toSet
-    persistenceTestKit.persistedInStorage(arTestId).map(_.asInstanceOf[B]).toList.filterNot(unwanted)
+    persistenceTestKit.persistedInStorage(persistenceId).map(_.asInstanceOf[B]).toList.filterNot(unwanted)
   }
 
   /** Last known command handling failure */

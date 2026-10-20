@@ -13,9 +13,9 @@ final case class EventNumber(value: Int) //extends Offset
 
 trait OffsetStore {
 
-  def saveOffset(viewIdentifier: String, offset: Offset): Future[Unit] = ???
+  def saveOffset(viewIdentifier: String, offset: Offset): Future[Unit]
 
-  def getOffset(viewIdentifier: String): Future[Offset] = ???
+  def getOffset(viewIdentifier: String): Future[Offset]
 
   def clear(): Future[Done] = {
     throw new IllegalStateException("Operation clear is not implemented for this OffsetStore")

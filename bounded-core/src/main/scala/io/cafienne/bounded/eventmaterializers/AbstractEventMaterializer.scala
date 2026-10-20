@@ -5,20 +5,15 @@
 package io.cafienne.bounded.eventmaterializers
 
 import java.util.UUID
-import org.apache.pekko.{Done, NotUsed}
+import org.apache.pekko.Done
 import org.apache.pekko.actor.ActorSystem
-import org.apache.pekko.persistence.query.{EventEnvelope, Offset}
-import org.apache.pekko.stream.{KillSwitches, UniqueKillSwitch}
-import org.apache.pekko.stream.scaladsl.{Keep, Sink, Source}
-import io.cafienne.bounded.pekko.ActorSystemProvider
+import org.apache.pekko.persistence.query.Offset
+import org.apache.pekko.stream.UniqueKillSwitch
 import io.cafienne.bounded.pekko.persistence.ReadJournalProvider
 import io.cafienne.bounded.config.Configured
 import com.typesafe.scalalogging.Logger
-import io.cafienne.bounded.aggregate.DomainEvent
-import io.cafienne.bounded.eventmaterializers.offsetstores.OffsetStore
 
-import scala.concurrent.{Await, ExecutionContextExecutor, Future}
-import scala.concurrent.duration._
+import scala.concurrent.{ExecutionContextExecutor, Future}
 
 /**
   * Abstract class to be used to create eventlisteners. Use this class as a base for listening for
@@ -37,9 +32,8 @@ abstract class AbstractEventMaterializer(
   actorSystem: ActorSystem,
   keepCurrentOffset: Boolean = true,
   materialzerEventFilter: MaterializerEventFilter = NoFilterEventFilter
-) extends ActorSystemProvider
+) extends EventStreamHandling
     with ReadJournalProvider
-    with OffsetStore
     with Resumable
     with ExceptionWriter
     with Configured {
@@ -70,7 +64,8 @@ abstract class AbstractEventMaterializer(
   def viewIdentifier: String = matMappingName
 
   /**
-    * Handle new incoming event
+    * Handle new incoming event. After a failure the event stream restarts from the last handled event, so an
+    * event can be handled more than once: make the handler idempotent.
     *
     * @param evt event
     */
@@ -85,43 +80,21 @@ abstract class AbstractEventMaterializer(
 
   /**
     * Register listener for events. Should be registered *after* replay is finished
-    * @return Future
+    * @return Future that completes when the listener is stopped, and fails when its restarts are used up
     */
   override def registerListener(maybeStartOffset: Option[Offset]): Future[Done] = {
     val (_, offsetFuture) = registerListenerWithKillSwitch(maybeStartOffset)
-    offsetFuture.mapTo[Done]
+    offsetFuture.map(_ => Done)
   }
 
   def registerListenerWithKillSwitch(maybeStartOffset: Option[Offset]): (UniqueKillSwitch, Future[Offset]) = {
     logger.info(s"Registering listener with killswitch $viewIdentifier")
 
-    val listenStartOffset = maybeStartOffset.getOrElse(Await.result(getOffset(viewIdentifier), 10.seconds))
-    val source: Source[EventEnvelope, NotUsed] =
-      journal
-        .eventsByTag(tagName, listenStartOffset)
-        .filter(eventEnvelope => materialzerEventFilter.filter(eventEnvelope.event.asInstanceOf[DomainEvent]))
-    val lastSnk = Sink.last[Offset]
-    val answer = source
-      .mapAsync(1) {
-        case EventEnvelope(evtOffset, persistenceId, sequenceNo, evt) =>
-          logger.debug(
-            s"$matMappingName: runStream: Received event: $evt(offset: $evtOffset, persistenceId: $persistenceId, sequenceNo: $sequenceNo)"
-          )
-          handleEvent(evt) map { _ =>
-            if (isPublishRequired) {
-              system.eventStream.publish(EventProcessed(materializerId, evtOffset, persistenceId, sequenceNo, evt))
-            }
-
-            if (keepCurrentOffset) {
-              saveOffset(viewIdentifier, evtOffset)
-            }
-            logger.debug(s"$matMappingName: runStream: Completed processing of event: $evt")
-            evtOffset
-          }
-      }
-      .viaMat(KillSwitches.single)(Keep.right)
-      .toMat(lastSnk)(Keep.both)
-
-    answer.run()
+    runListener(
+      offset => journal.eventsByTag(tagName, offset).map(PositionedEvent(_)),
+      listenStartOffset(maybeStartOffset),
+      keepCurrentOffset,
+      materialzerEventFilter
+    )
   }
 }

@@ -8,14 +8,13 @@ import java.io.File
 import java.nio.{Buffer, ByteBuffer}
 import java.nio.ByteBuffer.allocateDirect
 import java.nio.charset.StandardCharsets.UTF_8
-import java.util.UUID
-
-import org.apache.pekko.persistence.query.{Offset, Sequence, TimeBasedUUID}
+import org.apache.pekko.persistence.query.Offset
 import com.typesafe.config.Config
 import org.lmdbjava.{Dbi, DbiFlags, Env, EnvFlags}
 import org.slf4j.LoggerFactory
 
 import scala.concurrent.Future
+import scala.util.Try
 
 private class LmdbOffsetStore(lmdbConfig: LmdbConfig) extends OffsetStore {
 
@@ -29,56 +28,48 @@ private class LmdbOffsetStore(lmdbConfig: LmdbConfig) extends OffsetStore {
     .open(lmdbConfig.path, EnvFlags.MDB_NOSUBDIR)
   val dbi: Dbi[ByteBuffer] = env.openDbi(LmdbOffsetStore.DbName, DbiFlags.MDB_CREATE)
 
-  override def saveOffset(viewIdentifier: String, offset: Offset): Future[Unit] = {
-    val txn = env.txnWrite()
-    try {
-      val keyByteBuffer = allocateDirect(100)
-      keyByteBuffer.put(viewIdentifier.getBytes(UTF_8)).asInstanceOf[Buffer].flip
-
-      val valueByteBuffer = allocateDirect(300)
-      valueByteBuffer.put(offset2String(offset).getBytes(UTF_8)).asInstanceOf[Buffer].flip()
-      dbi.put(txn, keyByteBuffer, valueByteBuffer)
-      txn.commit()
-    } finally {
-      txn.close()
-    }
-    Future.successful(())
-  }
-
-  override def getOffset(viewIdentifier: String): Future[Offset] = {
-    val txn = env.txnRead()
-    try {
-      val keyByteBuffer = allocateDirect(100)
-      keyByteBuffer.put(viewIdentifier.getBytes(UTF_8)).asInstanceOf[Buffer].flip
-      val found = dbi.get(txn, keyByteBuffer)
-      if (found != null) {
-        val fetchedVal  = txn.`val`()
-        val offsetValue = UTF_8.decode(fetchedVal).toString()
-        val offset      = string2offset(offsetValue)
-        Future.successful(offset)
-      } else {
-        Future.successful(Offset.noOffset)
+  override def saveOffset(viewIdentifier: String, offset: Offset): Future[Unit] =
+    Future.fromTry(Try {
+      val keyByteBuffer   = bytesBuffer(keyBytes(viewIdentifier))
+      val valueByteBuffer = bytesBuffer(OffsetCodec.encodeString(offset).getBytes(UTF_8))
+      val txn             = env.txnWrite()
+      try {
+        dbi.put(txn, keyByteBuffer, valueByteBuffer)
+        txn.commit()
+      } finally {
+        txn.close()
       }
-    } finally {
-      txn.close()
+    })
+
+  override def getOffset(viewIdentifier: String): Future[Offset] =
+    Future.fromTry(Try {
+      val keyByteBuffer = bytesBuffer(keyBytes(viewIdentifier))
+      val txn           = env.txnRead()
+      try {
+        val found = dbi.get(txn, keyByteBuffer)
+        if (found != null) OffsetCodec.decodeString(UTF_8.decode(txn.`val`()).toString)
+        else Offset.noOffset
+      } finally {
+        txn.close()
+      }
+    })
+
+  // LMDB limits the key size (511 bytes by default)
+  private def keyBytes(viewIdentifier: String): Array[Byte] = {
+    val bytes = viewIdentifier.getBytes(UTF_8)
+    if (bytes.length > env.getMaxKeySize) {
+      throw new IllegalArgumentException(
+        s"View identifier [$viewIdentifier] is ${bytes.length} bytes, the LMDB offset store allows ${env.getMaxKeySize}"
+      )
     }
+    bytes
   }
 
-  private def offset2String(offset: Offset): String = offset match {
-    case o: Sequence      => "sequence" + ":" + o.value.toString
-    case o: TimeBasedUUID => "uuid" + ":" + o.value.toString
+  private def bytesBuffer(bytes: Array[Byte]): ByteBuffer = {
+    val buffer = allocateDirect(bytes.length)
+    buffer.put(bytes).asInstanceOf[Buffer].flip()
+    buffer
   }
-
-  private def string2offset(offset: String): Offset = {
-    val parts      = offset.split(":")
-    val offsetType = parts(0)
-    val offsetVal  = parts(1)
-    offsetType match {
-      case "uuid"     => Offset.timeBasedUUID(UUID.fromString(offsetVal))
-      case "sequence" => Offset.sequence(offsetVal.toLong)
-    }
-  }
-
 }
 
 class LmdbConfig(config: Config) {
@@ -89,14 +80,17 @@ class LmdbConfig(config: Config) {
 
 object LmdbOffsetStore {
 
-  private val DbSize = 1024 * 100
+  // Upper bound of the memory map, not allocated up front. LMDB writes copy-on-write pages, so a
+  // small map (it used to be 100 KB) fills up after a few saves.
+  private val DbSize = 16L * 1024 * 1024
   private val DbName = "offsets"
 
   private var store: Option[LmdbOffsetStore] = None
 
   private val logger = LoggerFactory.getLogger("LmdbOffsetStore Singleton")
 
-  def apply(lmdbConfig: LmdbConfig): OffsetStore = {
+  // Synchronized: only one LMDB environment may be open for the file in this process.
+  def apply(lmdbConfig: LmdbConfig): OffsetStore = synchronized {
     if (store.isEmpty) {
       if (!lmdbConfig.path.exists()) {
         val parentFolder = new File(lmdbConfig.path.getParent)

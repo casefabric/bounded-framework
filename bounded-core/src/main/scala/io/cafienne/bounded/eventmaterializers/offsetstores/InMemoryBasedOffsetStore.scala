@@ -7,6 +7,7 @@ package io.cafienne.bounded.eventmaterializers.offsetstores
 import org.apache.pekko.Done
 import org.apache.pekko.persistence.query.Offset
 
+import scala.collection.concurrent.TrieMap
 import scala.concurrent.Future
 
 /**
@@ -14,9 +15,8 @@ import scala.concurrent.Future
   */
 class InMemoryBasedOffsetStore extends OffsetStore {
 
-  import scala.collection.mutable.Map
-
-  val store: Map[String, Offset] = Map.empty
+  // Thread-safe: OffsetStoreProvider shares one instance between all materializers.
+  val store: TrieMap[String, Offset] = TrieMap.empty
 
   override def saveOffset(viewIdentifier: String, offset: Offset): Future[Unit] = {
     store += ((viewIdentifier, offset))

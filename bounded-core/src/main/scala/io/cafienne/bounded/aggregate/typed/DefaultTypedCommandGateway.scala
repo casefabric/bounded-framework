@@ -5,11 +5,17 @@
 package io.cafienne.bounded.aggregate.typed
 
 import org.apache.pekko.actor.typed.{ActorRef, ActorSystem, Behavior, PostStop, Scheduler, Terminated}
-import org.apache.pekko.actor.typed.scaladsl.{Behaviors, TimerScheduler}
+import org.apache.pekko.actor.typed.scaladsl.{ActorContext, Behaviors, TimerScheduler}
+import org.apache.pekko.pattern.StatusReply
 import org.apache.pekko.util.Timeout
 import io.cafienne.bounded.aggregate.{CommandValidator, DomainCommand, ValidateableCommand}
+
+import java.net.URLEncoder
+import java.nio.charset.StandardCharsets
+import java.util.concurrent.atomic.AtomicInteger
 import scala.concurrent.duration._
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.{ExecutionContext, Future, Promise}
+import scala.util.{Failure, Success, Try}
 
 trait TypedCommandGateway[T <: DomainCommand] {
   def ask[Res](aggregateRootId: String, replyTo: ActorRef[Res] => T)(
@@ -47,37 +53,70 @@ class DefaultTypedCommandGateway[Cmd <: DomainCommand](
   object CommandGatewayGuardian {
 
     sealed trait AggregateControl
-    final case class SpawnAggregate(aggregateId: String, replyTo: ActorRef[ActorRef[Cmd]]) extends AggregateControl
-    final case class StopAggregate(aggregateId: String)                                    extends AggregateControl
-    private case class AggregateTerminated(aggregateId: String)                            extends AggregateControl
-    final case object GracefulShutdown                                                     extends AggregateControl
+    final case class SpawnAggregate(aggregateId: String, replyTo: ActorRef[StatusReply[ActorRef[Cmd]]])
+        extends AggregateControl
+    final case class StopAggregate(aggregateId: String)         extends AggregateControl
+    private case class AggregateTerminated(aggregateId: String) extends AggregateControl
+    final case object GracefulShutdown                          extends AggregateControl
 
     val aggregates = collection.mutable.Map[String, ActorRef[Cmd]]()
+
+    // Completed when the guardian has stopped, which is after all its aggregates have stopped.
+    val stopped: Promise[Unit] = Promise()
+
+    // Aggregates being stopped, with the spawn requests for them that arrived since. Those requests are
+    // answered with a fresh actor once the old one has stopped, instead of with the stopping one.
+    private val stopping = collection.mutable.Map[String, Vector[ActorRef[StatusReply[ActorRef[Cmd]]]]]()
 
     def apply(): Behavior[AggregateControl] =
       Behaviors
         .setup[AggregateControl] { context => Behaviors.withTimers { timers => behaviors(timers) } }
 
+    // A failure to create the aggregate fails only the request for it: thrown here, it would stop the guardian and
+    // with it every aggregate of this gateway.
+    private def findOrCreate(
+      context: ActorContext[AggregateControl],
+      timers: TimerScheduler[AggregateControl],
+      aggregateId: String
+    ): StatusReply[ActorRef[Cmd]] = {
+      val created = aggregates.get(aggregateId).map(Success(_)).getOrElse {
+        Try(
+          context.spawn(aggregateRootCreator.behavior(aggregateId), DefaultTypedCommandGateway.actorName(aggregateId))
+        ).map { ref =>
+            context.watchWith(ref, AggregateTerminated(aggregateId))
+            aggregates += aggregateId -> ref
+            ref
+          }
+      }
+      created match {
+        case Success(ref) =>
+          // Note that the timer will be overwritten, so the last message sent will set the timer.
+          timers.startTimerWithFixedDelay(aggregateId, StopAggregate(aggregateId), aggregateMayIdleFor)
+          StatusReply.success(ref)
+        case Failure(cause) =>
+          context.log.error(s"Cannot create aggregate $aggregateId", cause)
+          StatusReply.error(cause)
+      }
+    }
+
     def behaviors(timers: TimerScheduler[AggregateControl]): Behavior[CommandGatewayGuardian.AggregateControl] =
       Behaviors
         .receive[AggregateControl] { (context, message) =>
           message match {
+            case SpawnAggregate(aggregateId, replyTo) if stopping.contains(aggregateId) =>
+              context.log.debug("Aggregate {} is stopping, it is created again once it has stopped", aggregateId)
+              stopping += aggregateId -> (stopping(aggregateId) :+ replyTo)
+              Behaviors.same
             case SpawnAggregate(aggregateId, replyTo) =>
               context.log.debug("Find or create aggregate {}", aggregateId)
-              val ref = aggregates.getOrElseUpdate(
-                aggregateId, {
-                  val ref = context.spawn(aggregateRootCreator.behavior(aggregateId), name = aggregateId)
-                  context.watchWith(ref, AggregateTerminated(aggregateId))
-                  ref
-                }
-              )
-              // Note that the timer will be overwritten, so the last message sent will set the timer.
-              timers.startTimerWithFixedDelay(aggregateId, StopAggregate(aggregateId), aggregateMayIdleFor)
-              replyTo ! ref
+              replyTo ! findOrCreate(context, timers, aggregateId)
               Behaviors.same
             case StopAggregate(aggregateId) =>
               context.log.debug("Aggregate {} needs to stop", aggregateId)
-              aggregates.get(aggregateId).foreach(aggregateActorRef => context.stop(aggregateActorRef))
+              aggregates.get(aggregateId).filterNot(_ => stopping.contains(aggregateId)).foreach { aggregateActorRef =>
+                stopping += aggregateId -> Vector.empty
+                context.stop(aggregateActorRef)
+              }
               Behaviors.same
             case GracefulShutdown =>
               context.log.info("Initiating graceful shutdown...")
@@ -87,12 +126,17 @@ class DefaultTypedCommandGateway[Cmd <: DomainCommand](
               context.log.debug("Aggregate {} terminated", aggregateId)
               timers.cancel(aggregateId)
               aggregates.-=(aggregateId)
+              stopping.remove(aggregateId).filter(_.nonEmpty).foreach { waiting =>
+                val reply = findOrCreate(context, timers, aggregateId)
+                waiting.foreach(_ ! reply)
+              }
               Behaviors.same
           }
         }
         .receiveSignal {
           case (context, PostStop) =>
             context.log.info("Typed Command Gateway Guardian stopped")
+            stopped.trySuccess(())
             Behaviors.same
           case (context, Terminated(ref)) =>
             context.log.debug("Terminated actor with ref {}", ref)
@@ -101,16 +145,31 @@ class DefaultTypedCommandGateway[Cmd <: DomainCommand](
   }
 
   val gateway =
-    system.systemActorOf(CommandGatewayGuardian(), "typedcommandgateway-" + aggregateRootCreator.getClass.getSimpleName)
+    system.systemActorOf(
+      CommandGatewayGuardian(),
+      s"typedcommandgateway-${aggregateRootCreator.getClass.getSimpleName}-${DefaultTypedCommandGateway.nextGatewayNumber()}"
+    )
 
   override def ask[Res](aggregateRootId: String, replyTo: ActorRef[Res] => Cmd)(
     implicit validator: ValidateableCommand[Cmd]
   ): Future[Res] = {
-    //TODO validation is only possible when the replyTo function is executed and that is in the ask.
-    //How to validate the command ?
-    spawnAggregateRoot(aggregateRootId).flatMap(ar => {
-      ar.ask[Res](replyTo)
-    })
+    // The command can only be built with the reply ref of an ask, and validation is asynchronous, so it cannot run
+    // inside the ask. The ask is made on the ignore ref just to get a reply ref: the reply to the command, sent
+    // after validation, completes it.
+    var command: Option[Cmd] = None
+    val response = system.ignoreRef[ActorRef[Res]].ask[Res] { replyRef =>
+      command = Some(replyTo(replyRef))
+      replyRef
+    }
+    command match {
+      case Some(cmd) =>
+        CommandValidator
+          .validate(cmd)
+          .flatMap(validatedCommand => spawnAggregateRoot(aggregateRootId).map(_ ! validatedCommand))
+          .flatMap(_ => response)
+      case None =>
+        Future.failed(new IllegalStateException(s"No command built for aggregate $aggregateRootId"))
+    }
   }
 
   override def tell(command: Cmd)(implicit validator: ValidateableCommand[Cmd]): Future[_] = {
@@ -122,12 +181,27 @@ class DefaultTypedCommandGateway[Cmd <: DomainCommand](
   }
 
   private def spawnAggregateRoot(aggregateRootId: String): Future[ActorRef[Cmd]] = {
-    gateway.ask(CommandGatewayGuardian.SpawnAggregate(aggregateRootId, _))
+    gateway.askWithStatus(CommandGatewayGuardian.SpawnAggregate(aggregateRootId, _))
   }
 
+  /**
+    * Stops the gateway and its aggregates. The future completes when they have stopped.
+    */
   def shutdown(): Future[Unit] = {
     gateway ! CommandGatewayGuardian.GracefulShutdown
-    Future.successful((): Unit)
+    CommandGatewayGuardian.stopped.future
   }
 
+}
+
+object DefaultTypedCommandGateway {
+  private val gatewayCount = new AtomicInteger()
+
+  // Gateways for the same manager class get their own guardian name.
+  private def nextGatewayNumber(): Int = gatewayCount.incrementAndGet()
+
+  // An aggregate id can hold characters that are not allowed in an actor name, such as '/' or a space, or start with
+  // '$'; URL encoding gives every id its own valid name.
+  private[bounded] def actorName(aggregateId: String): String =
+    URLEncoder.encode(aggregateId, StandardCharsets.UTF_8)
 }

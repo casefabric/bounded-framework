@@ -130,13 +130,14 @@ object TypedSimpleAggregate {
 
 import io.cafienne.bounded.test.typed.TypedSimpleAggregate._
 
-class SimpleAggregateManager() extends TypedAggregateRootManager[SimpleAggregateCommand] {
+class SimpleAggregateManager(persistenceIdFor: String => PersistenceId = PersistenceId.ofUniqueId)
+    extends TypedAggregateRootManager[SimpleAggregateCommand] {
   import TypedSimpleAggregate._
   final val logger = Logger(this.getClass.getSimpleName)
 
   override def behavior(id: String): Behavior[SimpleAggregateCommand] = {
     logger.debug("Create aggregate behavior for {}", id)
-    val persistenceId = PersistenceId.ofUniqueId(id)
+    val persistenceId = persistenceIdFor(id)
     Behaviors.withTimers { timers =>
       EventSourcedBehavior
         .withEnforcedReplies(

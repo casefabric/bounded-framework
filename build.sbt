@@ -109,7 +109,13 @@ val boundedCore = (project in file("bounded-core"))
     buildInfoOptions += BuildInfoOption.ToMap,
     buildInfoPackage := "io.cafienne.bounded",
     buildInfoObject := "BuildInfo",
-    libraryDependencies ++= Dependencies.baseDeps ++ Dependencies.persistenceLevelDBDeps ++ Dependencies.persistenceInMemoryDeps ++ Dependencies.persistenceCassandraDeps ++ Dependencies.persistenceJdbcDeps ++ Dependencies.testDeps,
+    libraryDependencies ++= Dependencies.baseDeps ++ Dependencies.persistenceLevelDBDeps ++ Dependencies.persistenceInMemoryDeps ++ Dependencies.persistenceCassandraDeps ++ Dependencies.persistenceJdbcDeps ++ Dependencies.testDeps ++ Dependencies.offsetStoreTestDeps,
+    // lmdbjava (LmdbOffsetStore) needs these opens on Java 17+, so the tests run in a forked JVM that has them
+    Test / fork := true,
+    Test / javaOptions ++= Seq(
+      "--add-opens=java.base/java.nio=ALL-UNNAMED",
+      "--add-opens=java.base/sun.nio.ch=ALL-UNNAMED"
+    ),
   )
 
 val boundedPekkoHttp = (project in file("bounded-pekko-http"))

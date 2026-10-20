@@ -1,72 +1,73 @@
 ## Domain driven design framework for Scala and Pekko
 
 Bounded is a framework that supports the Domain Driven Design approach. It enables you to leverage Scala and Apache Pekko technologies in a way that gives you a structured DDD based application.
-[![Maintainability Rating](https://sonarcloud.io/api/project_badges/measure?project=cafienne_bounded-framework&metric=sqale_rating)](https://sonarcloud.io/summary/new_code?id=cafienne_bounded-framework)
-
+[![Reliability Rating](https://sonarcloud.io/api/project_badges/measure?project=casefabric_bounded-framework&metric=reliability_rating)](https://sonarcloud.io/summary/new_code?id=casefabric_bounded-framework)
 
 ```scala
-class Cargo(cargoId: AggregateRootId) 
-   extends AggregateRootActor 
-   with AggregateStateCreator 
-   with ActorLogging {
+class Cargo(cargoId: String) extends AggregateRootActor[CargoState] {
 
-  override def aggregateId: 
-              AggregateRootId = cargoId
+  override def aggregateId: String = cargoId
 
-  override def handleCommand(
-            command: DomainCommand, 
-            currentState: AggregateState)
-          : Reply = {
-
+  override def handleCommand(command: DomainCommand, state: Option[CargoState]): Reply =
     command match {
-      case cmd: PlanCargo =>
-        Ok(Seq(
-          CargoPlanned(cmd.metaData, 
-                    cmd.cargoId, 
-                    cmd.trackingId, 
-                    cmd.routeSpecification)))
-      case cmd: SpecifyNewRoute =>
-        Ok(Seq(
-          NewRouteSpecified(
-                cmd.metaData, 
-                cmd.cargoId, 
-                cmd.routeSpecification)))
-      case other => 
-        Ko(UnexpectedCommand(other))
+      case cmd: PlanCargo if state.isEmpty =>
+        Ok(Seq(CargoPlanned(cmd.aggregateRootId, cmd.trackingId, cmd.routeSpecification)))
+      case cmd: SpecifyNewRoute if state.isDefined =>
+        Ok(Seq(NewRouteSpecified(cmd.aggregateRootId, cmd.routeSpecification)))
+      case other =>
+        Ko(new UnexpectedCommand(other))
     }
-  }
+
+  override def newState(evt: DomainEvent): Option[CargoState] =
+    evt match {
+      case CargoPlanned(_, trackingId, routeSpecification) => Some(CargoState(trackingId, routeSpecification))
+      case _                                               => None
+    }
+
+  // Event materializers read the events by tag
+  override def tags(event: DomainEvent): Set[String] = Set("cargo")
 }
 ```
-        
 
-The example shows the Cargo example as described in the book of Eric Evans. Bounded takes care of the persistence of the aggregate root via an event sourced mechanism based on Pekko persistence. Next to that, it takes care of handling the internal state of the aggregate root.
+The example shows the Cargo example as described in the book of Eric Evans. Bounded takes care of the persistence of the aggregate root via an event sourced mechanism based on Pekko persistence: the events of an `Ok` reply are stored before the reply is sent. Next to that, it takes care of handling the internal state of the aggregate root. `newState` creates the state from the first event, and the state then evolves with every next event:
 
 ```scala
-case class CargoAggregateState(
-        trackingId: TrackingId, 
-        routeSpecification: RouteSpecification)
-    extends AggregateState {
+final case class CargoState(trackingId: TrackingId, routeSpecification: RouteSpecification)
+    extends AggregateState[CargoState] {
 
-    override def update(evt: DomainEvent)
-                          : AggregateState = {
-      evt match {
-        case CargoPlanned(meta, 
-              cargoId, 
-              trackingId, 
-              routeSpecification) =>
-          CargoAggregateState(trackingId, 
-                        routeSpecification)
-        case NewRouteSpecified(meta, 
-              cargoId, 
-              routeSpecification) =>
-          this.copy(routeSpecification
-                     = routeSpecification)
-        case other => this
-      }
+  override def update(evt: DomainEvent): Option[CargoState] =
+    evt match {
+      case NewRouteSpecified(_, routeSpecification) => Some(copy(routeSpecification = routeSpecification))
+      case _                                        => Some(this)
     }
-  } 
+}
 ```
-        
+
+Commands carry the id of the aggregate root they are for, and events the id of the aggregate root that stored them:
+
+```scala
+final case class PlanCargo(aggregateRootId: String, trackingId: TrackingId, routeSpecification: RouteSpecification)
+    extends DomainCommand
+final case class SpecifyNewRoute(aggregateRootId: String, routeSpecification: RouteSpecification)
+    extends DomainCommand
+
+final case class CargoPlanned(id: String, trackingId: TrackingId, routeSpecification: RouteSpecification)
+    extends DomainEvent
+final case class NewRouteSpecified(id: String, routeSpecification: RouteSpecification) extends DomainEvent
+```
+
+A command gateway starts the aggregate root for a command when it is not running, validates the command, delivers it and stops aggregate roots that are idle:
+
+```scala
+val cargoCreator = new AggregateRootCreator {
+  override def props(cargoId: String): Props = Props(new Cargo(cargoId))
+}
+val gateway = new RouterCommandGateway(system, idleTime = 10.minutes, cargoCreator)
+
+implicit val planCargoValidator: ValidateableCommand[PlanCargo] = cmd => Future.successful(cmd)
+
+gateway.sendAndAsk(PlanCargo(cargoId, trackingId, routeSpecification)) // Future of the Reply: Ok(events) or Ko(failure)
+```
 
 ## Event sourcing
 
