@@ -22,11 +22,11 @@ trait PekkoHttpParameterOffsetConverters extends Configured {
   implicit val string2OffsetUnmarshaller: FromStringUnmarshaller[Offset] = {
     Unmarshaller.strict[String, Offset] { string =>
       try {
-        configuredJournal match { //depending on the journal a specific kind of Offset is required, parse according to that.
+        configuredJournal match { // depending on the journal a specific kind of Offset is required, parse according to that.
           case journal if journal.endsWith("cassandra-journal") || journal.endsWith("cassandra.journal") =>
             Offset.timeBasedUUID(UUID.fromString(string))
           case journal if journal.endsWith("inmemory-journal") => Offset.sequence(string.toLong)
-          case other @ _ =>
+          case _                                               =>
             throw new IllegalArgumentException(
               s"value $string cannot be transformed to an offset for journal $configuredJournal"
             )

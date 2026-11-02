@@ -26,11 +26,11 @@ import java.time.OffsetDateTime
 
 class TestableProjectionSpec extends AsyncWordSpecLike with Matchers with ScalaFutures with BeforeAndAfterAll {
 
-  implicit val timeout: Timeout = Timeout(30.seconds)
+  implicit val timeout: Timeout    = Timeout(30.seconds)
   implicit val system: ActorSystem =
     ActorSystem("TestableProjectionSpecSystem", SpecConfig.testConfig)
 
-  implicit val logger: LoggingAdapter = Logging(system, getClass)
+  implicit val logger: LoggingAdapter = Logging(system, classOf[TestableProjectionSpec])
 
   val metaDate: TestMetaData = TestMetaData(OffsetDateTime.now(), None, None)
 
@@ -39,7 +39,7 @@ class TestableProjectionSpec extends AsyncWordSpecLike with Matchers with ScalaF
     val testAggregateRootId1       = "arTest1"
     val evt1                       = InitialStateCreated(metaDate, testAggregateRootId1, "initialState")
     val evt2                       = StateUpdated(metaDate, testAggregateRootId1, "updatedState")
-    val fixture                    = TestableProjection.given(Seq(evt1, evt2), Set("ar-test", "aggregate"))
+    val fixture                    = TestableProjection.givenEvents(Seq(evt1, evt2), Set("ar-test", "aggregate"))
 
     "Store basic events at the start" in {
       whenReady(fixture.startProjection(testProjectionMaterializer)) { replayResult =>
@@ -50,25 +50,25 @@ class TestableProjectionSpec extends AsyncWordSpecLike with Matchers with ScalaF
 
     "Store more events" in {
       val evt3 = StateUpdated(metaDate, testAggregateRootId1, "morestate")
-      whenReady(fixture.addEvent(evt3)) { result => testProjectionMaterializer.events.size should be(3) }
+      whenReady(fixture.addEvent(evt3)) { _ => testProjectionMaterializer.events.size should be(3) }
     }
 
     "Store more events slowly" in {
       val evt4 = SlowStateUpdated(metaDate, testAggregateRootId1, "morestate", 1000L)
-      whenReady(fixture.addEvent(evt4)) { result => testProjectionMaterializer.events.size should be(4) }
+      whenReady(fixture.addEvent(evt4)) { _ => testProjectionMaterializer.events.size should be(4) }
     }
 
     "Store even more events slowly" in {
       val evt5 = SlowStateUpdated(metaDate, testAggregateRootId1, "morestate2", 1000L)
       val evt6 = SlowStateUpdated(metaDate, testAggregateRootId1, "morestate3", 1000L)
-      whenReady(fixture.addEvents(Seq(evt5, evt6))) { result => testProjectionMaterializer.events.size should be(6) }
+      whenReady(fixture.addEvents(Seq(evt5, evt6))) { _ => testProjectionMaterializer.events.size should be(6) }
     }
 
     "Store even more and more events slowly" in {
       val evt7 = SlowStateUpdated(metaDate, testAggregateRootId1, "morestate4", 2000L)
       val evt8 = SlowStateUpdated(metaDate, testAggregateRootId1, "morestate5", 2000L)
       val evt9 = SlowStateUpdated(metaDate, testAggregateRootId1, "morestate6", 2000L)
-      whenReady(fixture.addEvents(Seq(evt7, evt8, evt9))) { result =>
+      whenReady(fixture.addEvents(Seq(evt7, evt8, evt9))) { _ =>
         testProjectionMaterializer.events.size should be(9)
       }
     }
@@ -89,7 +89,7 @@ abstract class TestProjectionMaterializer(actorSystem: ActorSystem)
     */
   override val matMappingName: String = "test-view"
 
-  override lazy val logger: Logger = Logger(LoggerFactory.getLogger(TestProjectionMaterializer.this.getClass))
+  override val logger: Logger = Logger(LoggerFactory.getLogger(TestProjectionMaterializer.this.getClass))
 
   implicit val ec: ExecutionContext = system.dispatcher
 

@@ -36,14 +36,12 @@ class RouterCommandGateway[A <: AggregateRootCreator](
   system: ActorSystem,
   idleTime: FiniteDuration,
   aggregateRootCreator: A
-)(
-  implicit timeout: Timeout,
-  ec: ExecutionContext
-) extends CommandGateway {
+)(implicit timeout: Timeout, ec: ExecutionContext)
+    extends CommandGateway {
   import org.apache.pekko.pattern.ask
 
   implicit val actorSystem: ActorSystem = system
-  val logger: LoggingAdapter            = Logging(system, getClass)
+  val logger: LoggingAdapter            = Logging(system, classOf[RouterCommandGateway[?]])
 
   val gatewayActor = actorSystem.actorOf(Props(new AggregateGatewayRouter(aggregateRootCreator, idleTime)))
 

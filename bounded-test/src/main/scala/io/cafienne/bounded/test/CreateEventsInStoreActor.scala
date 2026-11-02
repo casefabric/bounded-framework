@@ -13,7 +13,7 @@ class CreateEventsInStoreActor(aggregateId: String, tags: Set[String] = Set.empt
 
   override def receiveRecover: Receive = {
     case RecoveryCompleted => // thats fine.
-    case other =>
+    case other             =>
       context.system.log.debug("received unknown event to recover:" + other)
   }
 

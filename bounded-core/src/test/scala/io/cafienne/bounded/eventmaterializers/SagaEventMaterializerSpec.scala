@@ -106,10 +106,9 @@ class SagaEventMaterializerSpec
       .systemActorOf(Props(classOf[CreateEventsInStoreActor], persistenceId), s"create-events-$persistenceId")
     val testProbe = TestProbe()
     testProbe watch storeEventsActor
-    events foreach {
-      case (event, tag) =>
-        testProbe.send(storeEventsActor, Tagged(event, Set(tag)))
-        testProbe.expectMsgType[Tagged]
+    events foreach { case (event, tag) =>
+      testProbe.send(storeEventsActor, Tagged(event, Set(tag)))
+      testProbe.expectMsgType[Tagged]
     }
     storeEventsActor ! PoisonPill
     testProbe.expectTerminated(storeEventsActor).existenceConfirmed shouldBe true

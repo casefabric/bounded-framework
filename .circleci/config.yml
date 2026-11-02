@@ -47,7 +47,8 @@ jobs:
             - v2-dependencies-
       - run:
           name: Run tests
-          command: cat /dev/null | sbt coverage test coverageReport
+          # sbt 2 runs a thin client that reads all arguments as one command line, so separate commands with ;
+          command: cat /dev/null | sbt "coverage; test; coverageReport"
           #- store_artifacts: # for display in Artifacts: https://circleci.com/docs/2.0/artifacts/
           #path: target/universal/samplescala.zip
           #destination: samplescala
@@ -55,6 +56,7 @@ jobs:
           key: v2-dependencies-{{ checksum "build.sbt" }}-{{ checksum "project/Dependencies.scala" }}-{{ checksum "project/plugins.sbt" }}-{{ checksum "project/build.properties" }}
           paths:
             - "~/.cache/coursier"
+            - "~/.cache/sbt"
             - "~/.ivy2/cache"
             - "~/.sbt"
             - "~/.m2"

@@ -16,11 +16,8 @@ import scala.concurrent.{ExecutionContext, Future}
 class TestTypedCommandGateway[T <: DomainCommand](
   testKit: ActorTestKit,
   aggregateRootCreator: TypedAggregateRootManager[T]
-)(
-  implicit timeout: Timeout,
-  ec: ExecutionContext,
-  scheduler: Scheduler
-) extends TypedCommandGateway[T] {
+)(implicit timeout: Timeout, ec: ExecutionContext, scheduler: Scheduler)
+    extends TypedCommandGateway[T] {
   import org.apache.pekko.actor.typed.scaladsl.AskPattern._
 
   val aggregates = mutable.Map[String, ActorRef[T]]()

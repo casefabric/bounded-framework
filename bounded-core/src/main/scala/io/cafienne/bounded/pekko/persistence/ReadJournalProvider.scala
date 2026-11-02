@@ -9,6 +9,7 @@ import org.apache.pekko.persistence.query.PersistenceQuery
 import org.apache.pekko.persistence.query.journal.leveldb.scaladsl.LeveldbReadJournal
 import org.apache.pekko.persistence.query.scaladsl._
 import io.cafienne.bounded.pekko.ActorSystemProvider
+import scala.annotation.nowarn
 import org.apache.pekko.persistence.jdbc.query.scaladsl.JdbcReadJournal
 import io.github.alstanchev.pekko.persistence.inmemory.query.scaladsl.InMemoryReadJournal
 
@@ -20,6 +21,7 @@ trait ReadJournalProvider { systemProvider: ActorSystemProvider =>
   val configuredJournal =
     system.settings.config.getString("pekko.persistence.journal.plugin")
 
+  @nowarn("cat=deprecation") // LevelDB is deprecated in Pekko but still supported here
   def readJournal
     : ReadJournal with CurrentEventsByTagQuery with EventsByTagQuery with CurrentEventsByPersistenceIdQuery = {
     system.log.debug("found configured journal " + configuredJournal)
@@ -52,7 +54,12 @@ trait ReadJournalProvider { systemProvider: ActorSystemProvider =>
       return PersistenceQuery(system)
         .readJournalFor[InMemoryReadJournal](InMemoryReadJournal.Identifier)
         .asInstanceOf[
-          ReadJournal with CurrentPersistenceIdsQuery with CurrentEventsByPersistenceIdQuery with CurrentEventsByTagQuery with EventsByPersistenceIdQuery with EventsByTagQuery
+          ReadJournal
+            with CurrentPersistenceIdsQuery
+            with CurrentEventsByPersistenceIdQuery
+            with CurrentEventsByTagQuery
+            with EventsByPersistenceIdQuery
+            with EventsByTagQuery
         ]
     }
     throw new RuntimeException(

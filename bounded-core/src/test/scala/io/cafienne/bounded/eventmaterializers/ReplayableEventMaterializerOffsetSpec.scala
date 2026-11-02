@@ -70,8 +70,8 @@ class ReplayableEventMaterializerOffsetSpec
 
       storeEvents(Seq(ReplayTestEvent(persistenceId, "e5")))
 
-      listener.fishForMessage() {
-        case e: EventProcessed => e.materializerId == materializer.materializerId
+      listener.fishForMessage() { case e: EventProcessed =>
+        e.materializerId == materializer.materializerId
       }
       materializer.live shouldBe Seq(ReplayTestEvent(persistenceId, "e5"))
       eventually(sharedOffsets.getOffset(viewId).futureValue shouldBe Sequence(5L))

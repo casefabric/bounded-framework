@@ -38,7 +38,7 @@ class ClassicSimpleAggregate(aggregateRootId: String) extends AggregateRootActor
 
   override def newState(evt: DomainEvent): Option[ClassicSimpleAggregateState] = {
     evt match {
-      case Created(aggregateRootId) =>
+      case Created(_) =>
         log.debug("Create new state based on event {}", evt)
         Some(ClassicSimpleAggregateState(List.empty))
       case _ =>
@@ -67,8 +67,8 @@ object ClassicSimpleAggregate {
   ) extends SimpleCommand
   final case class GetItems(aggregateRootId: String) extends SimpleCommand
 
-  //For testing there is no CQRS pattern and this misuses the HandlingFailure response to
-  //get part of the state back for verification during a test
+  // For testing there is no CQRS pattern and this misuses the HandlingFailure response to
+  // get part of the state back for verification during a test
   case class Items(items: Seq[String]) extends HandlingFailure
 
   trait SimpleEvent                                    extends DomainEvent
@@ -78,7 +78,7 @@ object ClassicSimpleAggregate {
   case class ClassicSimpleAggregateState(items: List[String]) extends AggregateState[ClassicSimpleAggregateState] {
     override def update(event: DomainEvent): Option[ClassicSimpleAggregateState] = {
       event match {
-        case evt: Created =>
+        case _: Created =>
           Some(this)
         case evt: ItemAdded =>
           Some(this.copy(items = items :+ evt.item))

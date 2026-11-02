@@ -79,8 +79,8 @@ class TypedCommandGatewaySpec
   "Command Gateway" should "work with send and ask" in {
     val commandMetaData = AggregateCommandMetaData(OffsetDateTime.now(), None)
     val aggregateId     = "testask"
-    whenReady(typedCommandGateway.ask(aggregateId, ref => Create(aggregateId, commandMetaData, ref))) {
-      answer: Response => answer shouldEqual (OK)
+    whenReady(typedCommandGateway.ask[Response](aggregateId, ref => Create(aggregateId, commandMetaData, ref))) {
+      answer => answer shouldEqual (OK)
     }
   }
 
@@ -116,8 +116,8 @@ class TypedCommandGatewaySpec
   "Command Gateway" should "reply with the items of the recovered aggregate" in {
     val commandMetaData = AggregateCommandMetaData(OffsetDateTime.now(), None)
     val aggregateId     = "test0"
-    whenReady(typedCommandGateway.ask(aggregateId, ref => GetItems(aggregateId, commandMetaData, ref))) {
-      answer: Response =>
+    whenReady(typedCommandGateway.ask[Response](aggregateId, ref => GetItems(aggregateId, commandMetaData, ref))) {
+      answer =>
         // the RecoveryCompleted signal of the (re)started aggregate has been received
         assert(TypedSimpleAggregate.replayed)
         answer shouldEqual Items(List("new item 2", "new item 1"))
@@ -128,7 +128,7 @@ class TypedCommandGatewaySpec
     val commandMetaData = AggregateCommandMetaData(OffsetDateTime.now(), None)
     val aggregateId     = "testPassivate"
     val probe           = testKit.createTestProbe[Response]()
-    //start the actor
+    // start the actor
 
     LoggingTestKit.debug(s"Aggregate $aggregateId terminated").expect {
       whenReady(typedCommandGateway.tell(Stop(aggregateId, commandMetaData, probe.ref))) { answer =>
@@ -137,7 +137,7 @@ class TypedCommandGatewaySpec
       }
       manualTime.expectNoMessageFor(6.seconds)
       manualTime.timePasses(2.millis)
-      //Assertion required although the terminated message is what is been asserted.
+      // Assertion required although the terminated message is what is been asserted.
       assert(true)
     }
   }

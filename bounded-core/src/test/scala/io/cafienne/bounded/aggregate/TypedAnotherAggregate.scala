@@ -36,7 +36,7 @@ object TypedAnotherAggregate {
     replyTo: ActorRef[Response]
   ) extends AnotherAggregateCommand
 
-  //NOTE that a GET on the aggregate is not according to the CQRS pattern and added here for testing.
+  // NOTE that a GET on the aggregate is not according to the CQRS pattern and added here for testing.
   final case class GetAnotherItems(aggregateRootId: String, metaData: CommandMetaData, replyTo: ActorRef[Response])
       extends AnotherAggregateCommand
 
@@ -67,7 +67,7 @@ object TypedAnotherAggregate {
         case cmd: CreateAnother   => createAggregate(cmd)
         case cmd: AddAnother      => addAnother(cmd)
         case cmd: GetAnotherItems => Effect.none.thenReply(cmd.replyTo)(_ => Items(state.items))
-        case cmd: StopAnother =>
+        case cmd: StopAnother     =>
           logger.debug("Stopping Aggregate {}", cmd.aggregateRootId)
           Effect.stop().thenReply(cmd.replyTo)(_ => OK)
       }
@@ -108,10 +108,9 @@ class AnotherAggregateManager() extends TypedAggregateRootManager[AnotherAggrega
         commandHandler,
         eventHandler
       )
-      .receiveSignal {
-        case (state, RecoveryCompleted) =>
-          logger.debug("Received RecoveryCompleted for actor with state {}", state)
-          replayed = true
+      .receiveSignal { case (state, RecoveryCompleted) =>
+        logger.debug("Received RecoveryCompleted for actor with state {}", state)
+        replayed = true
       }
   }
 

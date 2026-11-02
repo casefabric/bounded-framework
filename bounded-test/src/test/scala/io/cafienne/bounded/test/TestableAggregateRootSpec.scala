@@ -23,11 +23,11 @@ import scala.concurrent.duration._
 
 class TestableAggregateRootSpec extends AsyncWordSpecLike with Matchers with ScalaFutures with BeforeAndAfterAll {
 
-  //Setup required supporting classes
-  implicit val timeout: Timeout = Timeout(10.seconds)
+  // Setup required supporting classes
+  implicit val timeout: Timeout    = Timeout(10.seconds)
   implicit val system: ActorSystem =
     ActorSystem("TestSystem", PersistenceTestKitPlugin.config.withFallback(SpecConfig.testConfig))
-  implicit val logger: LoggingAdapter = Logging(system, getClass)
+  implicit val logger: LoggingAdapter = Logging(system, classOf[TestableAggregateRootSpec])
 
   val testAggregateRootCreator = new TestAggregateRootCreator(system)
 
@@ -40,7 +40,7 @@ class TestableAggregateRootSpec extends AsyncWordSpecLike with Matchers with Sca
       val testAggregateRootId1 = "1"
 
       val ar = TestableAggregateRoot
-        .given[TestAggregateRoot, TestAggregateRootState](testAggregateRootCreator, testAggregateRootId1)
+        .givenEvents[TestAggregateRoot, TestAggregateRootState](testAggregateRootCreator, testAggregateRootId1)
 
       ar.currentState map { state => assert(state.isEmpty) }
     }
@@ -50,7 +50,7 @@ class TestableAggregateRootSpec extends AsyncWordSpecLike with Matchers with Sca
       val targetState          = TestAggregateRootState("new")
 
       val ar = TestableAggregateRoot
-        .given[TestAggregateRoot, TestAggregateRootState](
+        .givenEvents[TestAggregateRoot, TestAggregateRootState](
           testAggregateRootCreator,
           testAggregateRootId1,
           InitialStateCreated(
@@ -73,7 +73,7 @@ class TestableAggregateRootSpec extends AsyncWordSpecLike with Matchers with Sca
       val targetState          = TestAggregateRootState("updated")
 
       val ar = TestableAggregateRoot
-        .given[TestAggregateRoot, TestAggregateRootState](
+        .givenEvents[TestAggregateRoot, TestAggregateRootState](
           testAggregateRootCreator,
           testAggregateRootId1,
           InitialStateCreated(
@@ -100,10 +100,10 @@ class TestableAggregateRootSpec extends AsyncWordSpecLike with Matchers with Sca
     }
 
     "ensure the event count is correct" in {
-      val testAggregateRootId1 = "4"
-      val now                  = OffsetDateTime.now()
-      val commandMetaData      = TestCommandMetaData(now, None)
-      val updateStateCommand   = UpdateState(commandMetaData, testAggregateRootId1, "updated")
+      val testAggregateRootId1     = "4"
+      val now                      = OffsetDateTime.now()
+      val commandMetaData          = TestCommandMetaData(now, None)
+      val updateStateCommand       = UpdateState(commandMetaData, testAggregateRootId1, "updated")
       val initialStateCreatedEvent = InitialStateCreated(
         currentMeta,
         testAggregateRootId1,
@@ -111,7 +111,7 @@ class TestableAggregateRootSpec extends AsyncWordSpecLike with Matchers with Sca
       )
 
       val ar = TestableAggregateRoot
-        .given[TestAggregateRoot, TestAggregateRootState](
+        .givenEvents[TestAggregateRoot, TestAggregateRootState](
           testAggregateRootCreator,
           testAggregateRootId1,
           initialStateCreatedEvent
@@ -134,7 +134,7 @@ class TestableAggregateRootSpec extends AsyncWordSpecLike with Matchers with Sca
       val updateStateCommand   = UpdateState(metaData, testAggregateRootId1, "updated")
 
       TestableAggregateRoot
-        .given[TestAggregateRoot, TestAggregateRootState](
+        .givenEvents[TestAggregateRoot, TestAggregateRootState](
           testAggregateRootCreator,
           testAggregateRootId1,
           InitialStateCreated(
@@ -153,7 +153,7 @@ class TestableAggregateRootSpec extends AsyncWordSpecLike with Matchers with Sca
 
       an[MisdirectedCommand] should be thrownBy {
         TestableAggregateRoot
-          .given[TestAggregateRoot, TestAggregateRootState](testAggregateRootCreator, aggregateRootId)
+          .givenEvents[TestAggregateRoot, TestAggregateRootState](testAggregateRootCreator, aggregateRootId)
           .when(UpdateState(metaData, wrongId, ""))
       }
     }
@@ -163,7 +163,7 @@ class TestableAggregateRootSpec extends AsyncWordSpecLike with Matchers with Sca
 
       an[UnexpectedCommandHandlingSuccess] should be thrownBy {
         TestableAggregateRoot
-          .given[TestAggregateRoot, TestAggregateRootState](
+          .givenEvents[TestAggregateRoot, TestAggregateRootState](
             testAggregateRootCreator,
             aggregateRootId,
             InitialStateCreated(currentMeta, aggregateRootId, "new")
@@ -178,7 +178,7 @@ class TestableAggregateRootSpec extends AsyncWordSpecLike with Matchers with Sca
 
       an[NoCommandsIssued.type] should be thrownBy {
         TestableAggregateRoot
-          .given[TestAggregateRoot, TestAggregateRootState](
+          .givenEvents[TestAggregateRoot, TestAggregateRootState](
             testAggregateRootCreator,
             aggregateRootId,
             InitialStateCreated(currentMeta, aggregateRootId, "new")
@@ -192,7 +192,7 @@ class TestableAggregateRootSpec extends AsyncWordSpecLike with Matchers with Sca
 
       an[NoCommandsIssued.type] should be thrownBy {
         TestableAggregateRoot
-          .given[TestAggregateRoot, TestAggregateRootState](
+          .givenEvents[TestAggregateRoot, TestAggregateRootState](
             testAggregateRootCreator,
             aggregateRootId,
             InitialStateCreated(currentMeta, aggregateRootId, "new")
@@ -206,7 +206,7 @@ class TestableAggregateRootSpec extends AsyncWordSpecLike with Matchers with Sca
 
       an[CommandHandlingFailed] should be thrownBy {
         val ar = TestableAggregateRoot
-          .given[TestAggregateRoot, TestAggregateRootState](
+          .givenEvents[TestAggregateRoot, TestAggregateRootState](
             testAggregateRootCreator,
             aggregateRootId,
             InitialStateCreated(currentMeta, aggregateRootId, "new")
@@ -225,7 +225,7 @@ class TestableAggregateRootSpec extends AsyncWordSpecLike with Matchers with Sca
       }
 
       val ar = TestableAggregateRoot
-        .given[PrefixedTestAggregateRoot, TestAggregateRootState](
+        .givenEvents[PrefixedTestAggregateRoot, TestAggregateRootState](
           prefixedCreator,
           aggregateRootId,
           InitialStateCreated(currentMeta, aggregateRootId, "new")

@@ -38,7 +38,7 @@ class CassandraOffsetStoreIntegrationSpec extends AnyFlatSpec with Matchers with
     container.start()
     cassandra = Some(container)
     val contactPoint = container.getContactPoint
-    val config = ConfigFactory
+    val config       = ConfigFactory
       .parseString(s"""
         pekko.persistence.journal.plugin = "pekko.persistence.cassandra.journal"
         datastax-java-driver {
@@ -72,10 +72,9 @@ class CassandraOffsetStoreIntegrationSpec extends AnyFlatSpec with Matchers with
 
   it should "store and read back every offset type" in {
     assume(dockerAvailable, "Docker is not available")
-    allOffsetTypes.zipWithIndex.foreach {
-      case (offset, i) =>
-        provider.saveOffset(s"view-$i", offset).futureValue
-        provider.getOffset(s"view-$i").futureValue shouldBe offset
+    allOffsetTypes.zipWithIndex.foreach { case (offset, i) =>
+      provider.saveOffset(s"view-$i", offset).futureValue
+      provider.getOffset(s"view-$i").futureValue shouldBe offset
     }
   }
 

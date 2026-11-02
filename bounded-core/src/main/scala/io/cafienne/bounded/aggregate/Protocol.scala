@@ -22,7 +22,7 @@ trait DomainEvent {
 trait HandlingFailure
 
 //class AggregateNotInitialized(id: PersistenceId) extends HandlingFailure
-class UnexpectedCommand(command: DomainCommand) extends HandlingFailure
+class UnexpectedCommand(val command: DomainCommand) extends HandlingFailure
 
 /**
   * The journal reported a failure while storing the events of a command; the aggregate stops.

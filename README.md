@@ -117,7 +117,9 @@ The code is  [Apache2 licensed](https://www.apache.org/licenses/LICENSE-2.0)  
 
 # Releasing
 
-Bounded is published to Maven Central (`io.cafienne.bounded` : `bounded-core`, `bounded-test`, `bounded-pekko-http`) using sbt's built-in Sonatype Central support.
+Bounded is built for Scala 3 with sbt 2 and published to Maven Central (`io.cafienne.bounded` : `bounded-core_3`, `bounded-test_3`, `bounded-pekko-http_3`) using sbt's built-in Sonatype Central support.
+
+sbt 2 starts a thin client that takes all its arguments as one command line, so several commands go in one quoted argument separated by `;` (`sbt "publishSigned; sonaRelease"`); `sbt publishSigned sonaRelease` fails.
 
 ## Prerequisites
 
@@ -145,7 +147,7 @@ git checkout main && git pull
 git tag v1.0.0
 git push origin v1.0.0
 sbt "show boundedCore/version"   # must print 1.0.0, without -SNAPSHOT
-sbt publishSigned sonaRelease
+sbt "publishSigned; sonaRelease"
 ```
 
 Uncommitted changes to tracked files turn the build into a snapshot (untracked files do not), so commit or stash them before publishing a release.

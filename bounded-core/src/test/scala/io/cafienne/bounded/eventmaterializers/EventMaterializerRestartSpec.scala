@@ -65,7 +65,7 @@ class EventMaterializerRestartSpec
     }
 
     "restart after a failing offset save and resume after the last handled event" in {
-      val tag = storeSixEvents()
+      val tag          = storeSixEvents()
       val materializer =
         new FlakyMaterializer(tag, failSave = (offset, attempt) => offset == Sequence(3L) && attempt == 1)
 
@@ -78,7 +78,7 @@ class EventMaterializerRestartSpec
     }
 
     "resume after the last handled event when it does not keep offsets" in {
-      val tag = storeSixEvents()
+      val tag          = storeSixEvents()
       val materializer =
         new FlakyMaterializer(tag, keepOffset = false, failHandling = (text, attempt) => text == "e5" && attempt == 1)
 
@@ -105,7 +105,8 @@ class EventMaterializerRestartSpec
       val materializer = new FlakyMaterializer(tag)
 
       val (killSwitch, lastOffset) = materializer.registerListenerWithKillSwitch(Some(NoOffset))
-      eventually(materializer.handled should have size 6)
+      // The future reports the last saved offset, and the save of the last event finishes after its handling
+      eventually(materializer.offsets.getOffset(materializer.viewIdentifier).futureValue shouldBe Sequence(6L))
       killSwitch.shutdown()
 
       lastOffset.futureValue shouldBe Sequence(6L)
@@ -141,9 +142,9 @@ class EventMaterializerRestartSpec
     * Stores e1..e6 under a tag of its own, so every test reads only its own events (and offsets 1..6).
     */
   private def storeSixEvents(): String = {
-    val n             = tagCounter.incrementAndGet()
-    val tag           = s"restart-tag-$n"
-    val persistenceId = s"restart-ar-$n"
+    val n                = tagCounter.incrementAndGet()
+    val tag              = s"restart-tag-$n"
+    val persistenceId    = s"restart-ar-$n"
     val storeEventsActor = classicSystem
       .asInstanceOf[ExtendedActorSystem]
       .systemActorOf(Props(classOf[CreateEventsInStoreActor], persistenceId), s"create-events-$n")

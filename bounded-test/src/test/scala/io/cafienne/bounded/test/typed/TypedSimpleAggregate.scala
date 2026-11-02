@@ -22,7 +22,7 @@ object TypedSimpleAggregate {
   var replayed = false
 
   final val logger = Logger(TypedSimpleAggregate.getClass.getSimpleName)
-  //Reply Type
+  // Reply Type
   sealed trait Response
   case object OK                              extends Response
   final case class KO(reason: String)         extends Response
@@ -53,7 +53,7 @@ object TypedSimpleAggregate {
 
   final case class TriggerError(aggregateRootId: String, metaData: TestCommandMetaData) extends SimpleAggregateCommand
 
-  //NOTE that a GET on the aggregate is not according to the CQRS pattern and added here for testing.
+  // NOTE that a GET on the aggregate is not according to the CQRS pattern and added here for testing.
   sealed trait SimpleDirectAggregateQuery extends SimpleAggregateCommand
 
   final case class GetItems(aggregateRootId: String, metaData: TestCommandMetaData, replyTo: ActorRef[Response])
@@ -85,9 +85,9 @@ object TypedSimpleAggregate {
       command match {
         case cmd: Create  => createAggregate(cmd)
         case cmd: AddItem => addItem(cmd)
-        case cmd: Stop =>
+        case cmd: Stop    =>
           logger.debug("Stopping Aggregate {}", cmd.aggregateRootId)
-          //timers.cancelAll()
+          // timers.cancelAll()
           Effect.stop().thenReply(cmd.replyTo)(_ => OK)
         case cmd: StopAfter =>
           timers.startSingleTimer(

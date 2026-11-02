@@ -21,7 +21,8 @@ import scala.concurrent.{Await, ExecutionContextExecutor, Future}
   * Two typed command gateways, each for its own type of aggregate root (with its own protocol),
   * running next to each other in the same actor system.
   */
-class TypedMultiCommandGatewaySpec extends ScalaTestWithActorTestKit(ConfigFactory.parseString(s"""
+class TypedMultiCommandGatewaySpec
+    extends ScalaTestWithActorTestKit(ConfigFactory.parseString(s"""
     pekko.persistence.publish-plugin-commands = on
     pekko.persistence.journal.plugin = "pekko.persistence.journal.inmem"
     pekko.persistence.journal.inmem.test-serialization = on
@@ -34,7 +35,11 @@ class TypedMultiCommandGatewaySpec extends ScalaTestWithActorTestKit(ConfigFacto
     pekko.coordinated-shutdown.run-by-actor-system-terminate = off
     pekko.coordinated-shutdown.run-by-jvm-shutdown-hook = off
     pekko.cluster.run-coordinated-shutdown-when-down = off
-    """)) with LogCapturing with AsyncFlatSpecLike with ScalaFutures with BeforeAndAfterAll {
+    """))
+    with LogCapturing
+    with AsyncFlatSpecLike
+    with ScalaFutures
+    with BeforeAndAfterAll {
 
   import TypedSimpleAggregate._
   import TypedAnotherAggregate._
