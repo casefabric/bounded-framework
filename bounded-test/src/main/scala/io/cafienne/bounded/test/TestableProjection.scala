@@ -9,7 +9,6 @@ import scala.compiletime.uninitialized
 
 import java.util.UUID
 import org.apache.pekko.actor._
-//import org.apache.pekko.persistence.inmemory.extension.{InMemoryJournalStorage, InMemorySnapshotStorage, StorageExtension}
 import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.Timeout
 import io.cafienne.bounded.aggregate._
@@ -29,12 +28,6 @@ object TestableProjection {
     evt: Seq[DomainEvent],
     tags: Set[String] = Set.empty
   )(implicit system: ActorSystem, timeout: Timeout = 2.seconds): TestableProjection = {
-    // Cleanup the store before this test is ran.
-//    tp.send(StorageExtension(system).journalStorage, InMemoryJournalStorage.ClearJournal)
-//    tp.expectMsg(org.apache.pekko.actor.Status.Success(""))
-//    tp.send(StorageExtension(system).snapshotStorage, InMemorySnapshotStorage.ClearSnapshots)
-//    tp.expectMsg(org.apache.pekko.actor.Status.Success(""))
-
     val testedProjection = new TestableProjection(system, timeout, tags)
     OffsetStoreProvider.getInMemoryStore().clear()
     testedProjection.storeEvents(evt)
@@ -51,7 +44,6 @@ class TestableProjection private (system: ActorSystem, timeout: Timeout, tags: S
   private var materializerId: Option[UUID]                   = None
 
   val eventStreamListener = TestProbe()
-//  val persistenceTestKit  = PersistenceTestKit(system)
 
   if (
     !system.settings.config.hasPath("bounded.eventmaterializers.publish") || !system.settings.config.getBoolean(
@@ -81,8 +73,6 @@ class TestableProjection private (system: ActorSystem, timeout: Timeout, tags: S
 
   // Blocking way to store events.
   private def storeEvents(evt: Seq[DomainEvent]): Future[Done] = {
-
-//    evt.groupBy(evt => evt.id).foreach(grp => persistenceTestKit.persistForRecovery(grp._1, grp._2))
 
     val storeEventsActor =
       system.actorOf(Props(classOf[CreateEventsInStoreActor], evt.head.id, tags), "create-events-actor")

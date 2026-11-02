@@ -21,7 +21,6 @@ trait DomainEvent {
 
 trait HandlingFailure
 
-//class AggregateNotInitialized(id: PersistenceId) extends HandlingFailure
 class UnexpectedCommand(val command: DomainCommand) extends HandlingFailure
 
 /**

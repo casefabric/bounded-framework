@@ -91,7 +91,6 @@ object TypedSimpleAggregate {
         case cmd: AddItem => addItem(cmd)
         case cmd: Stop    =>
           logger.debug("Stopping Aggregate {}", cmd.aggregateRootId)
-          // timers.cancelAll()
           Effect.stop().thenReply(cmd.replyTo)(_ => OK)
         case cmd: GetItems  => Effect.none.thenReply(cmd.replyTo)(_ => Items(state.items))
         case cmd: StopAfter =>

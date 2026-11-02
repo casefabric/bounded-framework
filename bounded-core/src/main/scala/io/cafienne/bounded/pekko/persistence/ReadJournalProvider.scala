@@ -46,9 +46,6 @@ trait ReadJournalProvider { systemProvider: ActorSystemProvider =>
     if (configuredJournal.endsWith("jdbc-journal")) {
       return PersistenceQuery(system)
         .readJournalFor[JdbcReadJournal](JdbcReadJournal.Identifier)
-//        .asInstanceOf[
-//        ReadJournal with CurrentPersistenceIdsQuery with CurrentEventsByPersistenceIdQuery with CurrentEventsByTagQuery with EventsByPersistenceIdQuery with EventsByTagQuery
-//      ]
     }
     if (configuredJournal.endsWith("inmemory-journal")) {
       return PersistenceQuery(system)

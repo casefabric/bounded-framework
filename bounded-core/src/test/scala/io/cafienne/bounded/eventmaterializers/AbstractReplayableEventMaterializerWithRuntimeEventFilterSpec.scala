@@ -55,16 +55,6 @@ class AbstractReplayableEventMaterializerWithEventFilterSpec
     with ScalaFutures
     with LogCapturing {
 
-  // Setup required supporting classes
-
-//  implicit val system: ActorSystem =
-//    ActorSystem("MaterializerTestSystem", PersistenceTestKitPlugin.config.withFallback(SpecConfig.testConfig))
-  // implicit val timeout: Timeout       = Timeout(10.seconds)
-  // implicit val logger: LoggingAdapter = Logging(system, getClass)
-//  implicit val defaultPatience: PatienceConfig =
-//    PatienceConfig(timeout = Span(4, Seconds), interval = Span(100, Millis))
-
-  // val testKit = PersistenceTestKit(system)
   private val projectionTestKit           = ProjectionTestKit(system)
   val projectionId: ProjectionId          = ProjectionId("name", "key")
   implicit val classicSystem: ActorSystem = system.classicSystem
