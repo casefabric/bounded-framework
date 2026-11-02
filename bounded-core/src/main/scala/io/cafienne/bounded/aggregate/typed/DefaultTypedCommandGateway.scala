@@ -30,8 +30,8 @@ trait TypedCommandGateway[T <: DomainCommand] {
   * it will keep a list of aggregate root actors and use those to ask or tell commands to
   * Typed aggregate roots.
   *
-  * TODO: Aggregate Root Actors are responsible for their own lifecycle
-  * TODO At this moment, a started AR will not be stopped.
+  * An aggregate root actor is started on its first command and stopped once it has been idle for
+  * `aggregateMayIdleFor`. An aggregate may also stop itself; the next command for it starts a new one.
   *
   * @param system A typed actorsystem
   * @param aggregateRootCreator The class that creates the specific type of aggregate root
