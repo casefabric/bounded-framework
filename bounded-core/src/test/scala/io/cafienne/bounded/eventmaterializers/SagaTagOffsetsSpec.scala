@@ -4,6 +4,7 @@
 
 package io.cafienne.bounded.eventmaterializers
 
+import io.cafienne.bounded.aggregate.AggregateType
 import org.apache.pekko.Done
 import org.apache.pekko.actor.{ActorSystem, ExtendedActorSystem, PoisonPill, Props}
 import org.apache.pekko.actor.testkit.typed.scaladsl.{LogCapturing, ScalaTestWithActorTestKit}
@@ -153,7 +154,7 @@ class SagaTagOffsetsSpec
   class TestSaga(tags: List[String], offsets: InMemoryBasedOffsetStore, failOnce: Set[String] = Set.empty)
       extends SagaEventMaterializer(classicSystem) {
     override val logger: Logger         = Logger(LoggerFactory.getLogger(classOf[TestSaga]))
-    override val tagNames: List[String] = tags
+    override val aggregateTypes         = tags.map(AggregateType(_))
     override val matMappingName: String = s"saga-view-${tags.mkString("-")}"
     private val handledEvents           = new ConcurrentLinkedQueue[String]()
     private val handlingAttempts        = new ConcurrentHashMap[String, AtomicInteger]()

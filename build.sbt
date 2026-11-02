@@ -4,6 +4,7 @@ lazy val basicSettings = {
   // Scala 3 LTS: libraries built with it can be used from every later Scala 3 version
   val scala3 = "3.3.9"
 
+  //noinspection ScalaStyle
   Seq(
     organization := "io.cafienne.bounded",
     description := "Scala and Pekko based Domain Driven Design Framework",
@@ -25,23 +26,23 @@ lazy val basicSettings = {
     libraryDependencySchemes ++= Dependencies.schemes,
 
     startYear := Some(2018),
-    licenses := Seq("Apache-2.0" -> url("https://www.apache.org/licenses/LICENSE-2.0")),
+    licenses := Seq("Apache-2.0" -> uri("https://www.apache.org/licenses/LICENSE-2.0")),
     headerLicense := {
       val toYear = java.time.Year.now
       Some(HeaderLicense.Custom(
         s"Copyright (C) 2016-$toYear Batav B.V. <https://www.cafienne.io/bounded>"
       ))
     },
-    homepage := Some(url("https://github.com/cafienne/bounded-framework")),
+    homepage := Some(uri("https://github.com/cafienne/bounded-framework")),
     scmInfo := Some(ScmInfo(
-      url("https://github.com/cafienne/bounded-framework"),
+      uri("https://github.com/cafienne/bounded-framework"),
       "git@github.com:cafienne/bounded-framework.git")
     ),
     developers := List(Developer(
       "olger",
       "Olger Warnier",
       "olger@spectare.nl",
-      url("https://github.com/olger"))
+      uri("https://github.com/olger"))
     ),
     versionScheme := Some("early-semver"),
     publishMavenStyle := true,

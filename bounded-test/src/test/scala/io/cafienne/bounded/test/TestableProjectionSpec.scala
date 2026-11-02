@@ -42,7 +42,7 @@ class TestableProjectionSpec extends AsyncWordSpecLike with Matchers with ScalaF
     val testAggregateRootId1       = "arTest1"
     val evt1                       = InitialStateCreated(metaDate, testAggregateRootId1, "initialState")
     val evt2                       = StateUpdated(metaDate, testAggregateRootId1, "updatedState")
-    val fixture                    = TestableProjection.givenEvents(Seq(evt1, evt2), Set("ar-test", "aggregate"))
+    val fixture                    = TestableProjection.givenEvents(Seq(evt1, evt2), TestAggregateRoot.Type)
 
     "Store basic events at the start" in {
       whenReady(fixture.startProjection(testProjectionMaterializer)) { replayResult =>
@@ -85,7 +85,7 @@ abstract class TestProjectionMaterializer(actorSystem: ActorSystem)
   /**
     * Tagname used to identify eventstream to listen to
     */
-  override val tagName: String = "ar-test"
+  override val aggregateType = TestAggregateRoot.Type
 
   /**
     * Mapping name of this listener

@@ -87,7 +87,7 @@ class ClassicGatewayTerminationSpec
       val creator     = new CountingCreator
       val gateway     = gateways(creator)(index)._2
       val aggregateId = s"recovery-failure-$index"
-      persistenceTestKit.failNextRead(aggregateId)
+      persistenceTestKit.failNextRead(ClassicSimpleAggregate.Type.persistenceId(aggregateId).id)
 
       // the aggregate stops while recovering, before it handles this command
       gateway.sendAndAsk(Create(aggregateId)).failed.futureValue shouldBe an[AskTimeoutException]

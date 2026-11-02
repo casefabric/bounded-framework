@@ -9,7 +9,8 @@ import org.apache.pekko.Done
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.persistence.query.Offset
 import org.apache.pekko.stream.UniqueKillSwitch
-import io.cafienne.bounded.pekko.persistence.ReadJournalProvider
+import io.cafienne.bounded.aggregate.AggregateType
+import io.cafienne.bounded.pekko.persistence.{AggregateTypeReadJournal, ReadJournalProvider}
 import io.cafienne.bounded.config.Configured
 import com.typesafe.scalalogging.Logger
 
@@ -19,7 +20,7 @@ import scala.concurrent.{ExecutionContextExecutor, Future}
   * Abstract class to be used to create eventlisteners. Use this class as a base for listening for
   * specific events. The class supports offset store to keep track of events received.
   *
-  * Set tagname to identify eventstream to listen to
+  * Set aggregateType to the type of the aggregates whose events to listen to
   * Set mappingname as identifier for this listener. It will be used as the id for storing current offset of
   * listener.
   *
@@ -49,12 +50,12 @@ abstract class AbstractEventMaterializer(
 
   implicit val mat: ExecutionContextExecutor = actorSystem.dispatcher
 
-  val journal = readJournal
+  val journal: AggregateTypeReadJournal = aggregateTypeJournal
 
   /**
-    * Tagname used to identify eventstream to listen to
+    * The type of the aggregates whose events this materializer reads
     */
-  val tagName: String
+  val aggregateType: AggregateType
 
   /**
     * Mapping name of this listener
@@ -91,7 +92,7 @@ abstract class AbstractEventMaterializer(
     logger.info(s"Registering listener with killswitch $viewIdentifier")
 
     runListener(
-      offset => journal.eventsByTag(tagName, offset).map(PositionedEvent(_)),
+      offset => journal.eventsByAggregateType(aggregateType, offset).map(PositionedEvent(_)),
       listenStartOffset(maybeStartOffset),
       keepCurrentOffset,
       materialzerEventFilter

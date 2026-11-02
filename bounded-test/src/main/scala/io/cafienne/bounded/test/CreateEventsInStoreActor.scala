@@ -8,8 +8,12 @@ import org.apache.pekko.persistence.{PersistentActor, RecoveryCompleted}
 import org.apache.pekko.persistence.journal.Tagged
 import io.cafienne.bounded.aggregate.DomainEvent
 
-class CreateEventsInStoreActor(aggregateId: String, tags: Set[String] = Set.empty) extends PersistentActor {
-  override def persistenceId: String = aggregateId
+/**
+  * Stores the events it receives under the given persistence id, tagged with the given tags, and replies with each
+  * stored event.
+  */
+class CreateEventsInStoreActor(storeUnder: String, tags: Set[String] = Set.empty) extends PersistentActor {
+  override def persistenceId: String = storeUnder
 
   override def receiveRecover: Receive = {
     case RecoveryCompleted => // thats fine.

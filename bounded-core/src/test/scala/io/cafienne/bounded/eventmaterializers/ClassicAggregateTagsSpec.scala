@@ -7,7 +7,9 @@ package io.cafienne.bounded.eventmaterializers
 import org.apache.pekko.Done
 import org.apache.pekko.actor.{ActorSystem, ExtendedActorSystem, PoisonPill, Props}
 import org.apache.pekko.actor.testkit.typed.scaladsl.{LogCapturing, ScalaTestWithActorTestKit}
-import org.apache.pekko.persistence.query.{Offset, Sequence}
+import org.apache.pekko.persistence.query.{NoOffset, Offset, PersistenceQuery, Sequence}
+import org.apache.pekko.stream.scaladsl.Sink
+import io.github.alstanchev.pekko.persistence.inmemory.query.scaladsl.InMemoryReadJournal
 import org.apache.pekko.testkit.TestProbe
 import com.typesafe.scalalogging.Logger
 import io.cafienne.bounded.aggregate.{DomainEvent, Ok}
@@ -27,7 +29,7 @@ import scala.jdk.CollectionConverters._
 object ClassicAggregateTagsSpec {
   val ItemTag = "classic-items"
 
-  /** Tags its ItemAdded events in code; Created is stored without tags. */
+  /** Tags its ItemAdded events with an extra tag; every event also gets the aggregate type as tag. */
   class TaggingClassicAggregate(id: String) extends ClassicSimpleAggregate(id) {
     override def tags(event: DomainEvent): Set[String] = event match {
       case _: ItemAdded => Set(ItemTag)
@@ -58,9 +60,9 @@ class ClassicAggregateTagsSpec
       .asInstanceOf[ExtendedActorSystem]
       .systemActorOf(Props(classOf[TaggingClassicAggregate], aggregateId), name)
 
-  "A classic aggregate that tags its events in code" must {
+  "A classic aggregate" must {
 
-    "store them under its tags without a journal event adapter, and recover from them" in {
+    "tag every event with its aggregate type and extra tags without a journal event adapter, and recover" in {
       val probe     = TestProbe()
       val aggregate = startAggregate("classic-tags-1")
       probe.send(aggregate, Create(aggregateId))
@@ -69,8 +71,20 @@ class ClassicAggregateTagsSpec
       probe.expectMsg(Ok(Seq(ItemAdded(aggregateId, "one"), ItemAdded(aggregateId, "two"))))
 
       val materializer = new CollectingMaterializer()
-      materializer.replayEvents().futureValue shouldBe Sequence(2L)
-      materializer.handled shouldBe Seq(ItemAdded(aggregateId, "one"), ItemAdded(aggregateId, "two"))
+      materializer.replayEvents().futureValue shouldBe Sequence(3L)
+      materializer.handled shouldBe Seq(
+        Created(aggregateId),
+        ItemAdded(aggregateId, "one"),
+        ItemAdded(aggregateId, "two")
+      )
+
+      // extra tags are stored too, for readers that query the journal by tag themselves
+      PersistenceQuery(classicSystem)
+        .readJournalFor[InMemoryReadJournal](InMemoryReadJournal.Identifier)
+        .currentEventsByTag(ItemTag, NoOffset)
+        .map(_.event)
+        .runWith(Sink.seq)
+        .futureValue shouldBe Seq(ItemAdded(aggregateId, "one"), ItemAdded(aggregateId, "two"))
 
       probe.watch(aggregate)
       aggregate ! PoisonPill
@@ -83,7 +97,7 @@ class ClassicAggregateTagsSpec
 
   class CollectingMaterializer extends AbstractReplayableEventMaterializer(classicSystem) {
     override val logger: Logger           = Logger(LoggerFactory.getLogger(classOf[CollectingMaterializer]))
-    override val tagName: String          = ItemTag
+    override val aggregateType            = ClassicSimpleAggregate.Type
     override val matMappingName: String   = "classic-tags-view"
     val offsets: InMemoryBasedOffsetStore = new InMemoryBasedOffsetStore()
     private val handledEvents             = new ConcurrentLinkedQueue[Any]()

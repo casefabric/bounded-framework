@@ -4,6 +4,7 @@
 
 package io.cafienne.bounded.eventmaterializers
 
+import io.cafienne.bounded.aggregate.AggregateType
 import org.apache.pekko.Done
 import org.apache.pekko.actor.{ActorSystem, ExtendedActorSystem, PoisonPill, Props}
 import org.apache.pekko.actor.testkit.typed.scaladsl.{LogCapturing, ScalaTestWithActorTestKit}
@@ -119,7 +120,7 @@ class ReplayableEventMaterializerOffsetSpec
   class TestReplayable(offsets: InMemoryBasedOffsetStore, withPartialReplay: Boolean = true)
       extends AbstractReplayableEventMaterializer(classicSystem, withPartialReplay) {
     override val logger: Logger         = Logger(LoggerFactory.getLogger(classOf[TestReplayable]))
-    override val tagName: String        = tag
+    override val aggregateType          = AggregateType(tag)
     override val matMappingName: String = viewId
     private val replayedEvents          = new ConcurrentLinkedQueue[Any]()
     private val liveEvents              = new ConcurrentLinkedQueue[Any]()

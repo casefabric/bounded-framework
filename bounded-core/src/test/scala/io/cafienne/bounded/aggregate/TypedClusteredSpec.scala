@@ -50,7 +50,7 @@ class TypedClusteredSpec
 
     val aggregateId = "test0"
     val creator     = new SimpleAggregateManager()
-    val actorRef    = spawn(creator.behavior(aggregateId), "testactor")
+    val actorRef    = spawn(creator.behaviorFor(aggregateId), "testactor")
     val probe       = testKit.createTestProbe[Response]()
 
     actorRef.tell(Create(aggregateId, commandMetaData, probe.ref))

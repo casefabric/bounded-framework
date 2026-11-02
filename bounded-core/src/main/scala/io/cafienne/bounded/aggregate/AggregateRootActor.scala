@@ -47,6 +47,14 @@ trait AggregateRootActor[A <: AggregateState[A]]
   def aggregateId: String
 
   /**
+    * When extending the AggregateRootActor you must return the type of the aggregate root, e.g.
+    * `AggregateType("order")`. It gives the persistence id (`order|<aggregateId>`) and is the tag of every event the
+    * aggregate stores, which is how event materializers find its events. It is part of every stored persistence id,
+    * so it can never be changed without migrating the journal (see `AggregateTypeMigration`).
+    */
+  def aggregateType: AggregateType
+
+  /**
     * When extending the AggregateRootActor you MUST implement the handleCommand method.
     *
     * @param command one of the commands your aggregate root expects
@@ -56,14 +64,15 @@ trait AggregateRootActor[A <: AggregateState[A]]
   def handleCommand(command: DomainCommand, state: Option[A]): Reply
 
   /**
-    * The tags to store an event with, so event materializers can read it by tag. With no tags (the default) the
-    * event is stored as is, and tags can still come from an event adapter configured on the journal.
+    * Tags to store an event with next to its aggregate type, which is always a tag. Event materializers read by
+    * aggregate type only; extra tags are for readers that query a tag-based journal directly, and the R2DBC journal
+    * cannot query them at all.
     *
-    * A tagged event reaches the journal wrapped in `Tagged`, so an event adapter bound to the event's class is not
-    * applied to it.
+    * Every event reaches the journal wrapped in `Tagged`, so a write-side event adapter bound to the event's class is
+    * not applied to it.
     *
     * @param event an event returned by handleCommand
-    * @return the tags for the event
+    * @return the extra tags for the event
     */
   def tags(@unused event: DomainEvent): Set[String] = Set.empty
 
@@ -77,13 +86,9 @@ trait AggregateRootActor[A <: AggregateState[A]]
   }
 
   /**
-    * Prefix of the persistence id, e.g. `"Order|"`. Two classic aggregate types whose ids can be equal must use
-    * different prefixes, or they share one journal stream and each recovers the other's events, failing or building
-    * wrong state. The default is no prefix, because changing it moves an existing aggregate to a new, empty stream.
+    * `aggregateType|aggregateId`, so aggregates of different types never share a journal stream, even with equal ids.
     */
-  def persistenceIdPrefix: String = ""
-
-  override def persistenceId: String = s"$persistenceIdPrefix$aggregateId"
+  final override def persistenceId: String = aggregateType.persistenceId(aggregateId).id
 
   /**
     * Save a snapshot of the state every `n` events. None (the default) saves no snapshots.
@@ -167,10 +172,7 @@ trait AggregateRootActor[A <: AggregateState[A]]
       )
   }
 
-  private def withTags(event: DomainEvent): Any = {
-    val eventTags = tags(event)
-    if (eventTags.isEmpty) event else Tagged(event, eventTags)
-  }
+  private def withTags(event: DomainEvent): Any = Tagged(event, tags(event) + aggregateType.name)
 
   private def withoutTags(persisted: Any): Any = persisted match {
     case Tagged(event, _) => event
