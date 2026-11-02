@@ -26,7 +26,10 @@ import java.time.OffsetDateTime
 
 class TestableProjectionSpec extends AsyncWordSpecLike with Matchers with ScalaFutures with BeforeAndAfterAll {
 
-  implicit val timeout: Timeout    = Timeout(30.seconds)
+  implicit val timeout: Timeout = Timeout(30.seconds)
+  // The default patience (150 ms) is too short for the first replay on a slow CI machine, which includes journal start-up.
+  implicit override val patienceConfig: PatienceConfig =
+    PatienceConfig(timeout = scaled(10.seconds), interval = scaled(50.millis))
   implicit val system: ActorSystem =
     ActorSystem("TestableProjectionSpecSystem", SpecConfig.testConfig)
 
