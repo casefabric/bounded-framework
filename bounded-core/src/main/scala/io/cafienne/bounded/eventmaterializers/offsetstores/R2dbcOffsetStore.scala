@@ -13,10 +13,12 @@ import org.apache.pekko.stream.scaladsl.{Sink, Source}
 import com.typesafe.config.Config
 import io.r2dbc.spi.{ConnectionFactory, Result, Row, RowMetadata}
 import org.reactivestreams.Publisher
+import reactor.core.publisher.Mono
 
 import java.util.function.BiFunction
 
 import scala.concurrent.{ExecutionContext, Future}
+import scala.jdk.FutureConverters._
 
 /**
   * Offset store for the R2DBC journal (Postgres or Yugabyte), in the table `bounded_offset_store`. It uses the
@@ -69,17 +71,19 @@ class R2dbcOffsetStore(system: ActorSystem, connectionFactoryPath: String) exten
     )
 
   // Runs one statement on a connection from the pool and closes the connection, also when the statement fails.
+  // The connection is taken with Mono.toFuture: a stream that cancels the pool's publisher after its one element
+  // (like Sink.head) keeps the connection from returning to the pool on close, so the pool runs dry.
   private def run[T](sql: String, binds: Seq[String])(read: Result => Publisher[T]): Future[Seq[T]] =
-    Source.fromPublisher(connectionFactory.create()).runWith(Sink.head).flatMap { connection =>
-      val statement = binds.zipWithIndex.foldLeft(connection.createStatement(sql)) {
-        case (stmt, (value, index)) => stmt.bind(index, value)
+    Mono.from(connectionFactory.create()).toFuture.asScala.flatMap { connection =>
+      val statement = binds.zipWithIndex.foldLeft(connection.createStatement(sql)) { case (stmt, (value, index)) =>
+        stmt.bind(index, value)
       }
       val results = Source
         .fromPublisher(statement.execute())
         .flatMapConcat(result => Source.fromPublisher(read(result)))
         .runWith(Sink.seq)
       results.transformWith { outcome =>
-        Source.fromPublisher(connection.close()).runWith(Sink.ignore).transform(_ => outcome)
+        Mono.from(connection.close()).toFuture.asScala.transform(_ => outcome)
       }
     }
 }

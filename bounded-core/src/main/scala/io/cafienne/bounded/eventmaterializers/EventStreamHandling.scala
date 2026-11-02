@@ -134,16 +134,15 @@ private[eventmaterializers] trait EventStreamHandling extends ActorSystemProvide
       .onFailuresWithBackoff(restartSettings) { () =>
         logger.debug(s"$viewIdentifier: listening for events after offset ${resumeFrom.get}")
         events(resumeFrom.get)
-        // resumeFrom is set as soon as the event is handled, also when a failing save tears the stream down meanwhile
+          // resumeFrom is set as soon as the event is handled, also when a failing save tears the stream down meanwhile
           .mapAsync(1)(processEvent(_, filter, handleEvent, isPublishRequired).map { offset =>
             resumeFrom.set(offset)
             offset
           })
           .via(savePositions(keepOffset))
-          .mapError {
-            case e =>
-              logger.warn(s"$viewIdentifier: event stream failed after offset ${resumeFrom.get}", e)
-              e
+          .mapError { case e =>
+            logger.warn(s"$viewIdentifier: event stream failed after offset ${resumeFrom.get}", e)
+            e
           }
       }
       .viaMat(KillSwitches.single)(Keep.right)

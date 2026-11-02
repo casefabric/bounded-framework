@@ -1,26 +1,20 @@
 import sbt.Keys.localStaging
 
 lazy val basicSettings = {
-  val scala213 = "2.13.18"
-  val supportedScalaVersions = List(scala213)
+  // Scala 3 LTS: libraries built with it can be used from every later Scala 3 version
+  val scala3 = "3.3.9"
 
   Seq(
     organization := "io.cafienne.bounded",
     description := "Scala and Pekko based Domain Driven Design Framework",
-    scalaVersion := scala213,
-    //crossScalaVersions := supportedScalaVersions,
+    scalaVersion := scala3,
     scalacOptions := Seq(
       "-encoding", "UTF-8",
-      //"-target:jvm-1.8",
       "-deprecation", // warning and location for usages of deprecated APIs
       "-feature", // warning and location for usages of features that should be imported explicitly
       "-unchecked", // additional warnings where generated code depends on assumptions
-      "-Xlint", // recommended additional warnings
-      "-Ywarn-value-discard", // Warn when non-Unit expression results are unused
-      "-Ywarn-dead-code",
-      "-Ywarn-unused" //,
-      //"-Xsource:3" //,
-      //"-Ywarn-unused-import"
+      "-Wvalue-discard", // Warn when non-Unit expression results are unused
+      "-Wunused:all"
     ),
     //scalastyleConfig := baseDirectory.value / "project/scalastyle-config.xml",
     scalafmtConfig := (ThisBuild / baseDirectory).value / "project/.scalafmt.conf",
@@ -81,7 +75,7 @@ lazy val basicSettings = {
 }
 
 lazy val boundedRoot = (project in file("."))
-  .settings(basicSettings: _*)
+  .settings(basicSettings*)
   .settings(publishArtifact := false,
             publish / skip := true,
             crossScalaVersions := Nil)
@@ -90,7 +84,7 @@ lazy val boundedRoot = (project in file("."))
 
 val boundedCore = (project in file("bounded-core"))
   .enablePlugins(BuildInfoPlugin, GitPlugin, GitVersioning, GitBranchPrompt, AutomateHeaderPlugin)
-  .settings(basicSettings: _*)
+  .settings(basicSettings*)
   .settings(
     name := "bounded-core",
     // Generate io.cafienne.bounded.BuildInfo with 'name', 'organization', 'version', 'description' and the git status
@@ -121,7 +115,7 @@ val boundedCore = (project in file("bounded-core"))
 val boundedPekkoHttp = (project in file("bounded-pekko-http"))
   .dependsOn(boundedCore)
   .enablePlugins(GitPlugin, GitVersioning, GitBranchPrompt, AutomateHeaderPlugin)
-  .settings(basicSettings: _*)
+  .settings(basicSettings*)
   .settings(
     name := "bounded-pekko-http",
     libraryDependencies ++= Dependencies.pekkoHttpDeps)
@@ -129,7 +123,7 @@ val boundedPekkoHttp = (project in file("bounded-pekko-http"))
 val boundedTest = (project in file("bounded-test"))
   .dependsOn(boundedCore)
   .enablePlugins(GitPlugin, GitVersioning, GitBranchPrompt, AutomateHeaderPlugin)
-  .settings(basicSettings: _*)
+  .settings(basicSettings*)
   .settings(
     name := "bounded-test",
     libraryDependencies ++= Dependencies.testDeps)

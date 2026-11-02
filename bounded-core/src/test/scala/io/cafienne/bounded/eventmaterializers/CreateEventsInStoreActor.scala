@@ -12,9 +12,8 @@ import io.cafienne.bounded.aggregate.DomainEvent
 class CreateEventsInStoreActor(aggregateId: String) extends PersistentActor {
   override def persistenceId: String = aggregateId
 
-  override def receiveRecover: Receive = {
-    case other =>
-      context.system.log.debug("received unknown event to recover:" + other)
+  override def receiveRecover: Receive = { case other =>
+    context.system.log.debug("received unknown event to recover:" + other)
   }
 
   override def receiveCommand: Receive = {

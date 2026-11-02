@@ -212,9 +212,9 @@ trait AggregateRootActor[A <: AggregateState[A]]
   }
 
   override def receiveRecover: Receive = {
-    case _: RecoveryCompleted                  => // initialize further processing when required
-    case SnapshotOffer(_, snapshot: Option[A]) => internalState = snapshot
-    case evt: DomainEvent                      => updateState(evt)
+    case _: RecoveryCompleted                             => // initialize further processing when required
+    case SnapshotOffer(_, snapshot: Option[A @unchecked]) => internalState = snapshot
+    case evt: DomainEvent                                 => updateState(evt)
     // journals unwrap Tagged when they store an event; this covers one that does not
     case Tagged(evt: DomainEvent, _) => updateState(evt)
 

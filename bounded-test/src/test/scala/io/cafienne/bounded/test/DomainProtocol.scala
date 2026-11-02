@@ -75,7 +75,7 @@ object DomainProtocol {
 
   case class SlowStateUpdated(metaData: MetaData, id: String, state: String, waited: Long) extends DomainEvent
 
-  //This can be sent but is not handled so gives a Ko(UnExpectedCommand)
+  // This can be sent but is not handled so gives a Ko(UnExpectedCommand)
   case class CommandWithoutHandler(metaData: CommandMetaData, aggregateRootId: String, msg: String)
       extends DomainCommand
 

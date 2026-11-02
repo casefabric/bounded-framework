@@ -25,10 +25,9 @@ class LmdbOffsetStoreSpec extends AnyFlatSpec with Matchers with ScalaFutures {
   behavior of "LmdbOffsetStore"
 
   it should "store and read back every offset type" in {
-    allOffsetTypes.zipWithIndex.foreach {
-      case (offset, i) =>
-        store.saveOffset(s"view-$i", offset).futureValue
-        store.getOffset(s"view-$i").futureValue shouldBe offset
+    allOffsetTypes.zipWithIndex.foreach { case (offset, i) =>
+      store.saveOffset(s"view-$i", offset).futureValue
+      store.getOffset(s"view-$i").futureValue shouldBe offset
     }
   }
 

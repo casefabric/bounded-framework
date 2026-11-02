@@ -40,7 +40,7 @@ class UserEventFilter(
   override def filter(evt: DomainEvent): Boolean = {
     evt match {
       case TestedEvent(metaData, text)
-          if (metaData.userContext.isDefined && metaData.userContext.get.equalsIgnoreCase("user-b")) =>
+          if (metaData.userContext.isDefined && metaData.userContext.get.equalsIgnoreCase(userToFilter)) =>
         true
       case _ => false
     }
@@ -55,16 +55,6 @@ class AbstractReplayableEventMaterializerWithEventFilterSpec
     with ScalaFutures
     with LogCapturing {
 
-  //Setup required supporting classes
-
-//  implicit val system: ActorSystem =
-//    ActorSystem("MaterializerTestSystem", PersistenceTestKitPlugin.config.withFallback(SpecConfig.testConfig))
-  // implicit val timeout: Timeout       = Timeout(10.seconds)
-  // implicit val logger: LoggingAdapter = Logging(system, getClass)
-//  implicit val defaultPatience: PatienceConfig =
-//    PatienceConfig(timeout = Span(4, Seconds), interval = Span(100, Millis))
-
-  //val testKit = PersistenceTestKit(system)
   private val projectionTestKit           = ProjectionTestKit(system)
   val projectionId: ProjectionId          = ProjectionId("name", "key")
   implicit val classicSystem: ActorSystem = system.classicSystem
@@ -84,7 +74,7 @@ class AbstractReplayableEventMaterializerWithEventFilterSpec
 
   def handler(strBuffer: StringBuffer, predicate: Int => Boolean): Handler[Int] = new Handler[Int] {
     override def process(env: Int): Future[Done] = {
-      if (predicate(env)) concat(env)
+      if (predicate(env)) concat(env): Unit
       Future.successful(Done)
     }
 
@@ -103,7 +93,7 @@ class AbstractReplayableEventMaterializerWithEventFilterSpec
 
       // stop as soon we observe that all expected elements passed through
       projectionTestKit.run(prj) {
-        strBuffer.toString shouldBe "1-2-3-4-5-6"
+        (strBuffer.toString shouldBe "1-2-3-4-5-6"): Unit
       }
     }
 
@@ -152,7 +142,7 @@ class AbstractReplayableEventMaterializerWithEventFilterSpec
 
     storeEventsActor ! PoisonPill
     val terminated = testProbe.expectTerminated(storeEventsActor)
-    assert(terminated.existenceConfirmed)
+    assert(terminated.existenceConfirmed): Unit
   }
 
   override def beforeAll(): Unit = {
