@@ -79,7 +79,7 @@ class AggregateSnapshotSpec
   }
 
   private def snapshotSequenceNrs(id: String): Seq[Long] =
-    snapshotTestKit.persistedInStorage(id).map(_._1.sequenceNr).toList
+    snapshotTestKit.persistedInStorage(ClassicSimpleAggregate.Type.persistenceId(id).id).map(_._1.sequenceNr).toList
 
   behavior of "Classic AggregateRootActor snapshots"
 

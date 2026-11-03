@@ -7,9 +7,9 @@ package io.cafienne.bounded.aggregate
 import org.apache.pekko.actor.typed.{ActorRef, Behavior}
 import org.apache.pekko.cluster.sharding.typed.scaladsl.EntityTypeKey
 import org.apache.pekko.persistence.typed.PersistenceId
-import org.apache.pekko.persistence.typed.scaladsl.{Effect, EventSourcedBehavior, ReplyEffect}
+import org.apache.pekko.persistence.typed.scaladsl.{Effect, ReplyEffect}
 import com.typesafe.scalalogging.Logger
-import io.cafienne.bounded.aggregate.typed.TypedAggregateRootManager
+import io.cafienne.bounded.aggregate.typed.{AggregateBehavior, TypedAggregateRootManager}
 import java.time.OffsetDateTime
 import java.util.UUID
 import scala.concurrent.duration._
@@ -131,12 +131,12 @@ class SimpleAggregateManager() extends TypedAggregateRootManager[SimpleAggregate
   import TypedSimpleAggregate._
   final val logger = Logger(this.getClass.getSimpleName)
 
-  override def behavior(id: String): Behavior[SimpleAggregateCommand] = {
-    logger.debug("Create aggregate behavior for {}", id)
+  override def behavior(persistenceId: PersistenceId): Behavior[SimpleAggregateCommand] = {
+    logger.debug("Create aggregate behavior for {}", persistenceId)
     Behaviors.withTimers { timers =>
-      EventSourcedBehavior
+      AggregateBehavior
         .withEnforcedReplies(
-          PersistenceId(aggregateRootTag, id),
+          persistenceId,
           SimpleAggregateState(List.empty[String]),
           commandHandler(timers),
           eventHandler

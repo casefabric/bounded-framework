@@ -6,18 +6,13 @@ package io.cafienne.bounded.eventmaterializers
 
 import java.util.UUID
 import org.apache.pekko.actor.ActorSystem
-import org.apache.pekko.persistence.query.scaladsl.{
-  CurrentEventsByPersistenceIdQuery,
-  CurrentEventsByTagQuery,
-  EventsByTagQuery,
-  ReadJournal
-}
 import org.apache.pekko.persistence.query.{NoOffset, Offset}
 import org.apache.pekko.stream.scaladsl.Source
 import org.apache.pekko.stream.UniqueKillSwitch
 import org.apache.pekko.{Done, NotUsed}
 import com.typesafe.scalalogging.Logger
-import io.cafienne.bounded.pekko.persistence.ReadJournalProvider
+import io.cafienne.bounded.aggregate.AggregateType
+import io.cafienne.bounded.pekko.persistence.{AggregateTypeReadJournal, ReadJournalProvider}
 import io.cafienne.bounded.config.Configured
 
 import scala.concurrent.{ExecutionContextExecutor, Future}
@@ -26,7 +21,7 @@ import scala.concurrent.{ExecutionContextExecutor, Future}
   * Abstract class to be used to create eventlisteners. Use this class as a base for listening for
   * specific events. The class supports offset store to keep track of events received.
   *
-  * Set tagname to identify eventstream to listen to
+  * Set aggregateTypes to the types of the aggregates whose events to listen to
   * Set mappingname as identifier for this listener. It will be used as the id for storing current offset of
   * listener.
   *
@@ -56,13 +51,14 @@ abstract class SagaEventMaterializer(
 
   implicit val mat: ExecutionContextExecutor = actorSystem.dispatcher
 
-  val journal: ReadJournal with CurrentEventsByTagQuery with EventsByTagQuery with CurrentEventsByPersistenceIdQuery =
-    readJournal
+  val journal: AggregateTypeReadJournal = aggregateTypeJournal
 
   /**
-    * Tagnames used to identify the eventstreams to listen to. The saga keeps its offset per tag.
+    * The types of the aggregates whose events the saga reads. The saga keeps its offset per type.
     */
-  val tagNames: List[String]
+  val aggregateTypes: List[AggregateType]
+
+  private def typeNames: List[String] = aggregateTypes.map(_.name)
 
   /**
     * Mapping name of this listener
@@ -96,20 +92,25 @@ abstract class SagaEventMaterializer(
   }
 
   def registerListenerWithKillSwitch(maybeStartOffset: Option[Offset]): (UniqueKillSwitch, Future[Offset]) = {
-    require(tagNames.nonEmpty, s"Saga $viewIdentifier must listen to at least one tag")
+    require(aggregateTypes.nonEmpty, s"Saga $viewIdentifier must listen to at least one aggregate type")
     logger.info(s"Registering saga with killswitch $viewIdentifier")
 
-    val startPosition = SagaEventMaterializer.tagOffsets(tagNames, listenStartOffset(maybeStartOffset))
+    val startPosition = SagaEventMaterializer.tagOffsets(typeNames, listenStartOffset(maybeStartOffset))
     runListener(events, startPosition, keepCurrentOffset, materialzerEventFilter)
   }
 
   /**
-    * The events of all tags after the given position, each with the position per tag once it is processed.
+    * The events of all aggregate types after the given position, each with the position per type once it is
+    * processed.
     */
   private def events(position: Offset): Source[PositionedEvent, NotUsed] = {
-    val start = SagaEventMaterializer.tagOffsets(tagNames, position)
-    Source(tagNames)
-      .flatMapMerge(tagNames.size, tag => journal.eventsByTag(tag, start.offsets(tag)).map(tag -> _))
+    val start = SagaEventMaterializer.tagOffsets(typeNames, position)
+    Source(aggregateTypes)
+      .flatMapMerge(
+        aggregateTypes.size,
+        aggregateType =>
+          journal.eventsByAggregateType(aggregateType, start.offsets(aggregateType.name)).map(aggregateType.name -> _)
+      )
       .statefulMap(() => start)(
         (positions, taggedEnvelope) => {
           val (tag, envelope) = taggedEnvelope
@@ -124,9 +125,10 @@ abstract class SagaEventMaterializer(
 object SagaEventMaterializer {
 
   /**
-    * The position per tag of a saga. A stored TagOffsets gives each tag its own offset (a tag without one
-    * starts from the beginning, a tag no longer listened to is dropped). A plain offset, stored by an older
-    * version of Bounded or given to registerListener, is the start offset of every tag.
+    * The position per aggregate type (stored per type name, the tag of its events) of a saga. A stored TagOffsets
+    * gives each type its own offset (a type without one starts from the beginning, a type no longer listened to is
+    * dropped). A plain offset, stored by an older version of Bounded or given to registerListener, is the start
+    * offset of every type.
     */
   private[eventmaterializers] def tagOffsets(tagNames: List[String], position: Offset): TagOffsets =
     position match {

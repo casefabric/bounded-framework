@@ -15,6 +15,8 @@ class TestAggregateRoot(aggregateRootId: String) extends AggregateRootActor[Test
 
   override def aggregateId: String = aggregateRootId
 
+  override def aggregateType: AggregateType = TestAggregateRoot.Type
+
   override def handleCommand(command: DomainCommand, aggregateState: Option[TestAggregateRootState]): Reply = {
     command match {
       case CreateInitialState(metaData, aggregateRootId, state) =>
@@ -89,6 +91,8 @@ object TestAggregateRoot {
   }
 
   val aggregateRootTag = "ar-test"
+
+  val Type: AggregateType = AggregateType(aggregateRootTag)
 }
 
 class TestAggregateRootCreator(system: ActorSystem) extends AggregateRootCreator {
@@ -103,6 +107,6 @@ class TestAggregateRootCreator(system: ActorSystem) extends AggregateRootCreator
 
 }
 
-class PrefixedTestAggregateRoot(aggregateRootId: String) extends TestAggregateRoot(aggregateRootId) {
-  override def persistenceIdPrefix: String = "test|"
+class OtherTypeTestAggregateRoot(aggregateRootId: String) extends TestAggregateRoot(aggregateRootId) {
+  override def aggregateType: AggregateType = AggregateType("test")
 }

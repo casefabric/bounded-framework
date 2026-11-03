@@ -4,6 +4,7 @@
 
 package io.cafienne.bounded.eventmaterializers
 
+import io.cafienne.bounded.aggregate.AggregateType
 import org.apache.pekko.Done
 import org.apache.pekko.actor.{ActorSystem, ExtendedActorSystem, PoisonPill, Props}
 import org.apache.pekko.actor.testkit.typed.scaladsl.{LogCapturing, ScalaTestWithActorTestKit}
@@ -84,11 +85,14 @@ class SagaTagOffsetsSpec
     "listen to a single tag" in {
       val tag = newTag()
       store(tag, "s1", "s2")
-      val saga = new TestSaga(List(tag), new InMemoryBasedOffsetStore())
+      val offsets = new InMemoryBasedOffsetStore()
+      val saga    = new TestSaga(List(tag), offsets)
 
       val (killSwitch, lastOffset) = saga.registerListenerWithKillSwitch(None)
 
       eventually(saga.handled shouldBe Seq("s1", "s2"))
+      // the event is handled before its offset passes; stop only once it has
+      eventually(offsets.getOffset(saga.viewIdentifier).futureValue shouldBe TagOffsets(Map(tag -> Sequence(2L))))
       killSwitch.shutdown()
       lastOffset.futureValue shouldBe TagOffsets(Map(tag -> Sequence(2L)))
     }
@@ -153,7 +157,7 @@ class SagaTagOffsetsSpec
   class TestSaga(tags: List[String], offsets: InMemoryBasedOffsetStore, failOnce: Set[String] = Set.empty)
       extends SagaEventMaterializer(classicSystem) {
     override val logger: Logger         = Logger(LoggerFactory.getLogger(classOf[TestSaga]))
-    override val tagNames: List[String] = tags
+    override val aggregateTypes         = tags.map(AggregateType(_))
     override val matMappingName: String = s"saga-view-${tags.mkString("-")}"
     private val handledEvents           = new ConcurrentLinkedQueue[String]()
     private val handlingAttempts        = new ConcurrentHashMap[String, AtomicInteger]()

@@ -218,14 +218,14 @@ class TestableAggregateRootSpec extends AsyncWordSpecLike with Matchers with Sca
 
     }
 
-    "create initial state in given for an aggregate with a persistence id prefix" in {
+    "create initial state in given for an aggregate of another type" in {
       val aggregateRootId = "5"
       val prefixedCreator = new AggregateRootCreator {
-        override def props(id: String): Props = Props(classOf[PrefixedTestAggregateRoot], id)
+        override def props(id: String): Props = Props(classOf[OtherTypeTestAggregateRoot], id)
       }
 
       val ar = TestableAggregateRoot
-        .givenEvents[PrefixedTestAggregateRoot, TestAggregateRootState](
+        .givenEvents[OtherTypeTestAggregateRoot, TestAggregateRootState](
           prefixedCreator,
           aggregateRootId,
           InitialStateCreated(currentMeta, aggregateRootId, "new")

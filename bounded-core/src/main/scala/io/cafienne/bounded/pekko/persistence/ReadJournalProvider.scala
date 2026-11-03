@@ -12,15 +12,31 @@ import io.cafienne.bounded.pekko.ActorSystemProvider
 import scala.annotation.nowarn
 import org.apache.pekko.persistence.jdbc.query.scaladsl.JdbcReadJournal
 import io.github.alstanchev.pekko.persistence.inmemory.query.scaladsl.InMemoryReadJournal
+import org.apache.pekko.persistence.r2dbc.query.scaladsl.R2dbcReadJournal
 
 /**
-  * Provides a readJournal that has the eventsByTag available that's used for
-  * creation of the domain/query models of the system.
+  * Provides the read journal of the configured journal plugin, which the event materializers read the events of
+  * an aggregate type from.
   */
 trait ReadJournalProvider { systemProvider: ActorSystemProvider =>
   val configuredJournal =
     system.settings.config.getString("pekko.persistence.journal.plugin")
 
+  /**
+    * Whether the configured journal is the R2DBC journal, which has no queries by tag.
+    */
+  def isR2dbcJournal: Boolean = ReadJournalProvider.isR2dbcJournal(configuredJournal)
+
+  /**
+    * The events per aggregate type: by tag on the tag-based journals, by entity type on the R2DBC journal.
+    */
+  def aggregateTypeJournal: AggregateTypeReadJournal =
+    if (isR2dbcJournal) new R2dbcAggregateTypeReadJournal(system)
+    else new TagAggregateTypeReadJournal(readJournal)
+
+  /**
+    * The read journal with the queries by tag, on every journal but R2DBC.
+    */
   @nowarn("cat=deprecation") // LevelDB is deprecated in Pekko but still supported here
   def readJournal
     : ReadJournal with CurrentEventsByTagQuery with EventsByTagQuery with CurrentEventsByPersistenceIdQuery = {
@@ -36,11 +52,11 @@ trait ReadJournalProvider { systemProvider: ActorSystemProvider =>
         .readJournalFor[CassandraReadJournal](CassandraReadJournal.Identifier)
     }
     // The Pekko plugin is pekko.persistence.r2dbc.journal. Its read journal offers eventsBySlices but no
-    // queries by tag, which the event materializers are built on.
-    if (configuredJournal.endsWith("r2dbc.journal") || configuredJournal.endsWith("r2dbc-journal")) {
+    // queries by tag; aggregateTypeJournal reads it by entity type.
+    if (isR2dbcJournal) {
       throw new UnsupportedOperationException(
-        s"Event materializers read events by tag, which the R2DBC journal $configuredJournal does not support " +
-          "(it only offers eventsBySlices)"
+        s"The R2DBC journal $configuredJournal has no queries by tag (it only offers eventsBySlices); " +
+          "read events by aggregate type with aggregateTypeJournal"
       )
     }
     if (configuredJournal.endsWith("jdbc-journal")) {
@@ -63,4 +79,24 @@ trait ReadJournalProvider { systemProvider: ActorSystemProvider =>
       s"Unsupported read journal $configuredJournal, please switch to cassandra for production"
     )
   }
+}
+
+object ReadJournalProvider {
+
+  /**
+    * The plugin id of the read journal that belongs to the configured journal plugin.
+    */
+  def queryPluginId(configuredJournal: String): String =
+    if (configuredJournal.endsWith("leveldb")) LeveldbReadJournal.Identifier
+    else if (configuredJournal.endsWith("cassandra-journal") || configuredJournal.endsWith("cassandra.journal"))
+      CassandraReadJournal.Identifier
+    else if (isR2dbcJournal(configuredJournal)) R2dbcReadJournal.Identifier
+    else if (configuredJournal.endsWith("jdbc-journal")) JdbcReadJournal.Identifier
+    else if (configuredJournal.endsWith("inmemory-journal")) InMemoryReadJournal.Identifier
+    else throw new IllegalArgumentException(s"Unsupported journal $configuredJournal")
+
+  // The Pekko plugin is pekko.persistence.r2dbc.journal; r2dbc-journal is accepted for a plugin configured under
+  // that name.
+  def isR2dbcJournal(configuredJournal: String): Boolean =
+    configuredJournal.endsWith("r2dbc.journal") || configuredJournal.endsWith("r2dbc-journal")
 }

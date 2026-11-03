@@ -4,6 +4,7 @@
 
 package io.cafienne.bounded.aggregate
 
+import org.apache.pekko.persistence.typed.PersistenceId
 import java.time.OffsetDateTime
 import java.util.concurrent.atomic.AtomicBoolean
 import org.apache.pekko.actor.testkit.typed.scaladsl.{LogCapturing, ScalaTestWithActorTestKit}
@@ -23,10 +24,10 @@ object TypedGatewayAskAndShutdownSpec {
 
   /** Aggregates that take a while to stop, and record that they did. */
   class SlowStoppingManager(stopped: AtomicBoolean) extends TypedAggregateRootManager[Ping] {
-    override def behavior(id: String): Behavior[Ping] =
+    override def behavior(persistenceId: PersistenceId): Behavior[Ping] =
       Behaviors
         .receiveMessage[Ping] { ping =>
-          ping.replyTo ! s"pong $id"
+          ping.replyTo ! s"pong ${AggregateType.aggregateIdOf(persistenceId)}"
           Behaviors.same
         }
         .receiveSignal { case (_, PostStop) =>

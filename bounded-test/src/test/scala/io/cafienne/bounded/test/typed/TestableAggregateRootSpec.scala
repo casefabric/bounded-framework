@@ -5,7 +5,6 @@
 package io.cafienne.bounded.test.typed
 
 import java.time.OffsetDateTime
-import org.apache.pekko.persistence.typed.PersistenceId
 import org.apache.pekko.util.Timeout
 import io.cafienne.bounded.aggregate.typed.TypedAggregateRootManager
 import io.cafienne.bounded.test.DomainProtocol._
@@ -49,23 +48,21 @@ class TestableAggregateRootSpec extends AsyncFlatSpecLike with Matchers with Sca
     testAR.events should be(List(ItemAdded(aggregateId, eventMetaData, "ar0 item 2")))
   }
 
-  it should "be created with initial events for a persistence id with the type name" in {
+  it should "fail for a behavior that does not persist under the persistence id it is given" in {
     val commandMetaData = TestCommandMetaData(OffsetDateTime.now(), None)
     val eventMetaData   = TestMetaData.fromCommand(commandMetaData)
-    val aggregateId     = "ar-typename"
-    val typeNameCreator = new SimpleAggregateManager(PersistenceId(aggregateRootTag, _))
+    val aggregateId     = "ar-own-id"
 
-    val testAR = TestableAggregateRoot
-      .givenEvents(
-        typeNameCreator,
+    val mismatch = intercept[TestableAggregateRoot.PersistenceIdMismatch] {
+      TestableAggregateRoot.givenEvents(
+        new SimpleAggregateManager(ignoreGivenPersistenceId = true),
         aggregateId,
-        Created(aggregateId, eventMetaData),
-        ItemAdded(aggregateId, eventMetaData, "item 1")
+        Created(aggregateId, eventMetaData)
       )
+    }
 
-    testAR.when(AddItem(aggregateId, commandMetaData, "item 2"))
-
-    testAR.events should be(List(ItemAdded(aggregateId, eventMetaData, "item 2")))
+    mismatch.expected should startWith(s"$aggregateRootTag|$aggregateId")
+    mismatch.actual should startWith(aggregateId)
   }
 
   it should "provide command handling failure for assertions" in {

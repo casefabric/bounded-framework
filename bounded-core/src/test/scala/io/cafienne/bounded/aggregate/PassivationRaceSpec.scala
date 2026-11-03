@@ -4,6 +4,7 @@
 
 package io.cafienne.bounded.aggregate
 
+import org.apache.pekko.persistence.typed.PersistenceId
 import org.apache.pekko.actor.{ActorSystem, Props}
 import org.apache.pekko.actor.typed.{ActorRef, Behavior, PostStop, Scheduler}
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
@@ -61,6 +62,8 @@ class SlowClassicAggregate(id: String) extends AggregateRootActor[ClassicSimpleA
 
   override def aggregateId: String = id
 
+  override def aggregateType: AggregateType = AggregateType("slow")
+
   override def preStart(): Unit = {
     AggregateLifecycles.onStart(id)
     super.preStart()
@@ -109,7 +112,8 @@ object PassivationRaceSpec {
 
   /** A typed aggregate whose TypedSlow command keeps it busy. */
   object SlowTypedAggregates extends TypedAggregateRootManager[TypedCommand] {
-    override def behavior(id: String): Behavior[TypedCommand] = Behaviors.setup { _ =>
+    override def behavior(persistenceId: PersistenceId): Behavior[TypedCommand] = Behaviors.setup { _ =>
+      val id = AggregateType.aggregateIdOf(persistenceId)
       AggregateLifecycles.onStart(id)
       Behaviors
         .receiveMessage[TypedCommand] {

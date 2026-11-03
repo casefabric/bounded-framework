@@ -46,7 +46,7 @@ abstract class AbstractReplayableEventMaterializer(
 
     var eventsReplayed = 0
     journal
-      .currentEventsByTag(tagName, targetOffset)
+      .currentEventsByAggregateType(aggregateType, targetOffset)
       .mapAsync(1)(eventEnvelope =>
         processEvent(PositionedEvent(eventEnvelope), materializerEventFilter, handleReplayEvent, publish = false)
       )
@@ -54,7 +54,7 @@ abstract class AbstractReplayableEventMaterializer(
         replayedUpTo.set(offset)
         eventsReplayed += 1
         if (eventsReplayed % 100 == 0) {
-          logger.info(s"$viewIdentifier: [$tagName] events replayed: $eventsReplayed")
+          logger.info(s"$viewIdentifier: [$aggregateType] events replayed: $eventsReplayed")
         }
         offset
       }

@@ -26,14 +26,14 @@ class TestTypedCommandGateway[T <: DomainCommand](
     implicit validator: ValidateableCommand[T]
   ): Future[Res] = {
     val aggregateRoot =
-      aggregates.getOrElseUpdate(aggregateRootId, testKit.spawn(aggregateRootCreator.behavior(aggregateRootId)))
+      aggregates.getOrElseUpdate(aggregateRootId, testKit.spawn(aggregateRootCreator.behaviorFor(aggregateRootId)))
     aggregateRoot.ask(replyTo)
   }
 
   override def tell(command: T)(implicit validator: ValidateableCommand[T]): Future[_] = {
     val aggregateRoot = aggregates.getOrElseUpdate(
       command.aggregateRootId,
-      testKit.spawn(aggregateRootCreator.behavior(command.aggregateRootId))
+      testKit.spawn(aggregateRootCreator.behaviorFor(command.aggregateRootId))
     )
     Future { aggregateRoot.tell(command) }
   }

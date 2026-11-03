@@ -24,11 +24,15 @@ import scala.concurrent.{ExecutionContext, Future}
 
 object TestableProjection {
 
+  /**
+    * Stores the events as an aggregate of the given type would (persistence id `aggregateType|<id of the first
+    * event>`, tagged with the type), before the projection starts.
+    */
   def givenEvents(
     evt: Seq[DomainEvent],
-    tags: Set[String] = Set.empty
+    aggregateType: AggregateType
   )(implicit system: ActorSystem, timeout: Timeout = 2.seconds): TestableProjection = {
-    val testedProjection = new TestableProjection(system, timeout, tags)
+    val testedProjection = new TestableProjection(system, timeout, aggregateType)
     OffsetStoreProvider.getInMemoryStore().clear()
     testedProjection.storeEvents(evt)
     testedProjection
@@ -36,7 +40,7 @@ object TestableProjection {
 
 }
 
-class TestableProjection private (system: ActorSystem, timeout: Timeout, tags: Set[String]) {
+class TestableProjection private (system: ActorSystem, timeout: Timeout, aggregateType: AggregateType) {
 
   private var eventMaterializers: Option[EventMaterializers] = uninitialized
   private implicit val executionContext: ExecutionContext    = system.dispatcher
@@ -75,7 +79,14 @@ class TestableProjection private (system: ActorSystem, timeout: Timeout, tags: S
   private def storeEvents(evt: Seq[DomainEvent]): Future[Done] = {
 
     val storeEventsActor =
-      system.actorOf(Props(classOf[CreateEventsInStoreActor], evt.head.id, tags), "create-events-actor")
+      system.actorOf(
+        Props(
+          classOf[CreateEventsInStoreActor],
+          aggregateType.persistenceId(evt.head.id).id,
+          Set(aggregateType.name)
+        ),
+        "create-events-actor"
+      )
 
     val testProbe = TestProbe()
     testProbe watch storeEventsActor

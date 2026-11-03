@@ -81,7 +81,8 @@ class DefaultTypedCommandGateway[Cmd <: DomainCommand](
     ): StatusReply[ActorRef[Cmd]] = {
       val created = aggregates.get(aggregateId).map(Success(_)).getOrElse {
         Try(
-          context.spawn(aggregateRootCreator.behavior(aggregateId), DefaultTypedCommandGateway.actorName(aggregateId))
+          context
+            .spawn(aggregateRootCreator.behaviorFor(aggregateId), DefaultTypedCommandGateway.actorName(aggregateId))
         ).map { ref =>
           context.watchWith(ref, AggregateTerminated(aggregateId))
           aggregates += aggregateId -> ref

@@ -17,9 +17,7 @@ import scala.concurrent.Future
 import scala.concurrent.duration._
 
 /**
-  * Keeps the offsets in the store that belongs to the configured journal. There is no branch for the R2DBC journal:
-  * it has no queries by tag, so `ReadJournalProvider` already fails the materializer before its store is made.
-  * `R2dbcOffsetStore` can be created directly.
+  * Keeps the offsets in the store that belongs to the configured journal.
   */
 trait ReadJournalOffsetStore extends OffsetStore {
   this: ReadJournalProvider with ActorSystemProvider =>
@@ -32,6 +30,8 @@ trait ReadJournalOffsetStore extends OffsetStore {
         cassandraCreateTableTimeout,
         keyspace = CassandraOffsetStore.keyspace(system.settings.config, configuredJournal)
       )
+    } else if (isR2dbcJournal) {
+      new R2dbcOffsetStore(system, R2dbcOffsetStore.connectionFactoryPath(system.settings.config))
     } else if (configuredJournal.endsWith("inmemory-journal")) {
       new InMemoryBasedOffsetStore()
     } else if (configuredJournal.endsWith("leveldb")) {

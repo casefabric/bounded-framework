@@ -4,6 +4,7 @@
 
 package io.cafienne.bounded.eventmaterializers
 
+import io.cafienne.bounded.aggregate.AggregateType
 import org.apache.pekko.Done
 import org.apache.pekko.actor.{ActorSystem, ExtendedActorSystem, PoisonPill, Props}
 import org.apache.pekko.actor.testkit.typed.scaladsl.{LogCapturing, ScalaTestWithActorTestKit}
@@ -170,7 +171,7 @@ class EventMaterializerRestartSpec
     failSave: (Offset, Int) => Boolean = (_, _) => false
   ) extends AbstractReplayableEventMaterializer(classicSystem, keepOffset) {
     override val logger: Logger           = Logger(LoggerFactory.getLogger(classOf[FlakyMaterializer]))
-    override val tagName: String          = tag
+    override val aggregateType            = AggregateType(tag)
     override val matMappingName: String   = s"view-$tag"
     val offsets: InMemoryBasedOffsetStore = new InMemoryBasedOffsetStore()
     private val handledEvents             = new ConcurrentLinkedQueue[String]()

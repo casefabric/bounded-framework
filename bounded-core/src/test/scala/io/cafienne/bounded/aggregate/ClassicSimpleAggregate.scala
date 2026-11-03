@@ -12,6 +12,8 @@ class ClassicSimpleAggregate(aggregateRootId: String) extends AggregateRootActor
 
   override def aggregateId: String = aggregateRootId
 
+  override def aggregateType: AggregateType = ClassicSimpleAggregate.Type
+
   override def handleCommand(command: DomainCommand, aggregateState: Option[ClassicSimpleAggregateState]): Reply = {
     command match {
       case Stop(aggregateRootId) =>
@@ -49,6 +51,7 @@ class ClassicSimpleAggregate(aggregateRootId: String) extends AggregateRootActor
 }
 
 object ClassicSimpleAggregate {
+  val Type: AggregateType = AggregateType("simple")
 
   trait SimpleCommand                              extends DomainCommand
   final case class Create(aggregateRootId: String) extends SimpleCommand
