@@ -36,9 +36,10 @@ import io.cafienne.bounded.aggregate.{
 import io.cafienne.bounded.aggregate.ClassicSimpleAggregate._
 import io.cafienne.bounded.aggregate.TypedSimpleAggregate.{AggregateCommandMetaData, SimpleAggregateCommand}
 import io.cafienne.bounded.aggregate.typed.DefaultTypedCommandGateway
-import io.cafienne.bounded.eventmaterializers.{AbstractReplayableEventMaterializer, SpecConfig}
+import io.cafienne.bounded.eventmaterializers.{AbstractReplayableEventMaterializer, SpecConfig, TagOffsets}
 import io.cafienne.bounded.eventmaterializers.offsetstores.{DockerTests, InMemoryBasedOffsetStore}
-import io.cafienne.bounded.pekko.persistence.ReadJournalProvider
+import io.cafienne.bounded.pekko.ActorSystemProvider
+import io.cafienne.bounded.pekko.persistence.{AggregateTypeReadJournal, ReadJournalProvider}
 import org.scalatest.{Assertion, BeforeAndAfterAll}
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.matchers.should.Matchers
@@ -49,7 +50,7 @@ import org.slf4j.LoggerFactory
 import java.time.OffsetDateTime
 import java.util.concurrent.ConcurrentLinkedQueue
 import scala.collection.immutable.ListMap
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.concurrent.duration._
 import scala.jdk.CollectionConverters._
 
@@ -115,6 +116,13 @@ abstract class AggregateTypeMigrationSpec extends AnyWordSpec with Matchers with
   private lazy val migration                     = new AggregateTypeMigration(system, rule, batchSize = 2)
   private implicit lazy val ec: ExecutionContext = system.dispatcher
   private var report: Option[MigrationReport]    = None
+
+  private def typeJournal: AggregateTypeReadJournal = {
+    val specSystem = system
+    new ActorSystemProvider with ReadJournalProvider {
+      implicit def system: ActorSystem = specSystem
+    }.aggregateTypeJournal
+  }
 
   private def journal: ReadJournal with CurrentPersistenceIdsQuery with CurrentEventsByPersistenceIdQuery =
     PersistenceQuery(system)
@@ -243,6 +251,33 @@ abstract class AggregateTypeMigrationSpec extends AnyWordSpec with Matchers with
 
       store.getOffset("view-1").futureValue shouldBe NoOffset
       store.getOffset("view-2").futureValue shouldBe NoOffset
+    }
+
+    "start a materializer and a saga after the migrated events" in {
+      assume(available, "The backend is not available")
+      val store = new InMemoryBasedOffsetStore()
+      // on R2DBC this waits until the backtracking window after the last copy has passed
+      Await.result(migration.startAtEnd(store, "view-end", Simple), 3.minutes) shouldBe Done
+      Await.result(migration.startSagaAtEnd(store, "saga-end", Seq(Simple, Typed)), 3.minutes) shouldBe Done
+
+      legacyUnder("simple|n", Append(Seq(Created("n")), tags = Set(Simple.name)))
+
+      def liveFrom(aggregateType: AggregateType, offset: Offset): Seq[Any] =
+        typeJournal
+          .eventsByAggregateType(aggregateType, offset)
+          .takeWithin(5.seconds)
+          .map(_.event)
+          .runWith(Sink.seq)
+          .futureValue
+
+      liveFrom(Simple, store.getOffset("view-end").futureValue) shouldBe Seq(Created("n"))
+      store.getOffset("saga-end").futureValue match {
+        case TagOffsets(offsets) =>
+          offsets.keySet shouldBe Set(Simple.name, Typed.name)
+          liveFrom(Simple, offsets(Simple.name)) shouldBe Seq(Created("n"))
+          liveFrom(Typed, offsets(Typed.name)) shouldBe empty
+        case other => fail(s"Expected TagOffsets, got $other")
+      }
     }
   }
 

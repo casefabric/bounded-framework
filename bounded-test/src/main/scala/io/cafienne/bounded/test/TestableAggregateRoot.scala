@@ -116,8 +116,8 @@ class TestableAggregateRoot[A <: AggregateRootActor[B], B <: AggregateState[B]] 
   // Start the Aggregate Root and replay to initial state
   private val aggregateRootActor: ActorRef = system.actorOf(creator.props(arTestId), s"test-aggregate-$arTestId")
 
-  // The events belong under the aggregate's persistence id, which can differ from its id (persistenceIdPrefix). It is
-  // only known once the aggregate runs, so a first instance on the still empty stream is asked for it and stopped.
+  // The events belong under the aggregate's persistence id, `aggregateType|id`. The aggregate type is a member of the
+  // aggregate instance, so a first instance on the still empty stream is asked for the persistence id and stopped.
   private def storeEvents(evt: Seq[DomainEvent]): Unit = {
     val probe    = TestProbe()
     val instance = system.actorOf(creator.props(arTestId), s"persistence-id-$arTestId")

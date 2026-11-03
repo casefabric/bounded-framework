@@ -113,7 +113,7 @@ object PassivationRaceSpec {
   /** A typed aggregate whose TypedSlow command keeps it busy. */
   object SlowTypedAggregates extends TypedAggregateRootManager[TypedCommand] {
     override def behavior(persistenceId: PersistenceId): Behavior[TypedCommand] = Behaviors.setup { _ =>
-      val id = persistenceId.entityId
+      val id = AggregateType.aggregateIdOf(persistenceId)
       AggregateLifecycles.onStart(id)
       Behaviors
         .receiveMessage[TypedCommand] {

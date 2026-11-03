@@ -92,7 +92,7 @@ class R2dbcAggregateTypeSpec
 
   "Aggregates on the R2DBC journal" should {
 
-    "store their events under type|id, with the type as entity type and tag" in {
+    "store their events under type|id with the type as entity type; classic events without extra tags untagged" in {
       assume(dockerAvailable, "Docker is not available")
       val id = "stored-shared"
       send(Props(classOf[ClassicSimpleAggregate], id), Create(id), AddItem(id, "simple item"))
@@ -103,12 +103,16 @@ class R2dbcAggregateTypeSpec
         "SELECT persistence_id, entity_type, tags FROM event_journal WHERE persistence_id LIKE ? ORDER BY persistence_id, seq_nr",
         s"%|$id"
       )(row =>
-        (row.getString(1), row.getString(2), row.getArray(3).getArray.asInstanceOf[Array[String]].toList)
+        (
+          row.getString(1),
+          row.getString(2),
+          Option(row.getArray(3)).fold(List.empty[String])(_.getArray.asInstanceOf[Array[String]].toList)
+        )
       ) shouldBe List(
         (s"${Typed.name}|$id", Typed.name, List(Typed.name)),
-        (s"order|$id", "order", List("order")),
-        (s"simple|$id", "simple", List("simple")),
-        (s"simple|$id", "simple", List("simple"))
+        (s"order|$id", "order", Nil),
+        (s"simple|$id", "simple", Nil),
+        (s"simple|$id", "simple", Nil)
       )
     }
   }

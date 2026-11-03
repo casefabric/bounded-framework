@@ -27,7 +27,7 @@ object TypedGatewayAskAndShutdownSpec {
     override def behavior(persistenceId: PersistenceId): Behavior[Ping] =
       Behaviors
         .receiveMessage[Ping] { ping =>
-          ping.replyTo ! s"pong ${persistenceId.entityId}"
+          ping.replyTo ! s"pong ${AggregateType.aggregateIdOf(persistenceId)}"
           Behaviors.same
         }
         .receiveSignal { case (_, PostStop) =>

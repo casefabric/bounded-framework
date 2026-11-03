@@ -13,7 +13,7 @@ trait TypedAggregateRootManager[T <: DomainCommand] {
 
   /**
     * The behavior of the aggregate with the given persistence id. The gateways call it with
-    * `PersistenceId(aggregateType.name, aggregateRootId)`; the aggregate id is `persistenceId.entityId`.
+    * `aggregateType.persistenceId(aggregateRootId)`; the aggregate id is `AggregateType.aggregateIdOf(persistenceId)`.
     *
     * The behavior must persist under exactly this persistence id and tag every event with the aggregate type, which
     * is how event materializers find its events. `AggregateBehavior` builds an `EventSourcedBehavior` that does both;

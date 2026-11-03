@@ -85,11 +85,14 @@ class SagaTagOffsetsSpec
     "listen to a single tag" in {
       val tag = newTag()
       store(tag, "s1", "s2")
-      val saga = new TestSaga(List(tag), new InMemoryBasedOffsetStore())
+      val offsets = new InMemoryBasedOffsetStore()
+      val saga    = new TestSaga(List(tag), offsets)
 
       val (killSwitch, lastOffset) = saga.registerListenerWithKillSwitch(None)
 
       eventually(saga.handled shouldBe Seq("s1", "s2"))
+      // the event is handled before its offset passes; stop only once it has
+      eventually(offsets.getOffset(saga.viewIdentifier).futureValue shouldBe TagOffsets(Map(tag -> Sequence(2L))))
       killSwitch.shutdown()
       lastOffset.futureValue shouldBe TagOffsets(Map(tag -> Sequence(2L)))
     }

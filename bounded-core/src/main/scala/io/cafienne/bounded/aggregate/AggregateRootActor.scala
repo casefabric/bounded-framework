@@ -17,6 +17,7 @@ import org.apache.pekko.persistence.{
 }
 import org.apache.pekko.persistence.journal.Tagged
 import io.cafienne.bounded.aggregate.AggregateRootActor.{GetPersistenceId, GetState, Passivate}
+import io.cafienne.bounded.pekko.persistence.ReadJournalProvider
 
 import scala.annotation.unused
 
@@ -68,8 +69,9 @@ trait AggregateRootActor[A <: AggregateState[A]]
     * aggregate type only; extra tags are for readers that query a tag-based journal directly, and the R2DBC journal
     * cannot query them at all.
     *
-    * Every event reaches the journal wrapped in `Tagged`, so a write-side event adapter bound to the event's class is
-    * not applied to it.
+    * An event is wrapped in `Tagged` only when it has tags to store: always on a tag-based journal (the aggregate
+    * type), and on the R2DBC journal (which finds the type by the persistence id) only with extra tags. A write-side
+    * event adapter bound to the event's class is not applied to an event wrapped in `Tagged`.
     *
     * @param event an event returned by handleCommand
     * @return the extra tags for the event
@@ -172,7 +174,18 @@ trait AggregateRootActor[A <: AggregateState[A]]
       )
   }
 
-  private def withTags(event: DomainEvent): Any = Tagged(event, tags(event) + aggregateType.name)
+  // The R2DBC journal reads the aggregate type from the persistence id, so it only needs a tag for the extra tags.
+  private lazy val typeIsTag: Boolean = {
+    val plugin =
+      if (journalPluginId.nonEmpty) journalPluginId
+      else context.system.settings.config.getString("pekko.persistence.journal.plugin")
+    !ReadJournalProvider.isR2dbcJournal(plugin)
+  }
+
+  private def withTags(event: DomainEvent): Any = {
+    val eventTags = if (typeIsTag) tags(event) + aggregateType.name else tags(event)
+    if (eventTags.isEmpty) event else Tagged(event, eventTags)
+  }
 
   private def withoutTags(persisted: Any): Any = persisted match {
     case Tagged(event, _) => event

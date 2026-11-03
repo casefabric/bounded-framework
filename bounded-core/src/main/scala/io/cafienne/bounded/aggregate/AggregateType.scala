@@ -29,9 +29,15 @@ final case class AggregateType(name: String) {
   )
 
   /**
-    * The persistence id of the aggregate with the given id: `name|aggregateId`.
+    * The persistence id of the aggregate with the given id: `name|aggregateId`. The aggregate id may contain `|`
+    * itself (Pekko's `PersistenceId(type, id)` refuses that): the type is the part before the first `|`. Read the
+    * aggregate id back with `AggregateType.aggregateIdOf(persistenceId)`, not with `persistenceId.entityId`, which
+    * takes an id with two `|` for a replication id and returns only its middle part.
     */
-  def persistenceId(aggregateId: String): PersistenceId = PersistenceId(name, aggregateId)
+  def persistenceId(aggregateId: String): PersistenceId = {
+    require(aggregateId.nonEmpty, s"An aggregate of type [$name] needs an id")
+    PersistenceId.ofUniqueId(s"$name${PersistenceId.DefaultSeparator}$aggregateId")
+  }
 
   override def toString: String = name
 }
@@ -53,4 +59,11 @@ object AggregateType {
     val separator = persistenceId.indexOf(PersistenceId.DefaultSeparator)
     if (separator <= 0) None else Some(persistenceId.substring(separator + 1))
   }
+
+  /**
+    * The aggregate id of the persistence id a gateway passes to `TypedAggregateRootManager.behavior`: everything after
+    * the first `|`, or the whole id when it has none.
+    */
+  def aggregateIdOf(persistenceId: PersistenceId): String =
+    aggregateIdOf(persistenceId.id).getOrElse(persistenceId.id)
 }
