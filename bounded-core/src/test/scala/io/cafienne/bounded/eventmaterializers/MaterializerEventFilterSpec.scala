@@ -4,6 +4,7 @@
 
 package io.cafienne.bounded.eventmaterializers
 
+import io.cafienne.bounded.aggregate.AggregateType
 import org.apache.pekko.Done
 import org.apache.pekko.actor.{ActorSystem, ExtendedActorSystem, PoisonPill, Props}
 import org.apache.pekko.actor.testkit.typed.scaladsl.{LogCapturing, ScalaTestWithActorTestKit}
@@ -104,7 +105,7 @@ class MaterializerEventFilterSpec
   class FilteringMaterializer(view: String)
       extends AbstractReplayableEventMaterializer(classicSystem, true, KeepFilter) {
     override val logger: Logger           = Logger(LoggerFactory.getLogger(classOf[FilteringMaterializer]))
-    override val tagName: String          = tag
+    override val aggregateType            = AggregateType(tag)
     override val matMappingName: String   = view
     val offsets: InMemoryBasedOffsetStore = new InMemoryBasedOffsetStore()
     private val handledEvents             = new ConcurrentLinkedQueue[Any]()

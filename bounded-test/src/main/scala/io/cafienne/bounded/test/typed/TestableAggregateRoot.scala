@@ -66,6 +66,12 @@ object TestableAggregateRoot {
 
   case object NoCommandsIssued extends Exception("Expected one or more commands, but got none")
 
+  case class PersistenceIdMismatch(expected: String, actual: String)
+      extends Exception(
+        s"The behavior persists under [$actual] instead of the persistence id it was given, [$expected]: build it " +
+          "with the PersistenceId passed to TypedAggregateRootManager.behavior (e.g. with AggregateBehavior)"
+      )
+
   /** Construct a test for a specific aggregate root that has a specific initial state
     *
     * @param id The aggregate root ID that is used for testing
@@ -139,12 +145,17 @@ class TestableAggregateRoot[A <: DomainCommand, B <: DomainEvent, C] private (
   private var lastCommand: Option[DomainCommand]             = Option.empty
 
   import TestableAggregateRoot.testId
-  private final val arTestId = testId(id)
-  private val persistenceId  = recoveredPersistenceId()
+  private final val arTestId    = testId(id)
+  private val persistenceId     = manager.persistenceId(arTestId).id
+  private val usedPersistenceId = recoveredPersistenceId()
+  if (usedPersistenceId != persistenceId) {
+    testKit.shutdownTestKit()
+    throw PersistenceIdMismatch(persistenceId, usedPersistenceId)
+  }
   if (evt != null && evt.nonEmpty) persistenceTestKit.persistForRecovery(persistenceId, evt)
 
-  // The behavior picks its own persistence id (PersistenceId(typeName, id), PersistenceId.ofUniqueId(id), ...). Run
-  // it once on the still empty journal and take the persistence id that it recovers from.
+  // The behavior is given its persistence id, but a hand-built one can ignore it. Run it once on the still empty
+  // journal and take the persistence id that it recovers from.
   private def recoveredPersistenceId(): String = {
     val recovered = Promise[String]()
     persistenceTestKit.withPolicy(new ProcessingPolicy[JournalOperation] {
@@ -153,7 +164,7 @@ class TestableAggregateRoot[A <: DomainCommand, B <: DomainEvent, C] private (
         ProcessingSuccess
       }
     })
-    val instance = testKit.spawn(manager.behavior(arTestId), s"persistence-id-$arTestId")
+    val instance = testKit.spawn(manager.behaviorFor(arTestId), s"persistence-id-$arTestId")
     try Await.result(recovered.future, timeout.duration)
     finally {
       testKit.stop(instance, timeout.duration)
@@ -165,7 +176,7 @@ class TestableAggregateRoot[A <: DomainCommand, B <: DomainEvent, C] private (
     Behaviors.supervise(handler).onFailure(SupervisorStrategy.stop)
 
   def handler: Behavior[A] = Behaviors.setup { context =>
-    val aggregateRootActor = context.spawn(manager.behavior(arTestId), s"test-aggregate-$arTestId")
+    val aggregateRootActor = context.spawn(manager.behaviorFor(arTestId), s"test-aggregate-$arTestId")
     context.watch(aggregateRootActor)
     Behaviors
       .receiveMessage[A] { message =>

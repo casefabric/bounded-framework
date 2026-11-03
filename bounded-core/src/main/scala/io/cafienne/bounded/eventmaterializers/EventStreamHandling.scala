@@ -173,7 +173,7 @@ private[eventmaterializers] trait EventStreamHandling extends ActorSystemProvide
 
 /**
   * An event and the position of the materializer once the event is processed. For a materializer that reads
-  * one tag the position is the event's offset; for a saga it is the offset per tag.
+  * one tag the position is the event's offset; for a combined logic it is the offset per tag.
   */
 private[eventmaterializers] final case class PositionedEvent(envelope: EventEnvelope, position: Offset)
 

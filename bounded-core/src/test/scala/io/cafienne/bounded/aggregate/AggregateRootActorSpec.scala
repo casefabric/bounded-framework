@@ -52,7 +52,7 @@ class AggregateRootActorSpec
     aggregateRef ! Create("ar-ok")
 
     expectMsg(Ok(List(Created("ar-ok"))))
-    persistenceTestKit.expectNextPersisted("ar-ok", Created("ar-ok"))
+    persistenceTestKit.expectNextPersisted("simple|ar-ok", Created("ar-ok"))
   }
 
   it should "reply Ok without events when the command produces none" in {
@@ -70,28 +70,28 @@ class AggregateRootActorSpec
     val aggregateRef = system.actorOf(creator.props("ar-fail"))
     val watcher      = TestProbe()
     watcher.watch(aggregateRef)
-    persistenceTestKit.failNextPersisted("ar-fail", new RuntimeException("journal down"))
+    persistenceTestKit.failNextPersisted("simple|ar-fail", new RuntimeException("journal down"))
 
     aggregateRef ! Create("ar-fail")
 
     expectMsgPF() { case Ko(PersistenceFailed(cause)) => cause.getMessage shouldBe "journal down" }
     watcher.expectTerminated(aggregateRef)
-    persistenceTestKit.expectNothingPersisted("ar-fail")
+    persistenceTestKit.expectNothingPersisted("simple|ar-fail")
   }
 
   it should "reply Ko and keep running when the journal rejects the events" in {
     val aggregateRef = system.actorOf(creator.props("ar-reject"))
-    persistenceTestKit.rejectNextPersisted("ar-reject", new RuntimeException("rejected"))
+    persistenceTestKit.rejectNextPersisted("simple|ar-reject", new RuntimeException("rejected"))
 
     aggregateRef ! Create("ar-reject")
 
     expectMsgPF() { case Ko(PersistenceRejected(cause)) => cause.getMessage shouldBe "rejected" }
-    persistenceTestKit.expectNothingPersisted("ar-reject")
+    persistenceTestKit.expectNothingPersisted("simple|ar-reject")
 
     aggregateRef ! Create("ar-reject")
 
     expectMsg(Ok(List(Created("ar-reject"))))
-    persistenceTestKit.expectNextPersisted("ar-reject", Created("ar-reject"))
+    persistenceTestKit.expectNextPersisted("simple|ar-reject", Created("ar-reject"))
   }
 
   it should "reply once, after the last event, when a command produces several events" in {
@@ -107,15 +107,15 @@ class AggregateRootActorSpec
     expectMsg(Ko(Items(List("a", "b", "c"))))
   }
 
-  it should "use the aggregate id as persistence id without a prefix" in {
-    val aggregateRef = system.actorOf(creator.props("ar-no-prefix"))
+  it should "use the aggregate type and the aggregate id as persistence id" in {
+    val aggregateRef = system.actorOf(creator.props("ar-type"))
 
     aggregateRef ! AggregateRootActor.GetPersistenceId
 
-    expectMsg("ar-no-prefix")
+    expectMsg("simple|ar-type")
   }
 
-  it should "keep aggregate types with the same id apart through their persistence id prefix" in {
+  it should "keep aggregate types with the same id apart through their persistence id" in {
     import AggregateRootActorSpec._
     val id      = "ar-shared-id"
     val order   = system.actorOf(Props(classOf[OrderAggregate], id))
@@ -151,10 +151,10 @@ class AggregateRootActorSpec
 
 object AggregateRootActorSpec {
   class OrderAggregate(id: String) extends ClassicSimpleAggregate(id) {
-    override def persistenceIdPrefix: String = "order|"
+    override def aggregateType: AggregateType = AggregateType("order")
   }
 
   class InvoiceAggregate(id: String) extends ClassicSimpleAggregate(id) {
-    override def persistenceIdPrefix: String = "invoice|"
+    override def aggregateType: AggregateType = AggregateType("invoice")
   }
 }

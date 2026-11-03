@@ -60,7 +60,7 @@ class TypedGatewayNamesSpec
     val gateway = new DefaultTypedCommandGateway[SimpleAggregateCommand](system, new SimpleAggregateManager())
 
     // no actor name can be made for an empty id
-    create(gateway, "").failed.futureValue.getMessage should include("must not be empty")
+    create(gateway, "").failed.futureValue.getMessage should include("needs an id")
     create(gateway, "after-failure").futureValue shouldBe OK
   }
 

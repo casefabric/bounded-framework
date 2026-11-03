@@ -4,6 +4,7 @@
 
 package io.cafienne.bounded.eventmaterializers
 
+import io.cafienne.bounded.aggregate.AggregateType
 import org.apache.pekko.Done
 import org.apache.pekko.actor.{ActorSystem, ExtendedActorSystem, PoisonPill, Props}
 import org.apache.pekko.actor.testkit.typed.scaladsl.{LogCapturing, ScalaTestWithActorTestKit}
@@ -24,13 +25,13 @@ import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.jdk.CollectionConverters._
 
-case class SagaTagEvent(id: String, text: String) extends DomainEvent
+case class CombinedLogicTagEvent(id: String, text: String) extends DomainEvent
 
 /**
-  * A saga keeps its position per tag (TagOffsets). The inmemory journal numbers the offsets of every tag
+  * A combined logic keeps its position per tag (TagOffsets). The inmemory journal numbers the offsets of every tag
   * separately, like LevelDB, so one shared offset would skip events.
   */
-class SagaTagOffsetsSpec
+class CombinedLogicTagOffsetsSpec
     extends ScalaTestWithActorTestKit(
       ConfigFactory
         .parseString("""
@@ -52,7 +53,7 @@ class SagaTagOffsetsSpec
 
   private val counter = new AtomicInteger()
 
-  "A saga" must {
+  "A combined logic" must {
 
     "resume every tag from its own offset" in {
       val (tagA, tagB, tagC) = (newTag(), newTag(), newTag())
@@ -61,7 +62,7 @@ class SagaTagOffsetsSpec
       store(tagC, "c1")
       val offsets = new InMemoryBasedOffsetStore()
 
-      val first           = new TestSaga(List(tagA, tagB, tagC), offsets)
+      val first           = new TestCombinedLogic(List(tagA, tagB, tagC), offsets)
       val (killSwitch, _) = first.registerListenerWithKillSwitch(None)
       eventually(first.handled should contain theSameElementsAs Seq("a1", "a2", "a3", "a4", "a5", "b1", "c1"))
       eventually {
@@ -72,7 +73,7 @@ class SagaTagOffsetsSpec
 
       store(tagB, "b2")
       store(tagC, "c2")
-      val second           = new TestSaga(List(tagA, tagB, tagC), offsets)
+      val second           = new TestCombinedLogic(List(tagA, tagB, tagC), offsets)
       val (killSwitch2, _) = second.registerListenerWithKillSwitch(None)
 
       eventually(second.handled should contain theSameElementsAs Seq("b2", "c2"))
@@ -84,11 +85,16 @@ class SagaTagOffsetsSpec
     "listen to a single tag" in {
       val tag = newTag()
       store(tag, "s1", "s2")
-      val saga = new TestSaga(List(tag), new InMemoryBasedOffsetStore())
+      val offsets       = new InMemoryBasedOffsetStore()
+      val combinedLogic = new TestCombinedLogic(List(tag), offsets)
 
-      val (killSwitch, lastOffset) = saga.registerListenerWithKillSwitch(None)
+      val (killSwitch, lastOffset) = combinedLogic.registerListenerWithKillSwitch(None)
 
-      eventually(saga.handled shouldBe Seq("s1", "s2"))
+      eventually(combinedLogic.handled shouldBe Seq("s1", "s2"))
+      // the event is handled before its offset passes; stop only once it has
+      eventually(
+        offsets.getOffset(combinedLogic.viewIdentifier).futureValue shouldBe TagOffsets(Map(tag -> Sequence(2L)))
+      )
       killSwitch.shutdown()
       lastOffset.futureValue shouldBe TagOffsets(Map(tag -> Sequence(2L)))
     }
@@ -97,15 +103,15 @@ class SagaTagOffsetsSpec
       val (tagA, tagB) = (newTag(), newTag())
       store(tagA, "a1", "a2")
       store(tagB, "b1", "b2")
-      val offsets = new InMemoryBasedOffsetStore()
-      val saga    = new TestSaga(List(tagA, tagB), offsets)
-      offsets.saveOffset(saga.viewIdentifier, Sequence(1L)).futureValue
+      val offsets       = new InMemoryBasedOffsetStore()
+      val combinedLogic = new TestCombinedLogic(List(tagA, tagB), offsets)
+      offsets.saveOffset(combinedLogic.viewIdentifier, Sequence(1L)).futureValue
 
-      val (killSwitch, _) = saga.registerListenerWithKillSwitch(None)
+      val (killSwitch, _) = combinedLogic.registerListenerWithKillSwitch(None)
 
-      eventually(saga.handled should contain theSameElementsAs Seq("a2", "b2"))
+      eventually(combinedLogic.handled should contain theSameElementsAs Seq("a2", "b2"))
       eventually {
-        offsets.getOffset(saga.viewIdentifier).futureValue shouldBe
+        offsets.getOffset(combinedLogic.viewIdentifier).futureValue shouldBe
           TagOffsets(Map(tagA -> Sequence(2L), tagB -> Sequence(2L)))
       }
       killSwitch.shutdown()
@@ -115,24 +121,24 @@ class SagaTagOffsetsSpec
       val (tagA, tagB) = (newTag(), newTag())
       store(tagA, "a1", "a2", "a3")
       store(tagB, "b1", "b2", "b3")
-      val saga = new TestSaga(List(tagA, tagB), new InMemoryBasedOffsetStore(), failOnce = Set("b2"))
+      val combinedLogic = new TestCombinedLogic(List(tagA, tagB), new InMemoryBasedOffsetStore(), failOnce = Set("b2"))
 
-      val (killSwitch, _) = saga.registerListenerWithKillSwitch(None)
+      val (killSwitch, _) = combinedLogic.registerListenerWithKillSwitch(None)
 
-      eventually(saga.handled should contain theSameElementsAs Seq("a1", "a2", "a3", "b1", "b2", "b3"))
-      saga.attempts("b2") shouldBe 2
-      (saga.handled.toSet - "b2").foreach(text => saga.attempts(text) shouldBe 1)
+      eventually(combinedLogic.handled should contain theSameElementsAs Seq("a1", "a2", "a3", "b1", "b2", "b3"))
+      combinedLogic.attempts("b2") shouldBe 2
+      (combinedLogic.handled.toSet - "b2").foreach(text => combinedLogic.attempts(text) shouldBe 1)
       killSwitch.shutdown()
     }
 
     "refuse to start without tags" in {
-      val saga = new TestSaga(List.empty, new InMemoryBasedOffsetStore())
+      val combinedLogic = new TestCombinedLogic(List.empty, new InMemoryBasedOffsetStore())
 
-      an[IllegalArgumentException] should be thrownBy saga.registerListenerWithKillSwitch(None)
+      an[IllegalArgumentException] should be thrownBy combinedLogic.registerListenerWithKillSwitch(None)
     }
   }
 
-  private def newTag(): String = s"saga-offsets-${counter.incrementAndGet()}"
+  private def newTag(): String = s"combined-logic-offsets-${counter.incrementAndGet()}"
 
   /** Stores the events under the tag, as one persistence id per tag. */
   private def store(tag: String, texts: String*): Unit = {
@@ -142,7 +148,7 @@ class SagaTagOffsetsSpec
     val testProbe = TestProbe()
     testProbe watch storeEventsActor
     texts.foreach { text =>
-      testProbe.send(storeEventsActor, Tagged(SagaTagEvent(s"ar-$tag", text), Set(tag)))
+      testProbe.send(storeEventsActor, Tagged(CombinedLogicTagEvent(s"ar-$tag", text), Set(tag)))
       testProbe.expectMsgType[Tagged]
     }
     storeEventsActor ! PoisonPill
@@ -150,11 +156,11 @@ class SagaTagOffsetsSpec
     ()
   }
 
-  class TestSaga(tags: List[String], offsets: InMemoryBasedOffsetStore, failOnce: Set[String] = Set.empty)
-      extends SagaEventMaterializer(classicSystem) {
-    override val logger: Logger         = Logger(LoggerFactory.getLogger(classOf[TestSaga]))
-    override val tagNames: List[String] = tags
-    override val matMappingName: String = s"saga-view-${tags.mkString("-")}"
+  class TestCombinedLogic(tags: List[String], offsets: InMemoryBasedOffsetStore, failOnce: Set[String] = Set.empty)
+      extends CombinedLogicEventMaterializer(classicSystem) {
+    override val logger: Logger         = Logger(LoggerFactory.getLogger(classOf[TestCombinedLogic]))
+    override val aggregateTypes         = tags.map(AggregateType(_))
+    override val matMappingName: String = s"combined-logic-view-${tags.mkString("-")}"
     private val handledEvents           = new ConcurrentLinkedQueue[String]()
     private val handlingAttempts        = new ConcurrentHashMap[String, AtomicInteger]()
 
@@ -162,7 +168,7 @@ class SagaTagOffsetsSpec
     def attempts(text: String): Int = Option(handlingAttempts.get(text)).fold(0)(_.get)
 
     override def handleEvent(evt: Any): Future[Done] = {
-      val text    = evt.asInstanceOf[SagaTagEvent].text
+      val text    = evt.asInstanceOf[CombinedLogicTagEvent].text
       val attempt = handlingAttempts.computeIfAbsent(text, _ => new AtomicInteger()).incrementAndGet()
       if (failOnce.contains(text) && attempt == 1) Future.failed(new RuntimeException(s"handling $text failed"))
       else {

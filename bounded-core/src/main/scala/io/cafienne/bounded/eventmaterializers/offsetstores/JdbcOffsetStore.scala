@@ -27,10 +27,10 @@ object OffsetStoreExecutionContext {
 // Use this execution context for IO instead of scala execution context.
 
 /**
-  * Offset store in the table `OFFSET`. Its `OFFSET` column is created as VARCHAR(4000), so the offsets of a saga
+  * Offset store in the table `OFFSET`. Its `OFFSET` column is created as VARCHAR(4000), so the offsets of a combined logic
   * over many tags fit. A table created by an older version keeps the column it has: on databases that give an
   * unsized string column a bounded type (Oracle, SQL Server and Derby make it VARCHAR(254)), widen it by hand
-  * before running sagas with many or long tags. An offset that does not fit fails its save.
+  * before running combined logic with many or long tags. An offset that does not fit fails its save.
   */
 class JdbcOffsetStore(val dbConfig: DatabaseConfig[JdbcProfile]) extends OffsetStore {
   import dbConfig.profile.api._

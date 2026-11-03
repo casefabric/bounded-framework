@@ -6,27 +6,23 @@ package io.cafienne.bounded.eventmaterializers
 
 import java.util.UUID
 import org.apache.pekko.actor.ActorSystem
-import org.apache.pekko.persistence.query.scaladsl.{
-  CurrentEventsByPersistenceIdQuery,
-  CurrentEventsByTagQuery,
-  EventsByTagQuery,
-  ReadJournal
-}
 import org.apache.pekko.persistence.query.{NoOffset, Offset}
 import org.apache.pekko.stream.scaladsl.Source
 import org.apache.pekko.stream.UniqueKillSwitch
 import org.apache.pekko.{Done, NotUsed}
 import com.typesafe.scalalogging.Logger
-import io.cafienne.bounded.pekko.persistence.ReadJournalProvider
+import io.cafienne.bounded.aggregate.AggregateType
+import io.cafienne.bounded.pekko.persistence.{AggregateTypeReadJournal, ReadJournalProvider}
 import io.cafienne.bounded.config.Configured
 
 import scala.concurrent.{ExecutionContextExecutor, Future}
 
 /**
-  * Abstract class to be used to create eventlisteners. Use this class as a base for listening for
-  * specific events. The class supports offset store to keep track of events received.
+  * Base class for combined logic: business logic that reacts to the events of several aggregate types, for
+  * example by sending commands to other aggregates. It only handles new events (there is no replay) and keeps
+  * its offset per aggregate type in the offset store, so it resumes after a restart.
   *
-  * Set tagname to identify eventstream to listen to
+  * Set aggregateTypes to the types of the aggregates whose events to listen to
   * Set mappingname as identifier for this listener. It will be used as the id for storing current offset of
   * listener.
   *
@@ -35,7 +31,7 @@ import scala.concurrent.{ExecutionContextExecutor, Future}
   * @param compatible indicate what events this materializer should process.
   *                   @see io.cafienne.bounded.Compatibility for more info
   */
-abstract class SagaEventMaterializer(
+abstract class CombinedLogicEventMaterializer(
   actorSystem: ActorSystem,
   keepCurrentOffset: Boolean = true,
   materialzerEventFilter: MaterializerEventFilter = NoFilterEventFilter
@@ -56,13 +52,14 @@ abstract class SagaEventMaterializer(
 
   implicit val mat: ExecutionContextExecutor = actorSystem.dispatcher
 
-  val journal: ReadJournal with CurrentEventsByTagQuery with EventsByTagQuery with CurrentEventsByPersistenceIdQuery =
-    readJournal
+  val journal: AggregateTypeReadJournal = aggregateTypeJournal
 
   /**
-    * Tagnames used to identify the eventstreams to listen to. The saga keeps its offset per tag.
+    * The types of the aggregates whose events the combined logic reads. It keeps its offset per type.
     */
-  val tagNames: List[String]
+  val aggregateTypes: List[AggregateType]
+
+  private def typeNames: List[String] = aggregateTypes.map(_.name)
 
   /**
     * Mapping name of this listener
@@ -96,20 +93,25 @@ abstract class SagaEventMaterializer(
   }
 
   def registerListenerWithKillSwitch(maybeStartOffset: Option[Offset]): (UniqueKillSwitch, Future[Offset]) = {
-    require(tagNames.nonEmpty, s"Saga $viewIdentifier must listen to at least one tag")
-    logger.info(s"Registering saga with killswitch $viewIdentifier")
+    require(aggregateTypes.nonEmpty, s"Combined logic $viewIdentifier must listen to at least one aggregate type")
+    logger.info(s"Registering combined logic with killswitch $viewIdentifier")
 
-    val startPosition = SagaEventMaterializer.tagOffsets(tagNames, listenStartOffset(maybeStartOffset))
+    val startPosition = CombinedLogicEventMaterializer.tagOffsets(typeNames, listenStartOffset(maybeStartOffset))
     runListener(events, startPosition, keepCurrentOffset, materialzerEventFilter)
   }
 
   /**
-    * The events of all tags after the given position, each with the position per tag once it is processed.
+    * The events of all aggregate types after the given position, each with the position per type once it is
+    * processed.
     */
   private def events(position: Offset): Source[PositionedEvent, NotUsed] = {
-    val start = SagaEventMaterializer.tagOffsets(tagNames, position)
-    Source(tagNames)
-      .flatMapMerge(tagNames.size, tag => journal.eventsByTag(tag, start.offsets(tag)).map(tag -> _))
+    val start = CombinedLogicEventMaterializer.tagOffsets(typeNames, position)
+    Source(aggregateTypes)
+      .flatMapMerge(
+        aggregateTypes.size,
+        aggregateType =>
+          journal.eventsByAggregateType(aggregateType, start.offsets(aggregateType.name)).map(aggregateType.name -> _)
+      )
       .statefulMap(() => start)(
         (positions, taggedEnvelope) => {
           val (tag, envelope) = taggedEnvelope
@@ -121,12 +123,13 @@ abstract class SagaEventMaterializer(
   }
 }
 
-object SagaEventMaterializer {
+object CombinedLogicEventMaterializer {
 
   /**
-    * The position per tag of a saga. A stored TagOffsets gives each tag its own offset (a tag without one
-    * starts from the beginning, a tag no longer listened to is dropped). A plain offset, stored by an older
-    * version of Bounded or given to registerListener, is the start offset of every tag.
+    * The position per aggregate type (stored per type name, the tag of its events) of a combined logic. A stored TagOffsets
+    * gives each type its own offset (a type without one starts from the beginning, a type no longer listened to is
+    * dropped). A plain offset, stored by an older version of Bounded or given to registerListener, is the start
+    * offset of every type.
     */
   private[eventmaterializers] def tagOffsets(tagNames: List[String], position: Offset): TagOffsets =
     position match {

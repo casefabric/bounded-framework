@@ -11,8 +11,8 @@ import org.apache.pekko.persistence.typed.RecoveryCompleted
 import org.apache.pekko.persistence.typed.PersistenceId
 import org.apache.pekko.persistence.typed.scaladsl.{Effect, EventSourcedBehavior, ReplyEffect}
 import com.typesafe.scalalogging.Logger
-import io.cafienne.bounded.aggregate.{DomainCommand, DomainEvent}
-import io.cafienne.bounded.aggregate.typed.TypedAggregateRootManager
+import io.cafienne.bounded.aggregate.{AggregateType, DomainCommand, DomainEvent}
+import io.cafienne.bounded.aggregate.typed.{AggregateBehavior, TypedAggregateRootManager}
 import io.cafienne.bounded.test.DomainProtocol._
 import scala.concurrent.duration._
 
@@ -129,22 +129,24 @@ object TypedSimpleAggregate {
 
 import io.cafienne.bounded.test.typed.TypedSimpleAggregate._
 
-class SimpleAggregateManager(persistenceIdFor: String => PersistenceId = PersistenceId.ofUniqueId)
+/**
+  * @param ignoreGivenPersistenceId builds the behavior by hand under `PersistenceId.ofUniqueId(id)` instead of the
+  *                                 persistence id it is given: the mistake TestableAggregateRoot has to catch
+  */
+class SimpleAggregateManager(ignoreGivenPersistenceId: Boolean = false)
     extends TypedAggregateRootManager[SimpleAggregateCommand] {
   import TypedSimpleAggregate._
   final val logger = Logger(this.getClass.getSimpleName)
 
-  override def behavior(id: String): Behavior[SimpleAggregateCommand] = {
-    logger.debug("Create aggregate behavior for {}", id)
-    val persistenceId = persistenceIdFor(id)
+  override def behavior(persistenceId: PersistenceId): Behavior[SimpleAggregateCommand] = {
+    logger.debug("Create aggregate behavior for {}", persistenceId)
+    val id = AggregateType.aggregateIdOf(persistenceId)
     Behaviors.withTimers { timers =>
-      EventSourcedBehavior
-        .withEnforcedReplies(
-          persistenceId,
-          SimpleAggregateState(List.empty[String], id),
-          commandHandler(timers),
-          eventHandler
-        )
+      val initial = SimpleAggregateState(List.empty[String], id)
+      (if (ignoreGivenPersistenceId)
+         EventSourcedBehavior
+           .withEnforcedReplies(PersistenceId.ofUniqueId(id), initial, commandHandler(timers), eventHandler)
+       else AggregateBehavior.withEnforcedReplies(persistenceId, initial, commandHandler(timers), eventHandler))
         .receiveSignal {
           case (state, _: RecoveryCompleted) => {
             logger.debug("Received RecoveryCompleted for actor with state {}", state)

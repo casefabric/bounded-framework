@@ -4,6 +4,7 @@
 
 package io.cafienne.bounded.eventmaterializers
 
+import io.cafienne.bounded.aggregate.AggregateType
 import java.time.OffsetDateTime
 import org.apache.pekko.Done
 import org.apache.pekko.actor.{ActorSystem, ExtendedActorSystem, PoisonPill, Props}
@@ -164,7 +165,7 @@ class AbstractReplayableEventMaterializerWithEventFilterSpec
     /**
       * Tagname used to identify eventstream to listen to
       */
-    override val tagName: String = "testar"
+    override val aggregateType = AggregateType("testar")
 
     /**
       * Mapping name of this listener
@@ -194,7 +195,7 @@ class AbstractReplayableEventMaterializerWithEventFilterSpec
 
     override def getOffset(viewIdentifier: String): Future[Offset] = offsets.getOffset(viewIdentifier)
 
-    override def toString: String = s"TestMaterializer $tagName contains ${storedEvents.mkString(",")}"
+    override def toString: String = s"TestMaterializer $aggregateType contains ${storedEvents.mkString(",")}"
   }
 
 }
