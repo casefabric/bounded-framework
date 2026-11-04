@@ -94,6 +94,7 @@ object Dependencies {
     "org.apache.pekko" %% "pekko-projection-jdbc"    % pekkoProjectionSnapshotVersion % Optional,
     "org.apache.pekko" %% "pekko-projection-slick"   % pekkoProjectionSnapshotVersion % Optional,
     "org.apache.pekko" %% "pekko-projection-r2dbc"   % pekkoProjectionR2dbcVersion    % Optional,
+    "org.apache.pekko" %% "pekko-projection-cassandra" % pekkoProjectionSnapshotVersion % Optional,
     "org.apache.pekko" %% "pekko-projection-testkit" % pekkoProjectionSnapshotVersion % Test
   )
 

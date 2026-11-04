@@ -12,14 +12,14 @@ import org.apache.pekko.projection.eventsourced.EventEnvelope
   * What the handlers read from an envelope. There are instances for the envelopes of both source providers: by tag
   * (`EventEnvelope`) and by slices on the R2DBC journal (`persistence.query.typed.EventEnvelope`).
   */
-trait ProjectionEnvelope[Envelope] {
+private[projection] trait ProjectionEnvelope[Envelope] {
   def event(envelope: Envelope): Any
   def offset(envelope: Envelope): Offset
   def persistenceId(envelope: Envelope): String
   def sequenceNr(envelope: Envelope): Long
 }
 
-object ProjectionEnvelope {
+private[projection] object ProjectionEnvelope {
 
   implicit def byTag[Event]: ProjectionEnvelope[EventEnvelope[Event]] = new ProjectionEnvelope[EventEnvelope[Event]] {
     def event(envelope: EventEnvelope[Event]): Any            = envelope.event

@@ -265,38 +265,52 @@ Delivery to materializers stays at-least-once: when a materializer moves, the ev
 
 ## Pekko Projections
 
-`bounded-pekko-projection` runs a Bounded read model as a [Pekko Projection](https://pekko.apache.org/docs/pekko-projection/current/), next to the event materializers. Use it when a read model needs exactly-once results: the handler's writes and the offset are committed in one transaction. Describe the read model with an `EventProjection` and pick a handler for the projection style:
+`bounded-pekko-projection` runs a Bounded read model as a [Pekko Projection](https://pekko.apache.org/docs/pekko-projection/current/), next to the event materializers. Use it when a read model needs exactly-once results (the handler's writes and the offset are committed in one transaction), grouped writes, or a read model split over the nodes of a cluster. Describe the read model with an `EventProjection`, build the projection with the factory of your store and run it:
 
 ```scala
 object CargoReport extends EventProjection {
   override val projectionName = "cargo-report"
   override val aggregateType  = Cargo.Type
+  override val eventFilter    = MyFilter // optional
 }
 
-val projection = JdbcProjection
-  .exactlyOnce(
-    CargoReport.projectionId,
-    BoundedProjections.eventsByAggregateType(system, CargoReport.aggregateType),
-    () => new MyJdbcSession(dataSource.getConnection),
-    () => BoundedJdbcHandler.byTag(CargoReport) { (session: MyJdbcSession, event) => /* write in the session */ }
-  )
-  .withStatusObserver(BoundedProjections.publishEventProcessed(system, CargoReport))
+val projection = BoundedJdbcProjection.exactlyOnce(
+  system,
+  CargoReport,
+  () => new MyJdbcSession(dataSource.getConnection),
+  adjust = _.withRecoveryStrategy(HandlerRecoveryStrategy.retryAndFail(3, 1.second))
+) { (session, event) => /* write in the session */ }
 
 BoundedProjections.runInCluster(system, "read-models", List(projection)) // or runLocally(system, projection)
 ```
 
-Every handler has `byTag` (for `eventsByAggregateType`) and `bySlices` (for `eventsByAggregateTypeSlices`).
+Every factory method calls the Pekko method of the same name on the store's projection object (`JdbcProjection.exactlyOnce`, `SlickProjection.groupedWithin`, ...). It reads the aggregate type's events from the configured journal, applies the filter, hands your function the events and publishes `EventProcessed`:
 
-| Projection | Handler | Source |
+| Factory (module to add) | Methods | Handler function |
 |---|---|---|
-| `JdbcProjection.exactlyOnce` (`pekko-projection-jdbc`) | `BoundedJdbcHandler` | `eventsByAggregateType` |
-| `SlickProjection.exactlyOnce` (`pekko-projection-slick`) | `BoundedSlickHandler` | `eventsByAggregateType` |
-| `R2dbcProjection.exactlyOnce` (`pekko-projection-r2dbc`) | `BoundedR2dbcHandler` | `eventsByAggregateTypeSlices` (R2DBC journal) |
-| any `atLeastOnce`, also `CassandraProjection` | `BoundedHandler` | either |
+| `BoundedJdbcProjection` (`pekko-projection-jdbc`) | `exactlyOnce`, `atLeastOnce`, `groupedWithin` | `(session, event) => Unit`, groups: `(session, events) => Unit` |
+| | `atLeastOnceAsync`, `groupedWithinAsync` | `event => Future[Done]`, groups: `events => Future[Done]` |
+| `BoundedSlickProjection` (`pekko-projection-slick`) | `exactlyOnce`, `atLeastOnce`, `groupedWithin` | `event => DBIO[Done]`, groups: `events => DBIO[Done]` |
+| | `atLeastOnceAsync`, `groupedWithinAsync` | `event => Future[Done]`, groups: `events => Future[Done]` |
+| `BoundedR2dbcProjection` (`pekko-projection-r2dbc`) | `exactlyOnce`, `atLeastOnce`, `groupedWithin` | `(R2dbcSession, event) => Future[Done]`, groups: `(R2dbcSession, events) => Future[Done]` |
+| | `atLeastOnceAsync`, `groupedWithinAsync` | `event => Future[Done]`, groups: `events => Future[Done]` |
+| `BoundedCassandraProjection` (`pekko-projection-cassandra`) | `atLeastOnce`, `groupedWithin` | `event => Future[Done]`, groups: `events => Future[Done]` |
 
-- Add the projection module of your store yourself; `bounded-pekko-projection` does not pull them in.
-- The `MaterializerEventFilter` of an `EventProjection` works as for materializers: filtered events skip the handler, and their offset is stored. `publishEventProcessed` publishes `EventProcessed` when `bounded.eventmaterializers.publish` is on (for exactly once: after the commit).
-- A projection keeps its offset in the tables of Pekko Projections, not in Bounded's offset stores. A read model moved from a materializer to a projection starts from the first event. There is no in-memory or LMDB equivalent.
+- **Adjusting:** the `adjust` argument gets the Pekko `ExactlyOnceProjection`, `AtLeastOnceProjection` or `GroupedProjection` and returns it changed with Pekko's own methods: `withRecoveryStrategy`, `withRestartBackoff`, `withSaveOffset`, `withGroup` and so on. The result is the Pekko projection itself. A `withStatusObserver` in `adjust` replaces the `EventProcessed` observer.
+- **Filter:** the `eventFilter` works as for materializers: filtered events skip your function and their offset is stored. A group reaches your function without its filtered events, and not at all when none are left. `EventProcessed` is published for every accepted event when `bounded.eventmaterializers.publish` is on (for exactly once and groups: after the commit).
+- **Journals:** the JDBC, Slick and Cassandra offset stores cannot hold the offsets of the R2DBC journal, so those factories refuse it and point to `BoundedR2dbcProjection`. That one reads by slices on the R2DBC journal and by tag on the others, so its projections are typed with `?` for the envelope.
+- **Slice ranges (R2DBC):** a busy read model can be split into one projection per range of slices, which `runInCluster` spreads over the nodes:
+
+  ```scala
+  val projections = BoundedR2dbcProjection.sliceRanges(system, 4).map { range =>
+    BoundedR2dbcProjection.exactlyOnce(system, CargoReport, slices = Some(range))(handle)
+  }
+  BoundedProjections.runInCluster(system, "read-models", projections)
+  ```
+
+  The projection id of a range has the key `<aggregate type>-<min>-<max>`, and the one for all slices has the aggregate type as key, so going from one projection to ranges gives new projection ids.
+- **Not covered:** Pekko's `atLeastOnceFlow` (a stream flow as handler) has no factory; filtered events could not move the offset through a user's flow.
+- **Offsets:** a projection keeps its offset in the tables of Pekko Projections, not in Bounded's offset stores (create them with the store's `createTablesIfNotExists` or its DDL). A read model moved from a materializer to a projection starts from the first event. There is no in-memory or LMDB equivalent.
 - Replay-then-stop (`startUp(keepListenersRunning = false)`), `handleReplayEvent` and combined logic over several types stay on the event materializers.
 - Projections run once in a cluster with `runInCluster`, which uses a `ShardedDaemonProcess` with one process per projection.
 

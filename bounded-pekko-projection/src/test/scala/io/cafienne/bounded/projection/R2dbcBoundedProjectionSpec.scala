@@ -8,8 +8,7 @@ import org.apache.pekko.Done
 import org.apache.pekko.actor.typed.{ActorRef, ActorSystem}
 import org.apache.pekko.actor.typed.scaladsl.AskPattern._
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
-import org.apache.pekko.projection.HandlerRecoveryStrategy
-import org.apache.pekko.projection.r2dbc.scaladsl.R2dbcProjection
+import org.apache.pekko.projection.{HandlerRecoveryStrategy, ProjectionBehavior}
 import org.apache.pekko.projection.testkit.scaladsl.ProjectionTestKit
 import org.apache.pekko.util.Timeout
 import com.typesafe.config.ConfigFactory
@@ -18,22 +17,29 @@ import io.cafienne.bounded.aggregate.{Ok, Reply}
 import io.cafienne.bounded.cluster.Notes._
 import io.cafienne.bounded.eventmaterializers.offsetstores.DockerTests
 import org.scalatest.BeforeAndAfterAll
-import org.scalatest.concurrent.ScalaFutures
+import org.scalatest.concurrent.{Eventually, ScalaFutures}
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.time.{Millis, Seconds, Span}
 import org.scalatest.wordspec.AnyWordSpec
 
+import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicBoolean
-import scala.concurrent.Await
+import scala.concurrent.{Await, Future}
 import scala.concurrent.duration._
 import scala.io.Source
+import scala.jdk.CollectionConverters._
 import scala.util.Using
 
 /**
-  * A Bounded handler as an exactly once R2DBC projection on the events of an aggregate type by slices, on Postgres in
-  * a container; canceled when Docker is not available.
+  * BoundedR2dbcProjection, exactly once on the events of an aggregate type by slices, on Postgres in a container;
+  * canceled when Docker is not available.
   */
-class R2dbcBoundedProjectionSpec extends AnyWordSpec with Matchers with ScalaFutures with BeforeAndAfterAll {
+class R2dbcBoundedProjectionSpec
+    extends AnyWordSpec
+    with Matchers
+    with ScalaFutures
+    with Eventually
+    with BeforeAndAfterAll {
   import BoundedProjectionsSpec.{noteOf, notesProjection}
 
   implicit override val patienceConfig: PatienceConfig =
@@ -72,40 +78,57 @@ class R2dbcBoundedProjectionSpec extends AnyWordSpec with Matchers with ScalaFut
     aggregate.ask[Reply](AddNote(s"r2dbc-$note", note, _)).futureValue shouldBe an[Ok]
   }
 
-  "A Bounded handler run as an R2DBC projection" should {
+  "A Bounded read model run as an R2DBC projection" should {
     "commit the statements and the offset of an exactly once projection together, skipping filtered events" in {
       assume(DockerTests.dockerAvailable, "Docker is not available")
       addNotes("one", "skip-two", "three")
       val view       = notesProjection("exactly-once-r2dbc")
       val failOnce   = new AtomicBoolean(true)
-      val projection = R2dbcProjection
-        .exactlyOnce(
-          view.projectionId,
-          None,
-          BoundedProjections.eventsByAggregateTypeSlices(system, view.aggregateType),
-          () =>
-            BoundedR2dbcHandler.bySlices(view) { (session, event) =>
-              val note   = noteOf(event)
-              val insert = session
-                .createStatement("INSERT INTO notes_view (projection, note) VALUES ($1, $2)")
-                .bind(0, view.projectionName)
-                .bind(1, note)
-              session
-                .updateOne(insert)
-                .map { _ =>
-                  // fails after its write: the write is rolled back with the offset
-                  if (note == "three" && failOnce.getAndSet(false)) throw new RuntimeException("failing once")
-                  Done
-                }(system.executionContext)
-            }
-        )(system)
-        .withRecoveryStrategy(HandlerRecoveryStrategy.retryAndFail(3, 100.millis))
+      val projection = BoundedR2dbcProjection.exactlyOnce(
+        system,
+        view,
+        adjust = _.withRecoveryStrategy(HandlerRecoveryStrategy.retryAndFail(3, 100.millis))
+      ) { (session, event) =>
+        val note   = noteOf(event)
+        val insert = session
+          .createStatement("INSERT INTO notes_view (projection, note) VALUES ($1, $2)")
+          .bind(0, view.projectionName)
+          .bind(1, note)
+        session
+          .updateOne(insert)
+          .map { _ =>
+            // fails after its write: the write is rolled back with the offset
+            if (note == "three" && failOnce.getAndSet(false)) throw new RuntimeException("failing once")
+            Done
+          }(system.executionContext)
+      }
 
       ProjectionTestKit(system).run(projection, 30.seconds) {
         postgres.query("SELECT note FROM notes_view WHERE projection = ?", view.projectionName)(_.getString(1)) should
           contain theSameElementsAs List("one", "three"): Unit
       }
       failOnce.get() shouldBe false
+    }
+
+    "split a read model over slice ranges, one projection per range" in {
+      assume(DockerTests.dockerAvailable, "Docker is not available")
+      val view    = notesProjection("sliced-r2dbc")
+      val handled = new ConcurrentLinkedQueue[String]()
+      val ranges  = BoundedR2dbcProjection.sliceRanges(system, 2)
+      ranges should have size 2
+      val projections = ranges.map { range =>
+        BoundedR2dbcProjection.atLeastOnceAsync(system, view, slices = Some(range)) { event =>
+          handled.add(noteOf(event))
+          Future.successful(Done)
+        }
+      }
+      projections.map(_.projectionId.key) shouldBe ranges.map(range =>
+        s"${view.aggregateType.name}-${range.min}-${range.max}"
+      )
+
+      val running = projections.map(BoundedProjections.runLocally(system, _))
+      try eventually(timeout(30.seconds))(handled.asScala.toList should contain theSameElementsAs List("one", "three"))
+      finally running.foreach(_ ! ProjectionBehavior.Stop)
     }
   }
 

@@ -6,7 +6,8 @@ package io.cafienne.bounded.projection
 
 import org.apache.pekko.Done
 import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
-import org.apache.pekko.actor.typed.ActorRef
+import org.apache.pekko.actor.typed.{ActorRef, ActorSystem}
+import org.apache.pekko.actor.typed.scaladsl.Behaviors
 import org.apache.pekko.actor.typed.scaladsl.AskPattern._
 import org.apache.pekko.actor.typed.eventstream.EventStream
 import org.apache.pekko.cluster.typed.{Cluster, Join}
@@ -133,6 +134,13 @@ class BoundedProjectionsSpec extends ScalaTestWithActorTestKit(BoundedProjection
   private def execute(statement: String): Unit =
     Using.resource(DriverManager.getConnection(database))(_.createStatement().execute(statement): Unit)
 
+  private def insert(view: EventProjection, note: String)(connection: Connection): Unit = {
+    val statement = connection.prepareStatement("INSERT INTO notes_view (projection, note) VALUES (?, ?)")
+    statement.setString(1, view.projectionName)
+    statement.setString(2, note)
+    statement.executeUpdate(): Unit
+  }
+
   private def rows(projection: String): List[String] =
     Using.resource(DriverManager.getConnection(database)) { connection =>
       val statement = connection.prepareStatement("SELECT note FROM notes_view WHERE projection = ?")
@@ -162,9 +170,9 @@ class BoundedProjectionsSpec extends ScalaTestWithActorTestKit(BoundedProjection
 
   private def published(projection: EventProjection): ConcurrentLinkedQueue[String] = {
     val notes = new ConcurrentLinkedQueue[String]()
-    val probe = spawn(org.apache.pekko.actor.typed.scaladsl.Behaviors.receiveMessage[EventProcessed] { processed =>
+    val probe = spawn(Behaviors.receiveMessage[EventProcessed] { processed =>
       if (processed.materializerId == projection.materializerId) notes.add(noteOf(processed.evt)): Unit
-      org.apache.pekko.actor.typed.scaladsl.Behaviors.same
+      Behaviors.same
     })
     system.eventStream ! EventStream.Subscribe(probe)
     notes
@@ -176,19 +184,16 @@ class BoundedProjectionsSpec extends ScalaTestWithActorTestKit(BoundedProjection
       val view       = notesProjection("at-least-once")
       val handled    = new ConcurrentLinkedQueue[String]()
       val processed  = published(view)
-      val projection = JdbcProjection
-        .atLeastOnceAsync(
-          view.projectionId,
-          BoundedProjections.eventsByAggregateType(system, view.aggregateType),
+      val projection =
+        BoundedJdbcProjection.atLeastOnceAsync(
+          system,
+          view,
           () => new H2Session(),
-          () =>
-            BoundedHandler.byTag(view) { event =>
-              handled.add(noteOf(event))
-              Future.successful(Done)
-            }
-        )
-        .withSaveOffset(1, Duration.Zero)
-        .withStatusObserver(BoundedProjections.publishEventProcessed(system, view))
+          _.withSaveOffset(1, Duration.Zero)
+        ) { event =>
+          handled.add(noteOf(event))
+          Future.successful(Done)
+        }
 
       projectionTestKit.run(projection, 30.seconds) {
         handled.asScala.toList shouldBe List("one", "three")
@@ -203,25 +208,21 @@ class BoundedProjectionsSpec extends ScalaTestWithActorTestKit(BoundedProjection
       val view       = notesProjection("exactly-once-jdbc", NoFilterEventFilter)
       val failOnce   = new AtomicBoolean(true)
       val processed  = published(view)
-      val projection = JdbcProjection
-        .exactlyOnce(
-          view.projectionId,
-          BoundedProjections.eventsByAggregateType(system, view.aggregateType),
-          () => new H2Session(),
-          () =>
-            BoundedJdbcHandler.byTag(view) { (session: H2Session, event) =>
-              session.withConnection { connection =>
-                val insert = connection.prepareStatement("INSERT INTO notes_view (projection, note) VALUES (?, ?)")
-                insert.setString(1, view.projectionName)
-                insert.setString(2, noteOf(event))
-                insert.executeUpdate()
-              }
-              // fails after its write: the write is rolled back with the offset
-              if (noteOf(event) == "three" && failOnce.getAndSet(false)) throw new RuntimeException("failing once")
-            }
-        )
-        .withRecoveryStrategy(HandlerRecoveryStrategy.retryAndFail(3, 100.millis))
-        .withStatusObserver(BoundedProjections.publishEventProcessed(system, view))
+      val projection = BoundedJdbcProjection.exactlyOnce(
+        system,
+        view,
+        () => new H2Session(),
+        _.withRecoveryStrategy(HandlerRecoveryStrategy.retryAndFail(3, 100.millis))
+      ) { (session, event) =>
+        session.withConnection { connection =>
+          val insert = connection.prepareStatement("INSERT INTO notes_view (projection, note) VALUES (?, ?)")
+          insert.setString(1, view.projectionName)
+          insert.setString(2, noteOf(event))
+          insert.executeUpdate()
+        }
+        // fails after its write: the write is rolled back with the offset
+        if (noteOf(event) == "three" && failOnce.getAndSet(false)) throw new RuntimeException("failing once")
+      }
 
       projectionTestKit.run(projection, 30.seconds) {
         rows(view.projectionName) should contain theSameElementsAs written: Unit
@@ -234,21 +235,18 @@ class BoundedProjectionsSpec extends ScalaTestWithActorTestKit(BoundedProjection
       import slickDatabase.profile.api._
       val view       = notesProjection("exactly-once-slick")
       val failOnce   = new AtomicBoolean(true)
-      val projection = SlickProjection
-        .exactlyOnce(
-          view.projectionId,
-          BoundedProjections.eventsByAggregateType(system, view.aggregateType),
-          slickDatabase,
-          () =>
-            BoundedSlickHandler.byTag(view) { event =>
-              val note = noteOf(event)
-              sqlu"INSERT INTO notes_view (projection, note) VALUES (${view.projectionName}, $note)".flatMap { _ =>
-                if (note == "one" && failOnce.getAndSet(false)) DBIO.failed(new RuntimeException("failing once"))
-                else DBIO.successful(Done)
-              }(system.executionContext)
-            }
-        )
-        .withRecoveryStrategy(HandlerRecoveryStrategy.retryAndFail(3, 100.millis))
+      val projection = BoundedSlickProjection.exactlyOnce(
+        system,
+        view,
+        slickDatabase,
+        _.withRecoveryStrategy(HandlerRecoveryStrategy.retryAndFail(3, 100.millis))
+      ) { event =>
+        val note = noteOf(event)
+        sqlu"INSERT INTO notes_view (projection, note) VALUES (${view.projectionName}, $note)".flatMap { _ =>
+          if (note == "one" && failOnce.getAndSet(false)) DBIO.failed(new RuntimeException("failing once"))
+          else DBIO.successful(Done)
+        }(system.executionContext)
+      }
 
       // the Slick projection writes to its own database
       projectionTestKit.run(projection, 30.seconds) {
@@ -260,21 +258,80 @@ class BoundedProjectionsSpec extends ScalaTestWithActorTestKit(BoundedProjection
     }
   }
 
+  "The store-session and grouped variants" should {
+    "write the events on the session at least once" in {
+      val view       = notesProjection("at-least-once-jdbc-session", NoFilterEventFilter)
+      val projection = BoundedJdbcProjection.atLeastOnce(system, view, () => new H2Session()) { (session, event) =>
+        session.withConnection(insert(view, noteOf(event)))
+      }
+
+      projectionTestKit.run(projection, 30.seconds) {
+        rows(view.projectionName) should contain theSameElementsAs written: Unit
+      }
+    }
+
+    "hand over the events in groups without the filtered ones, in the transaction of the group's offset" in {
+      addNotes("skip-seven", "eight")
+      val view       = notesProjection("grouped-jdbc")
+      val groups     = new ConcurrentLinkedQueue[Seq[String]]()
+      val processed  = published(view)
+      val accepted   = written.filterNot(_.startsWith("skip"))
+      val projection = BoundedJdbcProjection.groupedWithin(
+        system,
+        view,
+        () => new H2Session(),
+        _.withGroup(100, 200.millis)
+      ) { (session, events) =>
+        groups.add(events.map(noteOf))
+        events.foreach(event => session.withConnection(insert(view, noteOf(event))))
+      }
+
+      projectionTestKit.run(projection, 30.seconds) {
+        rows(view.projectionName) should contain theSameElementsAs accepted: Unit
+      }
+      groups.asScala.flatten.toList should contain theSameElementsAs accepted
+      groups.asScala.flatten.exists(_.startsWith("skip")) shouldBe false
+      groups.asScala.exists(_.size > 1) shouldBe true
+      processed.asScala.toList should contain theSameElementsAs accepted
+    }
+  }
+
+  "The store projections without a timestamp offset store" should {
+    "refuse the R2DBC journal and point to BoundedR2dbcProjection" in {
+      val r2dbcSystem = ActorSystem[Nothing](
+        Behaviors.empty[Nothing],
+        "R2dbcJournalSystem",
+        ConfigFactory
+          .parseString("""pekko.persistence.journal.plugin = "pekko.persistence.r2dbc.journal"""")
+          .withFallback(ConfigFactory.load())
+      )
+      try {
+        val view    = notesProjection("on-r2dbc")
+        val refusal = the[IllegalArgumentException] thrownBy
+          BoundedJdbcProjection.exactlyOnce(r2dbcSystem, view, () => new H2Session())((_, _) => ())
+        refusal.getMessage should include("BoundedR2dbcProjection")
+        an[IllegalArgumentException] should be thrownBy
+          BoundedSlickProjection.atLeastOnceAsync(r2dbcSystem, view, slickDatabase)(_ => Future.successful(Done))
+        an[IllegalArgumentException] should be thrownBy
+          BoundedCassandraProjection.atLeastOnce(r2dbcSystem, view)(_ => Future.successful(Done))
+        // and slice ranges are for the R2DBC journal only
+        an[IllegalArgumentException] should be thrownBy BoundedR2dbcProjection.sliceRanges(system, 2)
+      } finally {
+        r2dbcSystem.terminate()
+        r2dbcSystem.whenTerminated.futureValue: Unit
+      }
+    }
+  }
+
   "BoundedProjections.runInCluster" should {
     "run each projection once in the cluster" in {
       val views       = List(notesProjection("cluster-a"), notesProjection("cluster-b"))
       val handled     = views.map(view => view.projectionName -> new ConcurrentLinkedQueue[String]()).toMap
       val projections = views.map { view =>
-        JdbcProjection.atLeastOnceAsync(
-          view.projectionId,
-          BoundedProjections.eventsByAggregateType(system, view.aggregateType),
-          () => new H2Session(),
-          () =>
-            BoundedHandler.byTag(view) { event =>
-              handled(view.projectionName).add(noteOf(event))
-              Future.successful(Done)
-            }
-        )
+        BoundedJdbcProjection.atLeastOnceAsync(system, view, () => new H2Session()) { event =>
+          handled(view.projectionName).add(noteOf(event))
+          Future.successful(Done)
+        }
       }
 
       BoundedProjections.runInCluster(system, "bounded-projections", projections)

@@ -11,9 +11,9 @@ import io.cafienne.bounded.eventmaterializers.{MaterializerEventFilter, NoFilter
 import java.util.UUID
 
 /**
-  * A Bounded read model run as a Pekko Projection: the events of one aggregate type, with an optional filter. The
-  * handler itself is given to one of the handler factories (`BoundedHandler`, `BoundedJdbcHandler`,
-  * `BoundedSlickHandler`, `BoundedR2dbcHandler`), depending on the projection style.
+  * A Bounded read model run as a Pekko Projection: the events of one aggregate type, with an optional filter. Build
+  * the projection with the factory of its store (`BoundedJdbcProjection`, `BoundedSlickProjection`,
+  * `BoundedR2dbcProjection`, `BoundedCassandraProjection`) and run it with `BoundedProjections`.
   *
   * Unlike Bounded's event materializers, a projection keeps its offset in the offset store of Pekko Projections (in
   * the database of the projection style), not in a Bounded `OffsetStore`.
@@ -39,7 +39,7 @@ trait EventProjection {
   final def projectionId: ProjectionId = ProjectionId(projectionName, aggregateType.name)
 
   /** Whether the filter accepts the event. */
-  final def accepts(event: Any): Boolean = event match {
+  private[projection] final def accepts(event: Any): Boolean = event match {
     case domainEvent: DomainEvent => eventFilter.filter(domainEvent)
     case _                        => true
   }
