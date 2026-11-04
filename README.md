@@ -44,7 +44,8 @@ Bounded is built for Scala 3 and published to Maven Central:
 libraryDependencies ++= Seq(
   "io.cafienne.bounded" %% "bounded-core"       % boundedVersion,
   "io.cafienne.bounded" %% "bounded-test"       % boundedVersion % Test, // test helpers
-  "io.cafienne.bounded" %% "bounded-pekko-http" % boundedVersion         // optional: Pekko HTTP helpers
+  "io.cafienne.bounded" %% "bounded-pekko-http" % boundedVersion,        // optional: Pekko HTTP helpers
+  "io.cafienne.bounded" %% "bounded-pekko-projection" % boundedVersion    // optional: run read models as Pekko Projections
 )
 ```
 
@@ -201,7 +202,7 @@ Things to know:
 - **Offsets.** A materializer stores the offset of the last handled event, so it resumes after a restart. `ReadJournalOffsetStore` keeps the offsets in the same database as the journal. `OffsetStoreProvider` uses an in-memory or LMDB store, chosen by `bounded.eventmaterializers.offsetstore.type`. With `withPartialReplay = false` a materializer stores no offset and replays all events at every start.
 - **At-least-once delivery.** After a failure or a restart an event can be delivered again, so write handlers that are idempotent. A failing stream is restarted with backoff (`bounded.eventmaterializers.restart`).
 - **Filtering.** A `MaterializerEventFilter` skips events at runtime.
-- **One node only.** The gateways and materializers are node-local: two nodes would run two aggregate roots on one stream, and every node would run every materializer. Run Bounded on a single node.
+- **One node.** `EventMaterializers` runs its materializers on the node that starts it. In a cluster, run materializers that write to a shared store with `ClusteredEventMaterializers` (see [Running in a cluster](#running-in-a-cluster)).
 
 ## Combined logic
 
@@ -236,7 +237,91 @@ How it differs from a materializer:
 - **An offset per aggregate type.** The events of the types are merged, and the stored offset holds a position per type (`TagOffsets`), so a restart skips no events of a type that lags. Adding a type later reads that type from the beginning; a type that is removed is dropped from the offset. On the JDBC offset store the offsets of all types must fit in 4000 characters.
 - **No order across types.** Events of one aggregate arrive in order, but events of different types can interleave in any order. Keep the state the logic needs in an aggregate (a process manager) it sends commands to, not in the combined logic itself.
 - **Side effects happen at least once.** After a failure or a restart an event can be handled again, so make the commands it sends idempotent (for example by deriving ids from the event).
-- **One node only**, like every materializer: run it on a single node, or each node sends the commands.
+- **Once in a cluster.** Run it with `ClusteredEventMaterializers`, otherwise every node sends the commands (see [Running in a cluster](#running-in-a-cluster)).
+
+## Running in a cluster
+
+On one node nothing changes. In a cluster (`pekko.actor.provider = cluster`), each aggregate and each read model with a shared store must run on one node at a time.
+
+**Aggregates.** Use `ShardedTypedCommandGateway` instead of `DefaultTypedCommandGateway`. It has the same `ask` / `tell` / `shutdown`, and runs the aggregates with Cluster Sharding: commands for one aggregate reach the same actor, wherever they are sent from. Create it on every node that handles commands:
+
+```scala
+val gateway = new ShardedTypedCommandGateway[CargoCommand](system, new CargoManager(), aggregateMayIdleFor = 6.minutes)
+```
+
+`shutdown()` hands the node's aggregates over to the other nodes. The classic gateways (`DefaultCommandGateway`, `RouterCommandGateway`) stay node-local: run classic aggregates on one node, or move them to typed aggregates.
+
+**Materializers and combined logic.** `ClusteredEventMaterializers` runs each materializer on one node, spread over the cluster with a `ShardedDaemonProcess`. When a node leaves, its materializers resume on another node from their stored offsets, so the offset store must be shared by the nodes (`ReadJournalOffsetStore`). Every node starts it with the same materializers:
+
+```scala
+new ClusteredEventMaterializers(system, List(new CargoOverview(classicSystem), new DeliveryPlanning(classicSystem, cargoGateway, orderGateway))).start()
+```
+
+Its materializers implement `StoppableResumable`, which `AbstractEventMaterializer`, `AbstractReplayableEventMaterializer` and `CombinedLogicEventMaterializer` do. Each replays and then listens on its own; it does not wait for the replays of the others. A read model that every node keeps for itself (in memory, or with the in-memory or LMDB offset store) stays on `EventMaterializers`, on every node.
+
+**Serialization.** Commands, replies and events cross nodes, so each needs a serializer binding; turn Java serialization off (`pekko.actor.allow-java-serialization = off`). Bounded serializes its own `Ok`, `Ko`, `PersistenceFailed`, `PersistenceRejected` and `UnexpectedCommand`, and writes the events, failures and commands inside them with the serializers you bind to your types. The cause of a `PersistenceFailed` arrives on another node as a `RemoteFailureCause` with the original class name and message.
+
+Delivery to materializers stays at-least-once: when a materializer moves, the events after its last saved offset are handled again. Use a split brain resolver (`pekko.cluster.downing-provider-class`): without one, both halves of a split cluster run every aggregate and every materializer.
+
+## Pekko Projections
+
+`bounded-pekko-projection` runs a Bounded read model as a [Pekko Projection](https://pekko.apache.org/docs/pekko-projection/current/), next to the event materializers. Use it when a read model needs exactly-once results (the handler's writes and the offset are committed in one transaction), grouped writes, or a read model split over the nodes of a cluster. Describe the read model with an `EventProjection`, build the projection with the factory of your store and run it:
+
+```scala
+object CargoReport extends EventProjection {
+  override val projectionName = "cargo-report"
+  override val aggregateType  = Cargo.Type
+  override val eventFilter    = MyFilter // optional
+}
+
+val projection = BoundedJdbcProjection.exactlyOnce(
+  system,
+  CargoReport,
+  () => new MyJdbcSession(dataSource.getConnection),
+  adjust = _.withRecoveryStrategy(HandlerRecoveryStrategy.retryAndFail(3, 1.second))
+) { (session, event) => /* write in the session */ }
+
+BoundedProjections.runInCluster(system, "read-models", List(projection)) // or runLocally(system, projection)
+```
+
+Every factory method calls the Pekko method of the same name on the store's projection object (`JdbcProjection.exactlyOnce`, `SlickProjection.groupedWithin`, ...). It reads the aggregate type's events from the configured journal, applies the filter, hands your function the events and publishes `EventProcessed`:
+
+| Factory (module to add) | Methods | Handler function |
+|---|---|---|
+| `BoundedJdbcProjection` (`pekko-projection-jdbc`) | `exactlyOnce`, `atLeastOnce`, `groupedWithin` | `(session, event) => Unit`, groups: `(session, events) => Unit` |
+| | `atLeastOnceAsync`, `groupedWithinAsync` | `event => Future[Done]`, groups: `events => Future[Done]` |
+| `BoundedSlickProjection` (`pekko-projection-slick`) | `exactlyOnce`, `atLeastOnce`, `groupedWithin` | `event => DBIO[Done]`, groups: `events => DBIO[Done]` |
+| | `atLeastOnceAsync`, `groupedWithinAsync` | `event => Future[Done]`, groups: `events => Future[Done]` |
+| `BoundedR2dbcProjection` (`pekko-projection-r2dbc`) | `exactlyOnce`, `atLeastOnce`, `groupedWithin` | `(R2dbcSession, event) => Future[Done]`, groups: `(R2dbcSession, events) => Future[Done]` |
+| | `atLeastOnceAsync`, `groupedWithinAsync` | `event => Future[Done]`, groups: `events => Future[Done]` |
+| `BoundedCassandraProjection` (`pekko-projection-cassandra`) | `atLeastOnce`, `groupedWithin` | `event => Future[Done]`, groups: `events => Future[Done]` |
+
+- **Adjusting:** the `adjust` argument gets the Pekko `ExactlyOnceProjection`, `AtLeastOnceProjection` or `GroupedProjection` and returns it changed with Pekko's own methods: `withRecoveryStrategy`, `withRestartBackoff`, `withSaveOffset`, `withGroup` and so on. The result is the Pekko projection itself. A `withStatusObserver` in `adjust` replaces the `EventProcessed` observer.
+- **Filter:** the `eventFilter` works as for materializers: filtered events skip your function and their offset is stored. A group reaches your function without its filtered events, and not at all when none are left. `EventProcessed` is published for every accepted event when `bounded.eventmaterializers.publish` is on (for exactly once and groups: after the commit).
+- **Journals:** the JDBC, Slick and Cassandra offset stores cannot hold the offsets of the R2DBC journal, so those factories refuse it and point to `BoundedR2dbcProjection`. That one reads by slices on the R2DBC journal and by tag on the others, so its projections are typed with `?` for the envelope.
+- **Slice ranges (R2DBC):** a busy read model can be split into one projection per range of slices, which `runInCluster` spreads over the nodes:
+
+  ```scala
+  val projections = BoundedR2dbcProjection.sliceRanges(system, 4).map { range =>
+    BoundedR2dbcProjection.exactlyOnce(system, CargoReport, slices = Some(range))(handle)
+  }
+  BoundedProjections.runInCluster(system, "read-models", projections)
+  ```
+
+  The projection id of a range has the key `<aggregate type>-<min>-<max>`, and the one for all slices has the aggregate type as key, so going from one projection to ranges gives new projection ids.
+- **Not covered:** Pekko's `atLeastOnceFlow` (a stream flow as handler) has no factory; filtered events could not move the offset through a user's flow.
+- **Offsets:** a projection keeps its offset in the tables of Pekko Projections, not in Bounded's offset stores (create them with the store's `createTablesIfNotExists` or its DDL). A read model moved from a materializer to a projection starts from the first event. There is no in-memory or LMDB equivalent.
+- Replay-then-stop (`startUp(keepListenersRunning = false)`), `handleReplayEvent` and combined logic over several types stay on the event materializers.
+- Projections run once in a cluster with `runInCluster`, which uses a `ShardedDaemonProcess` with one process per projection.
+
+## Operating notes
+
+- **Handlers are at-least-once.** Materializers, combined logic and at-least-once projections can see an event again after a failure, a restart or a move to another node. Make them idempotent, or use an exactly-once projection.
+- **Serializers.** A serializer must not throw on an event it stored before, and must give new fields a default: one event it cannot read stops the recovery of its aggregate and the materializers that read it. Bounded ships no serializer for your types.
+- **Tags.** Bounded tags events with their aggregate type. Do not add a tag per aggregate (`tags(event)` returning an id): each tag is a query, and the tag table grows with every aggregate.
+- **JDBC journal.** Queries by tag filter `event_tag` on `tag`, but its key is `(event_id, tag)`. Add an index: `CREATE INDEX event_tag_tag_idx ON event_tag (tag, event_id);`.
+- **Combined logic.** Its offset holds a position per aggregate type, and on the JDBC offset store all of them must fit in 4000 characters: keep the number of types small.
+- **LMDB offset store.** lmdbjava needs `--add-opens java.base/java.nio=ALL-UNNAMED --add-opens java.base/sun.nio.ch=ALL-UNNAMED` on Java 17 and later.
 
 ## Journals
 
