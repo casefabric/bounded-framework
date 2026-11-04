@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-Bounded is a Scala 3 (3.3 LTS) library, built with sbt 2, for building CQRS / event-sourced Domain Driven Design applications on Apache Pekko (migrated from Akka; the `pekko_migration` branch). It is published to Maven Central as `io.cafienne.bounded` artifacts. The version comes from git tags (see Releasing); don't hardcode it.
+Bounded is a Scala 3 (3.3 LTS) library, built with sbt 2, for building CQRS / event-sourced Domain Driven Design applications on Apache Pekko (migrated from Akka). It is published to Maven Central as `io.cafienne.bounded` artifacts. The version comes from git tags (see Releasing); don't hardcode it.
 
 ## Commands
 
@@ -77,7 +77,7 @@ Both gateways run commands through an implicit `ValidateableCommand[T]` (`Comman
 
 ScalaTest with Pekko testkits (`actor-testkit-typed`, `persistence-testkit`, `projection-testkit`). `bounded-core` tests run in a forked JVM with `--add-opens` for `java.nio` and `sun.nio.ch`, which lmdbjava (`LmdbOffsetStore`) needs on Java 17+; users of the LMDB offset store need the same flags. Shared test config is in `bounded-core/src/test/resources/reference.conf`; `SampleProtocol.scala` and the `ClassicSimpleAggregate` / `TypedSimpleAggregate` classes are the reference examples for writing aggregates.
 
-The offset store specs for Postgres (R2DBC) and Cassandra, `R2dbcAggregateTypeSpec` and `R2dbcAggregateTypeMigrationSpec` (both on `R2dbcPostgres`, which applies `r2dbc/create_tables_postgres.sql`) start containers with Testcontainers and are canceled without Docker; JDBC is tested on H2 (`JdbcAggregateTypeMigrationSpec` runs the JDBC journal on H2, creating its tables with the plugin's `SchemaUtils`).
+The offset store specs for Postgres (R2DBC) and Cassandra, `R2dbcAggregateTypeSpec`, `R2dbcAggregateTypeMigrationSpec` (both on `R2dbcPostgres`, which applies `r2dbc/create_tables_postgres.sql`) and `CassandraAggregateTypeMigrationSpec` (tables auto-created, a recent `first-time-bucket` and a short `eventual-consistency-delay`) start containers with Testcontainers and are canceled without Docker; JDBC is tested on H2 (`JdbcAggregateTypeMigrationSpec` runs the JDBC journal on H2, creating its tables with the plugin's `SchemaUtils`).
 
 Persistence backends differ per kind of test:
 - Aggregate and gateway specs use Pekko's `pekko.persistence.journal.inmem` (or `PersistenceTestKitPlugin.config`), set inline in the spec's testkit config.

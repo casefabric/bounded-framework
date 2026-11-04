@@ -46,8 +46,12 @@ import org.scalatest.matchers.should.Matchers
 import org.scalatest.time.{Millis, Seconds, Span}
 import org.scalatest.wordspec.AnyWordSpec
 import org.slf4j.LoggerFactory
+import org.testcontainers.cassandra.CassandraContainer
 
-import java.time.OffsetDateTime
+import java.net.InetSocketAddress
+import java.time.{Instant, OffsetDateTime, ZoneOffset}
+import java.time.format.DateTimeFormatter
+import java.time.temporal.ChronoUnit
 import java.util.concurrent.ConcurrentLinkedQueue
 import scala.collection.immutable.ListMap
 import scala.concurrent.{Await, ExecutionContext, Future}
@@ -420,4 +424,72 @@ object JdbcAggregateTypeMigrationSpec {
       jdbc-read-journal.refresh-interval = 100ms
     """)
     .withFallback(ConfigFactory.load())
+}
+
+/**
+  * On Cassandra in a container; canceled when Docker is not available. Cassandra keeps deleted events in its tag
+  * views, so old streams stay readable by type after `deleteMigrated`.
+  */
+class CassandraAggregateTypeMigrationSpec extends AggregateTypeMigrationSpec {
+  override val keepsDeletedEventsInTagQueries: Boolean = true
+
+  private var cassandra: Option[CassandraContainer] = None
+  private var actorSystem: Option[ActorSystem]      = None
+
+  override def available: Boolean = DockerTests.dockerAvailable
+
+  override lazy val system: ActorSystem = {
+    val container = new CassandraContainer("cassandra:4.1")
+    container.start()
+    cassandra = Some(container)
+    val created = ActorSystem(
+      "CassandraAggregateTypeMigrationSpec",
+      CassandraAggregateTypeMigrationSpec.config(container.getContactPoint, container.getLocalDatacenter)
+    )
+    actorSystem = Some(created)
+    created
+  }
+
+  override protected def afterAll(): Unit = {
+    actorSystem.foreach(TestKit.shutdownActorSystem(_))
+    cassandra.foreach(_.stop())
+  }
+}
+
+object CassandraAggregateTypeMigrationSpec {
+
+  def config(contactPoint: InetSocketAddress, datacenter: String): Config = {
+    // Tag queries from NoOffset start at the first bucket; start it shortly before the test instead of in 2015.
+    val firstBucket = DateTimeFormatter
+      .ofPattern("yyyyMMdd'T'HH:mm")
+      .withZone(ZoneOffset.UTC)
+      .format(Instant.now().minus(1, ChronoUnit.HOURS).truncatedTo(ChronoUnit.HOURS))
+    ConfigFactory
+      .parseString(s"""
+        pekko.loglevel = INFO
+        pekko.persistence.journal.plugin = "pekko.persistence.cassandra.journal"
+        pekko.persistence.snapshot-store.plugin = "pekko.persistence.cassandra.snapshot"
+        pekko.persistence.cassandra {
+          journal.keyspace-autocreate = on
+          journal.tables-autocreate = on
+          snapshot.keyspace-autocreate = on
+          snapshot.tables-autocreate = on
+          query.refresh-interval = 200ms
+          events-by-tag {
+            first-time-bucket = "$firstBucket"
+            # one node and one writer: no delayed events to wait for
+            eventual-consistency-delay = 200ms
+            refresh-interval = 200ms
+          }
+        }
+        datastax-java-driver {
+          basic.contact-points = ["${contactPoint.getHostString}:${contactPoint.getPort}"]
+          basic.load-balancing-policy.local-datacenter = "$datacenter"
+          # creating the keyspaces and tables takes longer than the default 2s
+          basic.request.timeout = 30s
+          advanced.metadata.schema.request-timeout = 30s
+        }
+      """)
+      .withFallback(ConfigFactory.load())
+  }
 }

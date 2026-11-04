@@ -648,12 +648,16 @@ object AggregateTypeMigration {
   private final case class SaveSnapshotOf(state: Any)
 
   /**
-    * Writes events to one new stream: tagged with its aggregate type when `tagged`, and with their extra tags. Does
-    * not replay what the stream holds. A write the journal rejects fails the copy.
+    * Writes events to one new stream: tagged with its aggregate type when `tagged`, and with their extra tags. A
+    * write the journal rejects fails the copy.
+    *
+    * It recovers the events the stream already holds (from an interrupted run) and ignores them, without a snapshot.
+    * Not `Recovery.none`: the Cassandra journal restores a stream's position per tag during recovery, and without it
+    * numbers the tag rows of the next copies from 1 again, so its tag queries drop them as duplicates.
     */
   private class TargetWriter(override val persistenceId: String, typeName: String, tagged: Boolean)
       extends PersistentActor {
-    override def recovery: Recovery = Recovery.none
+    override def recovery: Recovery = Recovery(fromSnapshot = SnapshotSelectionCriteria.None)
 
     override def receiveRecover: Receive = { case _ => () }
 
