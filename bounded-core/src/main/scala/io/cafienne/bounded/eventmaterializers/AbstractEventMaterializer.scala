@@ -35,7 +35,7 @@ abstract class AbstractEventMaterializer(
   materialzerEventFilter: MaterializerEventFilter = NoFilterEventFilter
 ) extends EventStreamHandling
     with ReadJournalProvider
-    with Resumable
+    with StoppableResumable
     with ExceptionWriter
     with Configured {
 
