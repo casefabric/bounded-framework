@@ -81,7 +81,7 @@ lazy val boundedRoot = (project in file("."))
             publish / skip := true,
             crossScalaVersions := Nil)
   .enablePlugins(GitPlugin, GitVersioning, GitBranchPrompt, AutomateHeaderPlugin)
-  .aggregate(boundedCore, boundedPekkoHttp, boundedTest)
+  .aggregate(boundedCore, boundedPekkoHttp, boundedPekkoProjection, boundedTest)
 
 val boundedCore = (project in file("bounded-core"))
   .enablePlugins(BuildInfoPlugin, GitPlugin, GitVersioning, GitBranchPrompt, AutomateHeaderPlugin)
@@ -129,3 +129,14 @@ val boundedTest = (project in file("bounded-test"))
     name := "bounded-test",
     libraryDependencies ++= Dependencies.testDeps)
 
+
+val boundedPekkoProjection = (project in file("bounded-pekko-projection"))
+  // the tests reuse the journal setups of the bounded-core tests
+  .dependsOn(boundedCore % "compile->compile;test->test")
+  .enablePlugins(GitPlugin, GitVersioning, GitBranchPrompt, AutomateHeaderPlugin)
+  .settings(basicSettings*)
+  .settings(
+    name := "bounded-pekko-projection",
+    libraryDependencies ++= Dependencies.testDeps ++ Dependencies.pekkoProjectionDeps ++ Dependencies.offsetStoreTestDeps,
+    Test / fork := true,
+  )

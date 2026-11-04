@@ -85,6 +85,18 @@ object Dependencies {
     "com.h2database"     % "h2"                        % "2.5.252"             % Test
   )
 
+  /**
+   * The Pekko Projections adapter (bounded-pekko-projection). The store-specific projection modules are optional: an
+   * application adds the one for the store it uses. pekko-projection-r2dbc follows pekko-persistence-r2dbc.
+   */
+  val pekkoProjectionR2dbcVersion = "1.2.0"
+  val pekkoProjectionDeps = Seq(
+    "org.apache.pekko" %% "pekko-projection-jdbc"    % pekkoProjectionSnapshotVersion % Optional,
+    "org.apache.pekko" %% "pekko-projection-slick"   % pekkoProjectionSnapshotVersion % Optional,
+    "org.apache.pekko" %% "pekko-projection-r2dbc"   % pekkoProjectionR2dbcVersion    % Optional,
+    "org.apache.pekko" %% "pekko-projection-testkit" % pekkoProjectionSnapshotVersion % Test
+  )
+
   val persistenceLevelDBDeps = {
     baseDeps ++ Seq(
       "org.iq80.leveldb"            % "leveldb"        % "0.12",
