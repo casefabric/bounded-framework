@@ -156,7 +156,7 @@ final case class MigrationReport(
   *  1. `oldStreamsReadableByType(...)` for every aggregate type must be empty. Cassandra keeps deleted events in its
   *     tag views: when old events were tagged with the name of their new type, clean those with the plugin's
   *     reconciliation tool;
-  *  1. for every saga `startSagaAtEnd(...)`, so it does not handle the copies (and repeat its side effects); for every
+  *  1. for every combined logic `startCombinedLogicAtEnd(...)`, so it does not handle the copies (and repeat its side effects); for every
   *     other event materializer `startAtEnd(...)` when it keeps the data it already has, or `resetOffsets(...)` when its
   *     data is cleared and rebuilt: the copies have new offsets, so a materializer left as it is handles every copy;
   *  1. start the new version of the application.
@@ -309,10 +309,14 @@ class AggregateTypeMigration(
     endOffsets(Seq(aggregateType)).flatMap(ends => store.saveOffset(viewIdentifier, ends(aggregateType))).map(_ => Done)
 
   /**
-    * Sets the offsets of a saga to the last event of each of its aggregate types, so it handles only the events stored
+    * Sets the offsets of a combined logic to the last event of each of its aggregate types, so it handles only the events stored
     * after the migration and does not repeat its side effects for the copies. On R2DBC it waits as `startAtEnd` does.
     */
-  def startSagaAtEnd(store: OffsetStore, viewIdentifier: String, aggregateTypes: Seq[AggregateType]): Future[Done] =
+  def startCombinedLogicAtEnd(
+    store: OffsetStore,
+    viewIdentifier: String,
+    aggregateTypes: Seq[AggregateType]
+  ): Future[Done] =
     endOffsets(aggregateTypes)
       .flatMap(ends => store.saveOffset(viewIdentifier, TagOffsets(ends.map { case (t, offset) => t.name -> offset })))
       .map(_ => Done)

@@ -11,7 +11,7 @@ command → command gateway → aggregate root (stores events) → event journal
 
 - An **aggregate root** handles the commands for one aggregate and stores the resulting events.
 - A **command gateway** starts the aggregate root a command is for, validates the command and delivers it.
-- **Event materializers** (projections) read the stored events of an aggregate type and build query stores from them; **sagas** react to the events of several aggregate types.
+- **Event materializers** (projections) read the stored events of an aggregate type and build query stores from them; **combined logic** reacts to the events of several aggregate types.
 
 ```
                  ┌─────────┐   ┌──────────────────────┐
@@ -52,7 +52,7 @@ All configuration uses Pekko's `pekko.` keys; `akka.` keys are silently ignored.
 
 ## Aggregate types
 
-Every aggregate has an `AggregateType`. Define it once and use it on both the write side (the aggregate) and the read side (materializers and sagas):
+Every aggregate has an `AggregateType`. Define it once and use it on both the write side (the aggregate) and the read side (materializers and combined logic):
 
 ```scala
 object Cargo {
@@ -167,7 +167,7 @@ gateway.ask[CargoResponse](cargoId, replyTo => PlanCargo(cargoId, trackingId, ro
 gateway.tell(SpecifyNewRoute(cargoId, routeSpecification))
 ```
 
-## Event materializers and sagas
+## Event materializers
 
 An event materializer reads the events of one aggregate type and builds a query store. A replayable materializer first replays the stored events (`handleReplayEvent`) and then keeps listening for new ones (`handleEvent`):
 
@@ -189,12 +189,12 @@ class CargoOverview(system: ActorSystem)
 }
 ```
 
-A saga extends `SagaEventMaterializer`, lists its `aggregateTypes` and only handles new events; it keeps an offset per type.
+To react to the events of several aggregate types, use [combined logic](#combined-logic).
 
 Start all materializers together. `startUp` replays every replayable materializer first, then starts listening from where each replay ended:
 
 ```scala
-new EventMaterializers(List(new CargoOverview(system), new DeliverySaga(system))).startUp(keepListenersRunning = true)
+new EventMaterializers(List(new CargoOverview(system), new DeliveryPlanning(system))).startUp(keepListenersRunning = true)
 ```
 
 Things to know:
@@ -202,6 +202,41 @@ Things to know:
 - **At-least-once delivery.** After a failure or a restart an event can be delivered again, so write handlers that are idempotent. A failing stream is restarted with backoff (`bounded.eventmaterializers.restart`).
 - **Filtering.** A `MaterializerEventFilter` skips events at runtime.
 - **One node only.** The gateways and materializers are node-local: two nodes would run two aggregate roots on one stream, and every node would run every materializer. Run Bounded on a single node.
+
+## Combined logic
+
+Combined logic is business logic that spans aggregates: it reacts to the events of several aggregate types and usually sends commands to other aggregates through a command gateway. Extend `CombinedLogicEventMaterializer`, list the `aggregateTypes` to read and handle the events in `handleEvent`:
+
+```scala
+class DeliveryPlanning(
+  system: ActorSystem,
+  cargoGateway: TypedCommandGateway[CargoCommand],
+  orderGateway: TypedCommandGateway[OrderCommand]
+) extends CombinedLogicEventMaterializer(system)
+    with ReadJournalOffsetStore {
+
+  override val logger: Logger         = Logger(LoggerFactory.getLogger(classOf[DeliveryPlanning]))
+  override val aggregateTypes         = List(Order.Type, Cargo.Type)
+  override val matMappingName: String = "delivery-planning" // identifies the stored offsets
+
+  override def handleEvent(evt: Any): Future[Done] = evt match {
+    case OrderConfirmed(orderId, cargoId, route) =>
+      cargoGateway.tell(PlanCargo(cargoId, orderId, route)).map(_ => Done)
+    case CargoDelivered(cargoId, orderId) =>
+      orderGateway.tell(CompleteOrder(orderId)).map(_ => Done)
+    case _ => Future.successful(Done)
+  }
+}
+```
+
+Start it with the materializers: `new EventMaterializers(List(new CargoOverview(system), new DeliveryPlanning(system, cargoGateway, orderGateway))).startUp(keepListenersRunning = true)`.
+
+How it differs from a materializer:
+- **Only new events.** Combined logic has no replay phase; at its first start it reads every stored event of its types, after that it resumes from its offsets. When it is added to a system with existing events and must not act on them, set its offsets to the end first with `AggregateTypeMigration.startCombinedLogicAtEnd(offsetStore, "delivery-planning", Seq(Order.Type, Cargo.Type))`.
+- **An offset per aggregate type.** The events of the types are merged, and the stored offset holds a position per type (`TagOffsets`), so a restart skips no events of a type that lags. Adding a type later reads that type from the beginning; a type that is removed is dropped from the offset. On the JDBC offset store the offsets of all types must fit in 4000 characters.
+- **No order across types.** Events of one aggregate arrive in order, but events of different types can interleave in any order. Keep the state the logic needs in an aggregate (a process manager) it sends commands to, not in the combined logic itself.
+- **Side effects happen at least once.** After a failure or a restart an event can be handled again, so make the commands it sends idempotent (for example by deriving ids from the event).
+- **One node only**, like every materializer: run it on a single node, or each node sends the commands.
 
 ## Journals
 
@@ -239,7 +274,7 @@ cargo.events shouldBe List(NewRouteSpecified(cargoId, newRoute))
 Bounded 1.0 stored streams without an aggregate type (or with a `persistenceIdPrefix`), so materializers read them by a tag of their own. From this version every persistence id is `type|id`, and materializers name an `aggregateType` instead of a `tagName`. The API changes:
 - Classic aggregates: `persistenceIdPrefix` is replaced by the abstract `aggregateType`.
 - Typed aggregates: `behavior(id: String)` became `behavior(persistenceId: PersistenceId)`; build it with `AggregateBehavior`.
-- Materializers and sagas: `tagName` / `tagNames` became `aggregateType` / `aggregateTypes`.
+- Materializers and combined logic: `tagName` / `tagNames` became `aggregateType` / `aggregateTypes`.
 
 An existing journal is converted with `AggregateTypeMigration`. It runs in the application's own actor system, with the production journal config, while the application is stopped:
 
@@ -253,7 +288,7 @@ for {
   plan     <- migration.dryRun()                    // check: targets, splits, conflicts, untagged streams
   migrated <- migration.migrate()                   // resumable copy; check migrated.verified
   _        <- migration.deleteMigrated(migrated)    // delete the old streams and their snapshots
-  _        <- migration.startSagaAtEnd(offsetStore, "delivery-saga", Seq(Cargo.Type, Order.Type))
+  _        <- migration.startCombinedLogicAtEnd(offsetStore, "delivery-planning", Seq(Cargo.Type, Order.Type))
   _        <- migration.startAtEnd(offsetStore, "cargo-overview", Cargo.Type) // keeps its data
   _        <- migration.resetOffsets(offsetStore, Seq("order-view"))         // rebuilt from scratch
 } yield ()
@@ -261,7 +296,7 @@ for {
 
 - **The rule** maps an old persistence id and event to a `MigrationTarget(type, id)`. `byPrefix` and `byEvent` cover the common cases; `withTags` adds the extra tags of `tags(event)`. Events of one old stream with different targets split it.
 - **Safety.** `migrate()` copies nothing when two old streams share a target, or a target is itself migrated. When it is run again it checks what a target already holds. `verify` compares the counts.
-- **Materializers.** The copies get new offsets. A saga must start at the end (`startSagaAtEnd`) so it does not repeat its side effects. On R2DBC, `startAtEnd` / `startSagaAtEnd` wait for the backtracking window (about 2 minutes by default) before they return.
+- **Materializers.** The copies get new offsets. Combined logic must start at the end (`startCombinedLogicAtEnd`) so it does not repeat its side effects. On R2DBC, `startAtEnd` / `startCombinedLogicAtEnd` wait for the backtracking window (about 2 minutes by default) before they return.
 - **Cassandra** keeps deleted events in its tag views; `oldStreamsReadableByType` lists the old streams still readable by type.
 
 See the scaladoc of `AggregateTypeMigration` for the full order of operations.

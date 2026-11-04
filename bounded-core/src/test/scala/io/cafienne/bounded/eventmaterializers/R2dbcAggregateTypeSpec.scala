@@ -44,7 +44,7 @@ import scala.concurrent.duration._
 import scala.jdk.CollectionConverters._
 
 /**
-  * Event materializers and sagas on the R2DBC journal (Postgres in a container), reading aggregate types by entity
+  * Event materializers and combined logic on the R2DBC journal (Postgres in a container), reading aggregate types by entity
   * type. Canceled when Docker is not available.
   */
 class R2dbcAggregateTypeSpec
@@ -200,15 +200,15 @@ class R2dbcAggregateTypeSpec
     }
   }
 
-  "A saga on the R2DBC journal" should {
+  "A combined logic on the R2DBC journal" should {
 
     "read two aggregate types and resume per type from the stored offsets" in {
       assume(dockerAvailable, "Docker is not available")
-      val id = "saga"
+      val id = "combined-logic"
       send(Props(classOf[ClassicSimpleAggregate], id), Create(id))
       send(Props(classOf[AggregateRootActorSpec.OrderAggregate], id), Create(id))
 
-      val first           = new TypeSaga("r2dbc-saga", List(Simple, Order))
+      val first           = new TypeCombinedLogic("r2dbc-combined-logic", List(Simple, Order))
       val (killSwitch, _) = first.registerListenerWithKillSwitch(None)
       eventually(first.handled.count(_ == Created(id)) shouldBe 2)
       // stored up to and including the last event of each type
@@ -223,14 +223,19 @@ class R2dbcAggregateTypeSpec
       }
       killSwitch.shutdown()
 
-      send(Props(classOf[ClassicSimpleAggregate], id), AddItem(id, "saga simple"))
-      send(Props(classOf[AggregateRootActorSpec.OrderAggregate], id), AddItem(id, "saga order"))
-      val second                = new TypeSaga("r2dbc-saga", List(Simple, Order))
+      send(Props(classOf[ClassicSimpleAggregate], id), AddItem(id, "combined logic simple"))
+      send(Props(classOf[AggregateRootActorSpec.OrderAggregate], id), AddItem(id, "combined logic order"))
+      val second                = new TypeCombinedLogic("r2dbc-combined-logic", List(Simple, Order))
       val (secondKillSwitch, _) = second.registerListenerWithKillSwitch(None)
-      eventually(second.handled should contain allOf (ItemAdded(id, "saga simple"), ItemAdded(id, "saga order")))
+      eventually(
+        second.handled should contain allOf (
+          ItemAdded(id, "combined logic simple"),
+          ItemAdded(id, "combined logic order")
+        )
+      )
       Thread.sleep(3000) // backtracking reads its window again
-      second.handled.count(_ == ItemAdded(id, "saga simple")) shouldBe 1
-      second.handled.count(_ == ItemAdded(id, "saga order")) shouldBe 1
+      second.handled.count(_ == ItemAdded(id, "combined logic simple")) shouldBe 1
+      second.handled.count(_ == ItemAdded(id, "combined logic order")) shouldBe 1
       // The events at the stored offsets are not handled again. Older ones within the backtracking window before them
       // can be: after a restart, delivery is at-least-once.
       second.handled should not contain Created(id)
@@ -308,10 +313,10 @@ class R2dbcAggregateTypeSpec
     override def handleReplayEvent(evt: Any): Future[Done] = handleEvent(evt)
   }
 
-  class TypeSaga(name: String, types: List[AggregateType])
-      extends SagaEventMaterializer(system)
+  class TypeCombinedLogic(name: String, types: List[AggregateType])
+      extends CombinedLogicEventMaterializer(system)
       with ReadJournalOffsetStore {
-    override val logger: Logger         = Logger(LoggerFactory.getLogger(classOf[TypeSaga]))
+    override val logger: Logger         = Logger(LoggerFactory.getLogger(classOf[TypeCombinedLogic]))
     override val aggregateTypes         = types
     override val matMappingName: String = name
     private val handledEvents           = new ConcurrentLinkedQueue[Any]()

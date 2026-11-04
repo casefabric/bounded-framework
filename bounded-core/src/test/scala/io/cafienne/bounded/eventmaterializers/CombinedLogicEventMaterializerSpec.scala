@@ -23,12 +23,12 @@ import java.util.concurrent.ConcurrentLinkedQueue
 import scala.concurrent.Future
 import scala.jdk.CollectionConverters._
 
-case class SagaTestEvent(id: String, text: String) extends DomainEvent
+case class CombinedLogicTestEvent(id: String, text: String) extends DomainEvent
 
 /**
-  * Characterizes the current behaviour of SagaEventMaterializer over two tags.
+  * Characterizes the current behaviour of CombinedLogicEventMaterializer over two tags.
   */
-class SagaEventMaterializerSpec
+class CombinedLogicEventMaterializerSpec
     extends ScalaTestWithActorTestKit(SpecConfig.testConfig)
     with AnyWordSpecLike
     with Matchers
@@ -37,27 +37,27 @@ class SagaEventMaterializerSpec
 
   implicit val classicSystem: ActorSystem = system.classicSystem
 
-  val tagA = "saga-tag-a"
-  val tagB = "saga-tag-b"
+  val tagA = "combined-logic-tag-a"
+  val tagB = "combined-logic-tag-b"
 
   val initialEvents = Seq(
-    SagaTestEvent("saga-ar-a", "a1") -> tagA,
-    SagaTestEvent("saga-ar-b", "b1") -> tagB,
-    SagaTestEvent("saga-ar-a", "a2") -> tagA,
-    SagaTestEvent("saga-ar-b", "b2") -> tagB
+    CombinedLogicTestEvent("combined-logic-ar-a", "a1") -> tagA,
+    CombinedLogicTestEvent("combined-logic-ar-b", "b1") -> tagB,
+    CombinedLogicTestEvent("combined-logic-ar-a", "a2") -> tagA,
+    CombinedLogicTestEvent("combined-logic-ar-b", "b2") -> tagB
   )
 
-  "The Saga Event Materializer" must {
+  "The CombinedLogic Event Materializer" must {
 
     "handle the events of both tags, publish them and save an offset" in {
-      val saga                     = new TestSaga("saga-both-tags")
-      val (killSwitch, lastOffset) = saga.registerListenerWithKillSwitch(None)
+      val combinedLogic            = new TestCombinedLogic("combined-logic-both-tags")
+      val (killSwitch, lastOffset) = combinedLogic.registerListenerWithKillSwitch(None)
 
       eventually {
-        saga.handledEvents should contain theSameElementsAs initialEvents.map(_._1)
+        combinedLogic.handledEvents should contain theSameElementsAs initialEvents.map(_._1)
       }
       eventually {
-        saga.offsets.getOffset(saga.viewIdentifier).futureValue should not be NoOffset
+        combinedLogic.offsets.getOffset(combinedLogic.viewIdentifier).futureValue should not be NoOffset
       }
 
       killSwitch.shutdown()
@@ -67,35 +67,35 @@ class SagaEventMaterializerSpec
     "publish an EventProcessed per handled event" in {
       val listener = TestProbe()
       classicSystem.eventStream.subscribe(listener.ref, classOf[EventProcessed])
-      val saga            = new TestSaga("saga-publish")
-      val (killSwitch, _) = saga.registerListenerWithKillSwitch(None)
+      val combinedLogic   = new TestCombinedLogic("combined-logic-publish")
+      val (killSwitch, _) = combinedLogic.registerListenerWithKillSwitch(None)
 
       val published = listener.receiveWhile(messages = initialEvents.size) {
-        case e: EventProcessed if e.materializerId == saga.materializerId => e.evt
+        case e: EventProcessed if e.materializerId == combinedLogic.materializerId => e.evt
       }
       published should contain theSameElementsAs initialEvents.map(_._1)
       killSwitch.shutdown()
     }
 
     "start from the given offset instead of the stored one" in {
-      val saga = new TestSaga("saga-given-offset")
-      saga.offsets.saveOffset(saga.viewIdentifier, Offset.sequence(Long.MaxValue)).futureValue
-      val (killSwitch, _) = saga.registerListenerWithKillSwitch(Some(NoOffset))
+      val combinedLogic = new TestCombinedLogic("combined-logic-given-offset")
+      combinedLogic.offsets.saveOffset(combinedLogic.viewIdentifier, Offset.sequence(Long.MaxValue)).futureValue
+      val (killSwitch, _) = combinedLogic.registerListenerWithKillSwitch(Some(NoOffset))
 
       eventually {
-        saga.handledEvents should contain allElementsOf initialEvents.map(_._1)
+        combinedLogic.handledEvents should contain allElementsOf initialEvents.map(_._1)
       }
       killSwitch.shutdown()
     }
 
     "handle events that are added while it is listening" in {
-      val saga                     = new TestSaga("saga-live")
-      val (killSwitch, lastOffset) = saga.registerListenerWithKillSwitch(None)
-      eventually(saga.handledEvents should have size initialEvents.size.toLong)
+      val combinedLogic            = new TestCombinedLogic("combined-logic-live")
+      val (killSwitch, lastOffset) = combinedLogic.registerListenerWithKillSwitch(None)
+      eventually(combinedLogic.handledEvents should have size initialEvents.size.toLong)
 
-      storeEvents("saga-live-ar", Seq(SagaTestEvent("saga-live-ar", "b3") -> tagB))
+      storeEvents("combined-logic-live-ar", Seq(CombinedLogicTestEvent("combined-logic-live-ar", "b3") -> tagB))
 
-      eventually(saga.handledEvents should contain(SagaTestEvent("saga-live-ar", "b3")))
+      eventually(combinedLogic.handledEvents should contain(CombinedLogicTestEvent("combined-logic-live-ar", "b3")))
       killSwitch.shutdown()
       lastOffset.futureValue should not be NoOffset
     }
@@ -121,8 +121,8 @@ class SagaEventMaterializerSpec
     initialEvents.groupBy(_._1.id).foreach { case (id, events) => storeEvents(id, events) }
   }
 
-  class TestSaga(name: String) extends SagaEventMaterializer(classicSystem) {
-    override val logger: Logger           = Logger(LoggerFactory.getLogger(classOf[TestSaga]))
+  class TestCombinedLogic(name: String) extends CombinedLogicEventMaterializer(classicSystem) {
+    override val logger: Logger           = Logger(LoggerFactory.getLogger(classOf[TestCombinedLogic]))
     override val aggregateTypes           = List(AggregateType(tagA), AggregateType(tagB))
     override val matMappingName: String   = name
     val offsets: InMemoryBasedOffsetStore = new InMemoryBasedOffsetStore()

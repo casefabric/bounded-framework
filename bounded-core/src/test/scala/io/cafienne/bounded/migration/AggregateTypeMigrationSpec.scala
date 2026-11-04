@@ -253,12 +253,15 @@ abstract class AggregateTypeMigrationSpec extends AnyWordSpec with Matchers with
       store.getOffset("view-2").futureValue shouldBe NoOffset
     }
 
-    "start a materializer and a saga after the migrated events" in {
+    "start a materializer and a combined logic after the migrated events" in {
       assume(available, "The backend is not available")
       val store = new InMemoryBasedOffsetStore()
       // on R2DBC this waits until the backtracking window after the last copy has passed
       Await.result(migration.startAtEnd(store, "view-end", Simple), 3.minutes) shouldBe Done
-      Await.result(migration.startSagaAtEnd(store, "saga-end", Seq(Simple, Typed)), 3.minutes) shouldBe Done
+      Await.result(
+        migration.startCombinedLogicAtEnd(store, "combined-logic-end", Seq(Simple, Typed)),
+        3.minutes
+      ) shouldBe Done
 
       legacyUnder("simple|n", Append(Seq(Created("n")), tags = Set(Simple.name)))
 
@@ -271,7 +274,7 @@ abstract class AggregateTypeMigrationSpec extends AnyWordSpec with Matchers with
           .futureValue
 
       liveFrom(Simple, store.getOffset("view-end").futureValue) shouldBe Seq(Created("n"))
-      store.getOffset("saga-end").futureValue match {
+      store.getOffset("combined-logic-end").futureValue match {
         case TagOffsets(offsets) =>
           offsets.keySet shouldBe Set(Simple.name, Typed.name)
           liveFrom(Simple, offsets(Simple.name)) shouldBe Seq(Created("n"))

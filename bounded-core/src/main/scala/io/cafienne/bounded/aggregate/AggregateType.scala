@@ -9,7 +9,7 @@ import org.apache.pekko.persistence.typed.PersistenceId
 /**
   * The type of an aggregate root, e.g. `AggregateType("order")`. Every aggregate has one: it is the first part of
   * the aggregate's persistence id (`order|<aggregate id>`) and every event the aggregate stores is tagged with it.
-  * Event materializers and sagas select the events they read by aggregate type; Bounded reads them by tag or, on the
+  * Event materializers and combined logic select the events they read by aggregate type; Bounded reads them by tag or, on the
   * R2DBC journal, by entity type, so users never deal with either.
   *
   * Define it once per aggregate and use that value on both sides:

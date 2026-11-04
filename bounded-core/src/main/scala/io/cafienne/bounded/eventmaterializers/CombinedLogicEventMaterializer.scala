@@ -18,8 +18,9 @@ import io.cafienne.bounded.config.Configured
 import scala.concurrent.{ExecutionContextExecutor, Future}
 
 /**
-  * Abstract class to be used to create eventlisteners. Use this class as a base for listening for
-  * specific events. The class supports offset store to keep track of events received.
+  * Base class for combined logic: business logic that reacts to the events of several aggregate types, for
+  * example by sending commands to other aggregates. It only handles new events (there is no replay) and keeps
+  * its offset per aggregate type in the offset store, so it resumes after a restart.
   *
   * Set aggregateTypes to the types of the aggregates whose events to listen to
   * Set mappingname as identifier for this listener. It will be used as the id for storing current offset of
@@ -30,7 +31,7 @@ import scala.concurrent.{ExecutionContextExecutor, Future}
   * @param compatible indicate what events this materializer should process.
   *                   @see io.cafienne.bounded.Compatibility for more info
   */
-abstract class SagaEventMaterializer(
+abstract class CombinedLogicEventMaterializer(
   actorSystem: ActorSystem,
   keepCurrentOffset: Boolean = true,
   materialzerEventFilter: MaterializerEventFilter = NoFilterEventFilter
@@ -54,7 +55,7 @@ abstract class SagaEventMaterializer(
   val journal: AggregateTypeReadJournal = aggregateTypeJournal
 
   /**
-    * The types of the aggregates whose events the saga reads. The saga keeps its offset per type.
+    * The types of the aggregates whose events the combined logic reads. It keeps its offset per type.
     */
   val aggregateTypes: List[AggregateType]
 
@@ -92,10 +93,10 @@ abstract class SagaEventMaterializer(
   }
 
   def registerListenerWithKillSwitch(maybeStartOffset: Option[Offset]): (UniqueKillSwitch, Future[Offset]) = {
-    require(aggregateTypes.nonEmpty, s"Saga $viewIdentifier must listen to at least one aggregate type")
-    logger.info(s"Registering saga with killswitch $viewIdentifier")
+    require(aggregateTypes.nonEmpty, s"Combined logic $viewIdentifier must listen to at least one aggregate type")
+    logger.info(s"Registering combined logic with killswitch $viewIdentifier")
 
-    val startPosition = SagaEventMaterializer.tagOffsets(typeNames, listenStartOffset(maybeStartOffset))
+    val startPosition = CombinedLogicEventMaterializer.tagOffsets(typeNames, listenStartOffset(maybeStartOffset))
     runListener(events, startPosition, keepCurrentOffset, materialzerEventFilter)
   }
 
@@ -104,7 +105,7 @@ abstract class SagaEventMaterializer(
     * processed.
     */
   private def events(position: Offset): Source[PositionedEvent, NotUsed] = {
-    val start = SagaEventMaterializer.tagOffsets(typeNames, position)
+    val start = CombinedLogicEventMaterializer.tagOffsets(typeNames, position)
     Source(aggregateTypes)
       .flatMapMerge(
         aggregateTypes.size,
@@ -122,10 +123,10 @@ abstract class SagaEventMaterializer(
   }
 }
 
-object SagaEventMaterializer {
+object CombinedLogicEventMaterializer {
 
   /**
-    * The position per aggregate type (stored per type name, the tag of its events) of a saga. A stored TagOffsets
+    * The position per aggregate type (stored per type name, the tag of its events) of a combined logic. A stored TagOffsets
     * gives each type its own offset (a type without one starts from the beginning, a type no longer listened to is
     * dropped). A plain offset, stored by an older version of Bounded or given to registerListener, is the start
     * offset of every type.
