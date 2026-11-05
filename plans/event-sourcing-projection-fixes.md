@@ -4,6 +4,8 @@ Oct 18, 2026 · @Olger Warnier · revised after validation against the code
 
 ## Summary
 
+**Status (Nov 4, 2026): all 22 backlog items are done.** Items 1–14, 16, 18 and 21 are on `main` through #77 and #79 (item 13 was replaced by the required aggregate type of item 21). Items 15, 17, 19, 20 and 22 are in the commits after #79 (clustering, `bounded-pekko-projection` and its store factories). The text below is the original analysis; each backlog row ends with what was delivered. Combined logic testing and deadlines continue in [combined-logic-testing-deadlines-and-time.md](combined-logic-testing-deadlines-and-time.md).
+
 Bounded still has 15 of the 20 generic event-sourcing and projection bugs that case-engine fixed between 2020 and October 2026, plus 14 found while checking. Six are P1 because they lose events or report success for writes that never happened:
 
 - **Classic aggregates reply `Ok` before persisting** and do not handle persist failures (W1, W2).
@@ -21,7 +23,7 @@ The case-engine history was searched for commits that touch event sourcing (pers
 
 - Source: `casefabric/case-engine` git log, commit messages plus diffs. All cited commit hashes were checked to exist and match the fix they are cited for.
 - Target: `bounded-core` (aggregates, gateways, `eventmaterializers/`, offset stores) and `bounded-test`, at commit `f2f52fe` on `pekko_migration` (`bounded-core` on `review_fixes` is identical).
-- No code was changed; every fix is listed as a backlog item to implement later.
+- The analysis itself changed no code; every fix was listed as a backlog item, and all have since been implemented (see the status above).
 
 ## Issue catalogue
 
