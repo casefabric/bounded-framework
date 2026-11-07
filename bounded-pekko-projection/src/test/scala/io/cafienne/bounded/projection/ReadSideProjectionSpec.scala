@@ -98,6 +98,11 @@ class ReadSideProjectionSpec extends ScalaTestWithActorTestKit(ReadSideProjectio
     * A JDBC exactly-once projection that writes the notes of this test (those starting with `prefix`) and fails on
     * them as `fails(note, attempt)` says. Notes starting with "skip" are filtered out.
     */
+  // The handling attempts per note, of all projections of this spec
+  private val attempts = new ConcurrentHashMap[String, AtomicInteger]()
+
+  private def attemptsOf(note: String): Int = Option(attempts.get(note)).fold(0)(_.get)
+
   private def run(
     name: String,
     prefix: String,
@@ -105,7 +110,6 @@ class ReadSideProjectionSpec extends ScalaTestWithActorTestKit(ReadSideProjectio
     fails: (String, Int) => Boolean = (_, _) => false
   ): (EventProjection, ActorRef[ProjectionBehavior.Command]) = {
     val view       = BoundedProjectionsSpec.notesProjection(name, BoundedProjectionsSpec.SkipFilter)
-    val attempts   = new ConcurrentHashMap[String, AtomicInteger]()
     val projection =
       BoundedJdbcProjection.exactlyOnce(system, view, () => new H2Session(), _.withRecoveryStrategy(strategy)) {
         (session, event) =>
@@ -161,11 +165,31 @@ class ReadSideProjectionSpec extends ScalaTestWithActorTestKit(ReadSideProjectio
         case Failed(cause) => cause.getMessage shouldBe "cannot write bad-one"
         case other         => fail(s"Unexpected $other")
       }
+      // final only after the first attempt and its 2 retries (the projection may already have restarted since)
+      attemptsOf("bad-one") should be >= 3
       atBehind.futureValue shouldBe a[Pending]
       atBehind.futureValue match {
         case Pending(Pending.Down(_)) => succeed
         case other                    => fail(s"Unexpected $other")
       }
+      running ! ProjectionBehavior.Stop
+    }
+
+    "answer Failed when the strategy fails at once, and Processed after the projection restarts and succeeds" in {
+      val (view, running) =
+        run(
+          "wait-restart",
+          "flaky",
+          HandlerRecoveryStrategy.fail,
+          (note, attempt) => note == "flaky-one" && attempt == 1
+        )
+      val flaky = addNote("flaky-one")
+      registry.awaitProcessed(view.readSideId, flaky, 10.seconds).futureValue shouldBe a[Failed]
+      // pekko.projection.restart-backoff restarts the projection, which then handles the event
+      eventually(registry.awaitProcessed(view.readSideId, flaky, 1.second).futureValue shouldBe Processed)
+      attemptsOf("flaky-one") shouldBe 2
+      registry.awaitProcessed(view.readSideId, addNote("flaky-two"), 10.seconds).futureValue shouldBe Processed
+      rows("wait-restart", "flaky-one") shouldBe 1
       running ! ProjectionBehavior.Stop
     }
 

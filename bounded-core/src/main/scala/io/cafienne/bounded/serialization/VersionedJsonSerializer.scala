@@ -58,6 +58,16 @@ object EventFormat {
     new EventFormat[T](name, version, eventClass, e => (write(e), None), (json, _) => read(json), Map.empty, false)
 
   /**
+    * The format of an event whose codec writes and reads JSON text, e.g. with circe or Jackson instead of spray-json.
+    * The text is parsed into JSON to store it, so upcasters still work on JSON values.
+    */
+  def fromText[T <: AnyRef](name: String, version: Int, eventClass: Class[T])(
+    write: T => String,
+    read: String => T
+  ): EventFormat[T] =
+    apply(name, version, eventClass)(event => write(event).parseJson, json => read(json.compactPrint))
+
+  /**
     * The format of an event that carries `EventMetaData`: the serializer stores the metadata next to the JSON of
     * `write` (`{"meta": …, "data": …}`) and hands it back to `read`, so the codec does not have to know it.
     * Upcasters see the `data` part only.

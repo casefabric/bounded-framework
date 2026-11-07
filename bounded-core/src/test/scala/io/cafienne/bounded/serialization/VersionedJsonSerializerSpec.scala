@@ -125,6 +125,21 @@ class VersionedJsonSerializerSpec
       broken.getCause shouldBe a[DeserializationException]
     }
 
+    "take codecs that write and read JSON text" in {
+      final case class Noted(text: String)
+      val format = EventFormat.fromText("Noted", 1, classOf[Noted])(
+        noted => s"""{"text":"${noted.text}"}""",
+        text => Noted(text.parseJson.asJsObject.fields("text").asInstanceOf[JsString].value)
+      )
+      val textSerializer = new VersionedJsonSerializer {
+        override val identifier: Int                        = 1_160_203
+        override val formats: Seq[EventFormat[? <: AnyRef]] = List(format)
+      }
+      val bytes = textSerializer.toBinary(Noted("hi"))
+      textSerializer.manifest(Noted("hi")) shouldBe "Noted.v1"
+      textSerializer.fromBinary(bytes, "Noted.v1") shouldBe Noted("hi")
+    }
+
     "list the manifests of every version" in {
       serializer.manifests shouldBe List("PriceSet.v1", "PriceSet.v2", "PriceSet.v3", "Renamed.v1")
     }

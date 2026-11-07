@@ -318,7 +318,7 @@ Every factory method calls the Pekko method of the same name on the store's proj
 
 A client that writes and then reads its own write must not see the read model from before it. `ReadSideRegistry` lets a command wait until a read side shows its events, as an exactly-once projection commits them:
 
-1. **The reply tells where the events are.** A classic aggregate with `override val replyWithPosition = true` replies `Persisted(events, position)` instead of `Ok(events)`; a typed one builds the same reply in `thenReply` with `AggregateBehavior.positionOf(context, persistenceId)`, inside `Behaviors.setup`. An `EventPosition` is the persistence id and sequence number of the command's last event. A command without events replies `Ok(Nil)`: there is nothing to wait for.
+1. **The reply tells where the events are.** A classic aggregate with `override val replyWithPosition = true` replies `Persisted(events, position)` instead of `Ok(events)`; a typed one builds the same reply in `thenReply` with `AggregateBehavior.positionOf(context, persistenceId)`, inside `Behaviors.setup` (or with `AggregateBehavior.withContext`, whose command handler gets the `ActorContext` and whose `adjust` applies further `EventSourcedBehavior` settings). An `EventPosition` is the persistence id and sequence number of the command's last event. A command without events replies `Ok(Nil)`: there is nothing to wait for.
 2. **The read sides publish their progress** when `bounded.eventmaterializers.publish = on`: projections and listening event materializers publish a `ProjectionProgress` for every event they processed, filtered ones too (for exactly once: after the commit), a `ProjectionFailure` when their handler fails on an event (`isFinal` when they give up on it), and a `ProjectionDown` when their stream stops with a failure.
 3. **The caller waits** for the read side it needs:
 
@@ -384,7 +384,7 @@ pekko.actor {
 }
 ```
 
-- The codecs work on spray-json `JsValue`, which `bounded-core` already depends on; a codec written with another JSON library converts through the JSON text.
+- The codecs work on spray-json `JsValue`, which `bounded-core` already depends on; a codec written with another JSON library (circe, Jackson, …) works on the JSON text through `EventFormat.fromText(name, version, class)(event => text, text => event)`.
 - `EventFormat.withMetaData` stores the event's `EventMetaData` next to its JSON (`{"meta": …, "data": …}`) and hands it back to the codec, so the codec does not write it. Upcasters see the `data` part.
 - A version needs an upcaster from every older version; a format without one is refused. An unknown event, a version newer than the code and a JSON the codec cannot read throw a `NotSerializableException` naming the manifest.
 - Keep a fixture of every version of every event and check them in a test with `bounded-test`'s `EventFixtures` (below).

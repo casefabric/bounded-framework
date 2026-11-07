@@ -7,12 +7,13 @@ package io.cafienne.bounded.aggregate
 import org.apache.pekko.actor.{ExtendedActorSystem, Props}
 import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
 import org.apache.pekko.actor.typed.{ActorRef, Behavior}
-import org.apache.pekko.actor.typed.scaladsl.Behaviors
+import org.apache.pekko.actor.typed.scaladsl.{ActorContext, Behaviors}
 import org.apache.pekko.actor.typed.scaladsl.adapter._
 import org.apache.pekko.cluster.sharding.typed.scaladsl.EntityTypeKey
 import org.apache.pekko.persistence.testkit.PersistenceTestKitPlugin
 import org.apache.pekko.persistence.typed.PersistenceId
-import org.apache.pekko.persistence.typed.scaladsl.Effect
+import org.apache.pekko.persistence.typed.scaladsl.{Effect, ReplyEffect}
+import org.apache.pekko.persistence.testkit.scaladsl.PersistenceTestKit
 import org.apache.pekko.testkit.TestProbe
 import com.typesafe.config.ConfigFactory
 import io.cafienne.bounded.aggregate.typed.{AggregateBehavior, TypedAggregateRootManager}
@@ -32,19 +33,37 @@ object PositionReplySpec {
         AggregateBehavior.withEnforcedReplies[Count, Counted, Int](
           persistenceId,
           0,
-          (_, command) => {
-            val events = List.fill(command.times)(Counted(command.aggregateRootId))
-            if (events.isEmpty) Effect.reply(command.replyTo)(Ok(Nil))
-            else
-              Effect
-                .persist(events)
-                .thenReply(command.replyTo)(_ =>
-                  Persisted(events, AggregateBehavior.positionOf(context, persistenceId))
-                )
-          },
+          (_, command) => handle(context, persistenceId, command),
           (count, _) => count + 1
         )
       }
+  }
+
+  /** The same aggregate, built with `AggregateBehavior.withContext`. */
+  class CounterWithContextManager extends TypedAggregateRootManager[Count] {
+    override def entityTypeKey: EntityTypeKey[Count] = EntityTypeKey[Count](Type.name)
+
+    override def behavior(persistenceId: PersistenceId): Behavior[Count] =
+      AggregateBehavior.withContext[Count, Counted, Int](
+        persistenceId,
+        0,
+        (context, _, command) => handle(context, persistenceId, command),
+        (count, _) => count + 1,
+        _.withTagger(_ => Set(Type.name, "counted"))
+      )
+  }
+
+  private def handle(
+    context: ActorContext[Count],
+    persistenceId: PersistenceId,
+    command: Count
+  ): ReplyEffect[Counted, Int] = {
+    val events = List.fill(command.times)(Counted(command.aggregateRootId))
+    if (events.isEmpty) Effect.reply(command.replyTo)(Ok(Nil))
+    else
+      Effect
+        .persist(events)
+        .thenReply(command.replyTo)(_ => Persisted(events, AggregateBehavior.positionOf(context, persistenceId)))
   }
 }
 
@@ -101,6 +120,15 @@ class PositionReplySpec
       probe.expectMessage(Persisted(List(Counted("c1")), EventPosition("counter|c1", 3)))
       aggregate ! Count("c1", 0, probe.ref)
       probe.expectMessage(Ok(Nil))
+    }
+
+    "work with withContext, and apply its adjust to the EventSourcedBehavior" in {
+      val aggregate = spawn(new CounterWithContextManager().behaviorFor("c2"))
+      val probe     = createTestProbe[Reply]()
+
+      aggregate ! Count("c2", 2, probe.ref)
+      probe.expectMessage(Persisted(List(Counted("c2"), Counted("c2")), EventPosition("counter|c2", 2)))
+      PersistenceTestKit(system).persistedInStorage("counter|c2") shouldBe List(Counted("c2"), Counted("c2"))
     }
   }
 }
