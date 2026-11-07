@@ -44,7 +44,7 @@ object BoundedSlickProjection {
           BoundedProjections.eventsByTag(system, projection, store),
           databaseConfig,
           () => handler(projection)(handle)
-        )(using implicitly[ClassTag[P]], system)
+        )(implicitly[ClassTag[P]], system)
         .withStatusObserver(BoundedProjections.publishEventProcessed[EventEnvelope[Any]](system, projection))
     )
 
@@ -63,7 +63,7 @@ object BoundedSlickProjection {
           BoundedProjections.eventsByTag(system, projection, store),
           databaseConfig,
           () => handler(projection)(handle)
-        )(using implicitly[ClassTag[P]], system)
+        )(implicitly[ClassTag[P]], system)
         .withStatusObserver(BoundedProjections.publishEventProcessed[EventEnvelope[Any]](system, projection))
     )
 
@@ -82,7 +82,7 @@ object BoundedSlickProjection {
           BoundedProjections.eventsByTag(system, projection, store),
           databaseConfig,
           () => BoundedHandlers.async[EventEnvelope[Any]](projection)(handle)
-        )(using implicitly[ClassTag[P]], system)
+        )(implicitly[ClassTag[P]], system)
         .withStatusObserver(BoundedProjections.publishEventProcessed[EventEnvelope[Any]](system, projection))
     )
 
@@ -103,7 +103,7 @@ object BoundedSlickProjection {
           BoundedProjections.eventsByTag(system, projection, store),
           databaseConfig,
           () => groupedHandler(projection)(handle)
-        )(using implicitly[ClassTag[P]], system)
+        )(implicitly[ClassTag[P]], system)
         .withStatusObserver(BoundedProjections.publishEventProcessed[EventEnvelope[Any]](system, projection))
     )
 
@@ -121,7 +121,7 @@ object BoundedSlickProjection {
           BoundedProjections.eventsByTag(system, projection, store),
           databaseConfig,
           () => BoundedHandlers.groupedAsync[EventEnvelope[Any]](projection)(handle)
-        )(using implicitly[ClassTag[P]], system)
+        )(implicitly[ClassTag[P]], system)
         .withStatusObserver(BoundedProjections.publishEventProcessed[EventEnvelope[Any]](system, projection))
     )
 
