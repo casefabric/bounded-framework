@@ -35,10 +35,23 @@ final case class PersistenceRejected(cause: Throwable) extends HandlingFailure
 sealed trait Reply
 
 object Reply {
-  def ok(events: Seq[DomainEvent]): Reply = Ok(events)
-  def ko(failure: HandlingFailure): Reply = Ko(failure)
+  def ok(events: Seq[DomainEvent]): Reply                                 = Ok(events)
+  def ko(failure: HandlingFailure): Reply                                 = Ko(failure)
+  def persisted(events: Seq[DomainEvent], position: EventPosition): Reply = Persisted(events, position)
 }
 
 case class Ok(events: Seq[DomainEvent]) extends Reply
+
+/**
+  * Where the last event of a command is stored: its persistence id and sequence number. A read side that has
+  * processed this position shows the command's events (see `readside.ReadSideRegistry`).
+  */
+final case class EventPosition(persistenceId: String, sequenceNr: Long)
+
+/**
+  * The events of a command are stored, and the last one is at `position`. A classic aggregate replies this instead
+  * of `Ok` when it sets `replyWithPosition`; a typed one builds it with `AggregateBehavior.positionOf`.
+  */
+final case class Persisted(events: Seq[DomainEvent], position: EventPosition) extends Reply
 
 case class Ko(failure: HandlingFailure) extends Reply

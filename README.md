@@ -259,7 +259,7 @@ new ClusteredEventMaterializers(system, List(new CargoOverview(classicSystem), n
 
 Its materializers implement `StoppableResumable`, which `AbstractEventMaterializer`, `AbstractReplayableEventMaterializer` and `CombinedLogicEventMaterializer` do. Each replays and then listens on its own; it does not wait for the replays of the others. A read model that every node keeps for itself (in memory, or with the in-memory or LMDB offset store) stays on `EventMaterializers`, on every node.
 
-**Serialization.** Commands, replies and events cross nodes, so each needs a serializer binding; turn Java serialization off (`pekko.actor.allow-java-serialization = off`). Bounded serializes its own `Ok`, `Ko`, `PersistenceFailed`, `PersistenceRejected` and `UnexpectedCommand`, and writes the events, failures and commands inside them with the serializers you bind to your types. The cause of a `PersistenceFailed` arrives on another node as a `RemoteFailureCause` with the original class name and message.
+**Serialization.** Commands, replies and events cross nodes, so each needs a serializer binding; turn Java serialization off (`pekko.actor.allow-java-serialization = off`). Bounded serializes its own `Ok`, `Persisted`, `Ko`, `PersistenceFailed`, `PersistenceRejected` and `UnexpectedCommand`, and writes the events, failures and commands inside them with the serializers you bind to your types. The cause of a `PersistenceFailed` arrives on another node as a `RemoteFailureCause` with the original class name and message.
 
 Delivery to materializers stays at-least-once: when a materializer moves, the events after its last saved offset are handled again. Use a split brain resolver (`pekko.cluster.downing-provider-class`): without one, both halves of a split cluster run every aggregate and every materializer.
 
@@ -314,12 +314,89 @@ Every factory method calls the Pekko method of the same name on the store's proj
 - Replay-then-stop (`startUp(keepListenersRunning = false)`), `handleReplayEvent` and combined logic over several types stay on the event materializers.
 - Projections run once in a cluster with `runInCluster`, which uses a `ShardedDaemonProcess` with one process per projection.
 
+## Waiting for the read side
+
+A client that writes and then reads its own write must not see the read model from before it. `ReadSideRegistry` lets a command wait until a read side shows its events, as an exactly-once projection commits them:
+
+1. **The reply tells where the events are.** A classic aggregate with `override val replyWithPosition = true` replies `Persisted(events, position)` instead of `Ok(events)`; a typed one builds the same reply in `thenReply` with `AggregateBehavior.positionOf(context, persistenceId)`, inside `Behaviors.setup` (or with `AggregateBehavior.withContext`, whose command handler gets the `ActorContext` and whose `adjust` applies further `EventSourcedBehavior` settings). An `EventPosition` is the persistence id and sequence number of the command's last event. A command without events replies `Ok(Nil)`: there is nothing to wait for.
+2. **The read sides publish their progress** when `bounded.eventmaterializers.publish = on`: projections and listening event materializers publish a `ProjectionProgress` for every event they processed, filtered ones too (for exactly once: after the commit), a `ProjectionFailure` when their handler fails on an event (`isFinal` when they give up on it), and a `ProjectionDown` when their stream stops with a failure.
+3. **The caller waits** for the read side it needs:
+
+```scala
+gateway.ask[Reply](orderId, replyTo => PlaceOrder(orderId, replyTo)).flatMap {
+  case Persisted(_, position) => ReadSideRegistry(system).awaitProcessed(OrderOverview.readSideId, position)
+  case Ok(_)                  => Future.successful(Processed)
+  case Ko(failure)            => ...
+}
+```
+
+The wait ends in one of three values; none means that the command failed, so never retry the command on them:
+
+| Result | Meaning | A REST API would answer |
+|---|---|---|
+| `Processed` | the read side shows the events | 200 / 201 |
+| `Pending(TimedOut)`, `Pending(Down(cause))` | not yet: the timeout passed (`bounded.read-side.timeout`, 5 s), or the read side stopped and may restart and catch up | 202 Accepted with a `Location` |
+| `Failed(cause)` | the read side gave up on an event at or before the position (recovery strategy `fail` or `skip`, or after its last retry; a materializer whose restarts are used up); it will not show the events without intervention | 202, and an alert |
+
+A failed future is a programming or infrastructure error: a read side that never registered (projections register when they are built, materializers when they start listening; `register(id)` for your own), publishing switched off, or a terminating actor system.
+
+- **Ids.** A projection waits under `EventProjection.readSideId` (`name-aggregatetype`, the same for all its slice ranges), a materializer under its `viewIdentifier`.
+- **Since startup.** The registry knows what it saw since it started and drops what it knows of a persistence id after `bounded.read-side.idle-retention` (5 minutes) without waiters. A wait for an event processed before that ends in `Pending(TimedOut)`, which is why a command without events must not wait.
+- **One node.** The registry hears the read sides on its own node. A replaying materializer publishes nothing until it listens.
+
+## Event metadata
+
+Commands and events can carry who caused them, why and when, as values of their own: `CommandMetaData` (command id, correlation id, causation id, actor, timestamp, application fields) and `EventMetaData` (the same with an event id, and `migrated` for imported events). They are opt-in: a command extends `HasCommandMetaData`, an event `HasEventMetaData`; `DomainCommand` and `DomainEvent` require nothing.
+
+```scala
+final case class PlaceOrder(aggregateRootId: String, metaData: CommandMetaData, replyTo: ActorRef[Reply])
+    extends OrderCommand with HasCommandMetaData
+final case class OrderPlaced(id: String, metaData: EventMetaData) extends OrderEvent with HasEventMetaData
+
+val command = PlaceOrder(id, CommandMetaData.create(requestId, userId, Map("tenant" -> tenant)), replyTo)
+// in the aggregate:
+Effect.persist(OrderPlaced(command.aggregateRootId, EventMetaData.causedBy(command.metaData)))
+// in a policy or combined logic, for the next command:
+CommandMetaData.causedBy(event.metaData, actor = Some("system:policy"))
+```
+
+The metadata travels in the events, so read sides find it with `EventMetaData.of(event)`. Pekko's typed persistence has no public API to store metadata next to an event, and the gateway never sees events, so the aggregate copies it with `causedBy`. All constructors take a `java.time.Clock`.
+
+## Event serialization
+
+Bounded ships a base for event serializers that keeps every stored event readable: `VersionedJsonSerializer` stores an event as UTF-8 JSON with the manifest `<EventName>.v<n>` (never its class name), and reads an older version through an upcaster per version:
+
+```scala
+class OrderSerializer extends VersionedJsonSerializer {
+  override val identifier = 4_200_001 // unique in the actor system; 0 to 40 are Pekko's
+  override val formats = List(
+    EventFormat("OrderPlaced", 2, classOf[OrderPlaced])(placed => placedJson(placed), json => placedFrom(json))
+      .upcast(1)(json => JsObject(json.asJsObject.fields + ("currency" -> JsString("EUR")))),
+    EventFormat.withMetaData("OrderShipped", 1, classOf[OrderShipped])(shippedJson, (json, meta) => shippedFrom(json, meta))
+  )
+}
+```
+
+```hocon
+pekko.actor {
+  serializers.orders = "com.example.OrderSerializer"
+  serialization-bindings { "com.example.OrderEvent" = orders }
+}
+```
+
+- The codecs work on spray-json `JsValue`, which `bounded-core` already depends on; a codec written with another JSON library (circe, Jackson, …) works on the JSON text through `EventFormat.fromText(name, version, class)(event => text, text => event)`.
+- `EventFormat.withMetaData` stores the event's `EventMetaData` next to its JSON (`{"meta": …, "data": …}`) and hands it back to the codec, so the codec does not write it. Upcasters see the `data` part.
+- A version needs an upcaster from every older version; a format without one is refused. An unknown event, a version newer than the code and a JSON the codec cannot read throw a `NotSerializableException` naming the manifest.
+- Keep a fixture of every version of every event and check them in a test with `bounded-test`'s `EventFixtures` (below).
+
 ## Operating notes
 
 - **Handlers are at-least-once.** Materializers, combined logic and at-least-once projections can see an event again after a failure, a restart or a move to another node. Make them idempotent, or use an exactly-once projection.
-- **Serializers.** A serializer must not throw on an event it stored before, and must give new fields a default: one event it cannot read stops the recovery of its aggregate and the materializers that read it. Bounded ships no serializer for your types.
+- **Serializers.** A serializer must not throw on an event it stored before, and must give new fields a default: one event it cannot read stops the recovery of its aggregate and the materializers that read it. Use `VersionedJsonSerializer` with fixtures of every event version, or a serializer of your own.
+- **`serialize-messages = on`.** The gateways' own messages are exempt (`NoSerializationVerificationNeeded`), so only your commands and replies need serializers.
 - **Tags.** Bounded tags events with their aggregate type. Do not add a tag per aggregate (`tags(event)` returning an id): each tag is a query, and the tag table grows with every aggregate.
 - **JDBC journal.** Queries by tag filter `event_tag` on `tag`, but its key is `(event_id, tag)`. Add an index: `CREATE INDEX event_tag_tag_idx ON event_tag (tag, event_id);`.
+- **JDBC offset store.** The offset store of materializers and combined logic on JDBC (`JdbcOffsetStore`, also through `ReadJournalOffsetStore`) creates its table on first use, in the journal's database unless `bounded.eventmaterializers.jdbc-offsetstore.database-config` points elsewhere. Where the schema is managed elsewhere, create it there: table `OFFSET` with the string columns `VIEW_IDENTIFIER` (primary key), `OFFSET` (`VARCHAR(4000)`) and `OFFSET_TYPE`, all not null.
 - **Combined logic.** Its offset holds a position per aggregate type, and on the JDBC offset store all of them must fit in 4000 characters: keep the number of types small.
 - **LMDB offset store.** lmdbjava needs `--add-opens java.base/java.nio=ALL-UNNAMED --add-opens java.base/sun.nio.ch=ALL-UNNAMED` on Java 17 and later.
 
@@ -350,7 +427,8 @@ val cargo = TestableAggregateRoot
 cargo.events shouldBe List(NewRouteSpecified(cargoId, newRoute))
 ```
 
-- `TestableAggregateRoot` (classic and `typed`): start an aggregate from events, send a command, check the events, the state or the failure.
+- `TestableAggregateRoot` (classic and `typed`): start an aggregate from events, send a command, check the events, the state or the failure. The typed one also sends a command with a reply ref (`whenAsk(replyTo => ShipOrder(id, replyTo))`), waits for the reply, also after an asynchronous step such as `pipeToSelf`, and shows it as `reply` (a `Ko` also as `failure`); `whenAskAll` sends several at once, to test what an aggregate stashes while it waits.
+- `EventFixtures.verify(serializer, folder)` (or `assertEventFixtures` from `EventFixtureChecks`) reads every `<EventName>.v<n>.json` in a folder with a `VersionedJsonSerializer`, checks that the current version is written back the same, and lists versions without a fixture; `EventFixtures.write` creates the fixtures of the current versions from sample events.
 - `TestableProjection.givenEvents(events, Cargo.Type)`: store events for an aggregate type, then `startProjection(materializer)` and `addEvent(...)`.
 - `TestTypedCommandGateway`: a typed gateway for tests.
 

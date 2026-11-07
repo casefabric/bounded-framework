@@ -14,7 +14,9 @@ import org.apache.pekko.testkit.TestProbe
 import com.typesafe.config.ConfigFactory
 import com.typesafe.scalalogging.Logger
 import io.cafienne.bounded.aggregate.DomainEvent
+import io.cafienne.bounded.aggregate.EventPosition
 import io.cafienne.bounded.eventmaterializers.offsetstores.InMemoryBasedOffsetStore
+import io.cafienne.bounded.readside.{Failed, Pending, Processed, ReadSideRegistry}
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpecLike
 import org.slf4j.LoggerFactory
@@ -22,6 +24,7 @@ import org.slf4j.LoggerFactory
 import java.util.concurrent.{ConcurrentHashMap, ConcurrentLinkedQueue}
 import java.util.concurrent.atomic.AtomicInteger
 import scala.concurrent.Future
+import scala.concurrent.duration._
 import scala.jdk.CollectionConverters._
 
 case class RestartTestEvent(id: String, text: String) extends DomainEvent
@@ -114,6 +117,49 @@ class EventMaterializerRestartSpec
     }
   }
 
+  "A listening event materializer as read side" must {
+
+    "let a waiter complete once it handled the event, also for an event its filter rejects" in {
+      val tag    = storeSixEvents()
+      val skipE4 = new MaterializerEventFilter {
+        override def filter(evt: DomainEvent): Boolean = evt.asInstanceOf[RestartTestEvent].text != "e4"
+      }
+      val materializer = new FlakyMaterializer(tag, filter = skipE4)
+      val registry     = ReadSideRegistry(classicSystem)
+
+      val (killSwitch, _) = materializer.registerListenerWithKillSwitch(Some(NoOffset))
+
+      registry
+        .awaitProcessed(materializer.viewIdentifier, EventPosition(persistenceIdOf(tag), 4), 10.seconds)
+        .futureValue shouldBe Processed
+      registry
+        .awaitProcessed(materializer.viewIdentifier, EventPosition(persistenceIdOf(tag), 6), 10.seconds)
+        .futureValue shouldBe Processed
+      materializer.handled shouldBe Seq("e1", "e2", "e3", "e5", "e6")
+      killSwitch.shutdown()
+    }
+
+    "answer Failed for the event it gave up on, and Pending(Down) for the events behind it" in {
+      val tag          = storeSixEvents()
+      val materializer = new FlakyMaterializer(tag, failHandling = (text, _) => text == "e2")
+      val registry     = ReadSideRegistry(classicSystem)
+      val pid          = persistenceIdOf(tag)
+
+      val failure = materializer.registerListener(Some(NoOffset))
+      val atE2    = registry.awaitProcessed(materializer.viewIdentifier, EventPosition(pid, 2), 10.seconds)
+      // e2 belongs to the same persistence id, so a waiter for e5 also sees the final failure of e2
+      val atE5 = registry.awaitProcessed(materializer.viewIdentifier, EventPosition(pid, 5), 10.seconds)
+
+      failure.failed.futureValue.getMessage shouldBe "handling e2 failed"
+      atE2.futureValue shouldBe a[Failed]
+      atE5.futureValue shouldBe a[Failed]
+      // another persistence id of the same read side only learns that it is down
+      registry
+        .awaitProcessed(materializer.viewIdentifier, EventPosition("someone-else", 1), 200.millis)
+        .futureValue shouldBe Pending(Pending.TimedOut)
+    }
+  }
+
   "A replaying event materializer" must {
 
     "retry a failing replay from the last replayed event" in {
@@ -138,6 +184,8 @@ class EventMaterializerRestartSpec
   }
 
   private def texts(range: Range): Seq[String] = range.map(i => s"e$i")
+
+  private def persistenceIdOf(tag: String): String = tag.replace("restart-tag-", "restart-ar-")
 
   /**
     * Stores e1..e6 under a tag of its own, so every test reads only its own events (and offsets 1..6).
@@ -168,8 +216,9 @@ class EventMaterializerRestartSpec
     tag: String,
     keepOffset: Boolean = true,
     failHandling: (String, Int) => Boolean = (_, _) => false,
-    failSave: (Offset, Int) => Boolean = (_, _) => false
-  ) extends AbstractReplayableEventMaterializer(classicSystem, keepOffset) {
+    failSave: (Offset, Int) => Boolean = (_, _) => false,
+    filter: MaterializerEventFilter = NoFilterEventFilter
+  ) extends AbstractReplayableEventMaterializer(classicSystem, keepOffset, filter) {
     override val logger: Logger           = Logger(LoggerFactory.getLogger(classOf[FlakyMaterializer]))
     override val aggregateType            = AggregateType(tag)
     override val matMappingName: String   = s"view-$tag"

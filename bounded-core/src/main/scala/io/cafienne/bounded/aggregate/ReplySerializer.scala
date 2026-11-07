@@ -17,7 +17,7 @@ import java.io.{
 import scala.collection.immutable.Seq
 
 /**
-  * Serializes the replies of aggregates (`Ok`, `Ko`) and Bounded's own handling failures, so they can cross nodes
+  * Serializes the replies of aggregates (`Ok`, `Persisted`, `Ko`) and Bounded's own handling failures, so they can cross nodes
   * in a cluster without Java serialization. It is bound to them in Bounded's `reference.conf`.
   *
   * The events in an `Ok`, the failure in a `Ko` and the command in an `UnexpectedCommand` are the application's own
@@ -35,6 +35,7 @@ class ReplySerializer(system: ExtendedActorSystem) extends SerializerWithStringM
 
   override def manifest(o: AnyRef): String = o match {
     case _: Ok                  => OkManifest
+    case _: Persisted           => PersistedManifest
     case _: Ko                  => KoManifest
     case _: PersistenceFailed   => PersistenceFailedManifest
     case _: PersistenceRejected => PersistenceRejectedManifest
@@ -49,6 +50,11 @@ class ReplySerializer(system: ExtendedActorSystem) extends SerializerWithStringM
       case Ok(events) =>
         out.writeInt(events.size)
         events.foreach(writePayload(out, _))
+      case Persisted(events, position) =>
+        out.writeInt(events.size)
+        events.foreach(writePayload(out, _))
+        out.writeUTF(position.persistenceId)
+        out.writeLong(position.sequenceNr)
       case Ko(failure)                   => writePayload(out, failure)
       case PersistenceFailed(cause)      => writeCause(out, cause)
       case PersistenceRejected(cause)    => writeCause(out, cause)
@@ -62,7 +68,10 @@ class ReplySerializer(system: ExtendedActorSystem) extends SerializerWithStringM
   override def fromBinary(bytes: Array[Byte], manifest: String): AnyRef = {
     val in = new DataInputStream(new ByteArrayInputStream(bytes))
     manifest match {
-      case OkManifest                  => Ok(Seq.fill(in.readInt())(readPayload(in).asInstanceOf[DomainEvent]))
+      case OkManifest        => Ok(Seq.fill(in.readInt())(readPayload(in).asInstanceOf[DomainEvent]))
+      case PersistedManifest =>
+        val events = Seq.fill(in.readInt())(readPayload(in).asInstanceOf[DomainEvent])
+        Persisted(events, EventPosition(in.readUTF(), in.readLong()))
       case KoManifest                  => Ko(readPayload(in).asInstanceOf[HandlingFailure])
       case PersistenceFailedManifest   => PersistenceFailed(readCause(in))
       case PersistenceRejectedManifest => PersistenceRejected(readCause(in))
@@ -104,6 +113,7 @@ object ReplySerializer {
   val Identifier: Int = 1_160_001
 
   private val OkManifest                  = "Ok"
+  private val PersistedManifest           = "Persisted"
   private val KoManifest                  = "Ko"
   private val PersistenceFailedManifest   = "PersistenceFailed"
   private val PersistenceRejectedManifest = "PersistenceRejected"
