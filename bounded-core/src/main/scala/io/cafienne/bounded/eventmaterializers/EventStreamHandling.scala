@@ -17,9 +17,12 @@ import com.typesafe.scalalogging.Logger
 import io.cafienne.bounded.aggregate.DomainEvent
 import io.cafienne.bounded.pekko.ActorSystemProvider
 import io.cafienne.bounded.eventmaterializers.offsetstores.OffsetStore
+import io.cafienne.bounded.readside.{ProjectionDown, ProjectionFailure, ProjectionProgress, ReadSideRegistry}
 
 import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.concurrent.duration._
+import scala.util.control.NonFatal
+import scala.util.{Failure, Success}
 
 /**
   * The event stream steps shared by the event materializers, for replay as well as live listening:
@@ -67,9 +70,11 @@ private[eventmaterializers] trait EventStreamHandling extends ActorSystemProvide
     maybeStartOffset.getOrElse(Await.result(getOffset(viewIdentifier), 10.seconds))
 
   /**
-    * Handles one event and publishes an EventProcessed when `publish` is set. A failing handler fails the
-    * returned future. An event the filter rejects is not handled or published, but its position is still
-    * returned, so that `savePositions` can save it and a stretch of filtered events is not read again.
+    * Handles one event and, when `publish` is set, publishes an EventProcessed for an accepted event and a
+    * `ProjectionProgress` for every event (also one the filter rejects), or a `ProjectionFailure` (not final) when
+    * the handler fails. A failing handler fails the returned future. An event the filter rejects is not handled,
+    * but its position is still returned, so that `savePositions` can save it and a stretch of filtered events is
+    * not read again.
     *
     * @return the position after the event, once it is handled
     */
@@ -88,12 +93,28 @@ private[eventmaterializers] trait EventStreamHandling extends ActorSystemProvide
     logger.debug(
       s"$matMappingName: Received event: $evt(offset: $evtOffset, persistenceId: $persistenceId, sequenceNo: $sequenceNo, filtered out: ${!accepted})"
     )
-    (if (accepted) handler(evt) else Future.successful(Done)).map { _ =>
-      if (publish && accepted) {
-        system.eventStream.publish(EventProcessed(materializerId, evtOffset, persistenceId, sequenceNo, evt))
-      }
-      logger.debug(s"$matMappingName: Completed processing of event: $evt")
-      event.position
+    val handled =
+      if (!accepted) Future.successful(Done)
+      else
+        try handler(evt)
+        catch { case NonFatal(e) => Future.failed(e) }
+    handled.transform {
+      case Success(_) =>
+        if (publish) {
+          if (accepted) {
+            system.eventStream.publish(EventProcessed(materializerId, evtOffset, persistenceId, sequenceNo, evt))
+          }
+          system.eventStream.publish(ProjectionProgress(viewIdentifier, persistenceId, sequenceNo))
+        }
+        logger.debug(s"$matMappingName: Completed processing of event: $evt")
+        Success(event.position)
+      case Failure(cause) =>
+        if (publish) {
+          system.eventStream.publish(
+            ProjectionFailure(viewIdentifier, persistenceId, sequenceNo, cause, isFinal = false)
+          )
+        }
+        Failure(cause)
     }
   }
 
@@ -121,7 +142,9 @@ private[eventmaterializers] trait EventStreamHandling extends ActorSystemProvide
     * @param startOffset the position to start from
     * @param filter the events to handle
     * @return the kill switch, and the position after the last handled event (the start position when none
-    *         was) once the stream has stopped. The future fails when the restarts are used up.
+    *         was) once the stream has stopped. The future fails when the restarts are used up; with publishing on,
+    *         a final `ProjectionFailure` for the event the handler last failed on and a `ProjectionDown` are
+    *         published then.
     */
   protected def runListener(
     events: Offset => Source[PositionedEvent, NotUsed],
@@ -130,15 +153,25 @@ private[eventmaterializers] trait EventStreamHandling extends ActorSystemProvide
     filter: MaterializerEventFilter
   ): (UniqueKillSwitch, Future[Offset]) = {
     val resumeFrom = new AtomicReference[Offset](startOffset)
-    RestartSource
+    // The event the handler last failed on, until an event is handled again
+    val lastFailure = new AtomicReference[Option[(String, Long, Throwable)]](None)
+    if (isPublishRequired) ReadSideRegistry(system).register(viewIdentifier)
+    val (killSwitch, result) = RestartSource
       .onFailuresWithBackoff(restartSettings) { () =>
         logger.debug(s"$viewIdentifier: listening for events after offset ${resumeFrom.get}")
         events(resumeFrom.get)
           // resumeFrom is set as soon as the event is handled, also when a failing save tears the stream down meanwhile
-          .mapAsync(1)(processEvent(_, filter, handleEvent, isPublishRequired).map { offset =>
-            resumeFrom.set(offset)
-            offset
-          })
+          .mapAsync(1) { event =>
+            processEvent(event, filter, handleEvent, isPublishRequired).transform {
+              case Success(offset) =>
+                resumeFrom.set(offset)
+                lastFailure.set(None)
+                Success(offset)
+              case Failure(cause) =>
+                lastFailure.set(Some((event.envelope.persistenceId, event.envelope.sequenceNr, cause)))
+                Failure(cause)
+            }
+          }
           .via(savePositions(keepOffset))
           .mapError { case e =>
             logger.warn(s"$viewIdentifier: event stream failed after offset ${resumeFrom.get}", e)
@@ -148,6 +181,17 @@ private[eventmaterializers] trait EventStreamHandling extends ActorSystemProvide
       .viaMat(KillSwitches.single)(Keep.right)
       .toMat(Sink.fold(startOffset)((_, offset) => offset))(Keep.both)
       .run()
+    result.failed.foreach { cause =>
+      if (isPublishRequired) {
+        lastFailure.get.foreach { case (persistenceId, sequenceNr, failure) =>
+          system.eventStream.publish(
+            ProjectionFailure(viewIdentifier, persistenceId, sequenceNr, failure, isFinal = true)
+          )
+        }
+        system.eventStream.publish(ProjectionDown(viewIdentifier, cause))
+      }
+    }
+    (killSwitch, result)
   }
 
   /**

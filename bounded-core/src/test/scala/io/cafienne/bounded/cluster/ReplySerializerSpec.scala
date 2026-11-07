@@ -8,6 +8,8 @@ import org.apache.pekko.actor.typed.ActorSystem
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
 import org.apache.pekko.serialization.{SerializationExtension, Serializers}
 import io.cafienne.bounded.aggregate.{
+  EventPosition,
+  Persisted,
   Ko,
   Ok,
   PersistenceFailed,
@@ -49,6 +51,11 @@ class ReplySerializerSpec extends AnyWordSpec with Matchers with BeforeAndAfterA
       val ok = Ok(List(NoteAdded("a", "first"), NoteAdded("a", "second")))
       roundTrip(ok) shouldBe ok
       roundTrip(Ok(Nil)) shouldBe Ok(Nil)
+    }
+
+    "serialize a Persisted with the events and the position of the last one" in {
+      val persisted = Persisted(List(NoteAdded("a", "first"), NoteAdded("a", "second")), EventPosition("notes|a", 7))
+      roundTrip(persisted) shouldBe persisted
     }
 
     "serialize a Ko with an application failure" in {
