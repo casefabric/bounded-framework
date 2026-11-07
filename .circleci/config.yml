@@ -42,18 +42,22 @@ jobs:
             git checkout -q ${CIRCLE_SHA1}
       - restore_cache:
           keys:
-            - v2-dependencies-{{ checksum "build.sbt" }}-{{ checksum "project/Dependencies.scala" }}-{{ checksum "project/plugins.sbt" }}-{{ checksum "project/build.properties" }}
+            - v3-dependencies-{{ checksum "build.sbt" }}-{{ checksum "project/Dependencies.scala" }}-{{ checksum "project/plugins.sbt" }}-{{ checksum "project/build.properties" }}
             # fallback to using the latest cache if no exact match is found
-            - v2-dependencies-
+            - v3-dependencies-
       - run:
           name: Run tests
           # sbt 2 runs a thin client that reads all arguments as one command line, so separate commands with ;
           command: cat /dev/null | sbt "coverage; test; coverageReport"
+      - run:
+          name: Run tests on Scala 2.13
+          # The sbt server keeps the coverage setting of the previous step, so switch it off first
+          command: cat /dev/null | sbt "coverageOff; ++2.13.18; test"
           #- store_artifacts: # for display in Artifacts: https://circleci.com/docs/2.0/artifacts/
           #path: target/universal/samplescala.zip
           #destination: samplescala
       - save_cache:
-          key: v2-dependencies-{{ checksum "build.sbt" }}-{{ checksum "project/Dependencies.scala" }}-{{ checksum "project/plugins.sbt" }}-{{ checksum "project/build.properties" }}
+          key: v3-dependencies-{{ checksum "build.sbt" }}-{{ checksum "project/Dependencies.scala" }}-{{ checksum "project/plugins.sbt" }}-{{ checksum "project/build.properties" }}
           paths:
             - "~/.cache/coursier"
             - "~/.cache/sbt"

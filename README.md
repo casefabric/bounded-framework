@@ -38,7 +38,7 @@ Because every change is an event, the journal holds the full history of the appl
 
 ## Getting started
 
-Bounded is built for Scala 3 and published to Maven Central:
+Bounded is built for Scala 3 (3.3 LTS) and Scala 2.13, and published to Maven Central for both (`bounded-core_3`, `bounded-core_2.13`, …), so `%%` picks the right one:
 
 ```scala
 libraryDependencies ++= Seq(

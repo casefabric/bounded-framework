@@ -3,20 +3,31 @@ import sbt.Keys.localStaging
 lazy val basicSettings = {
   // Scala 3 LTS: libraries built with it can be used from every later Scala 3 version
   val scala3 = "3.3.9"
+  // Also published for Scala 2.13, from the same sources (see plans/scala-2.13-cross-build.md)
+  val scala213 = "2.13.18"
 
   //noinspection ScalaStyle
   Seq(
     organization := "io.cafienne.bounded",
     description := "Scala and Pekko based Domain Driven Design Framework",
+    // Scala 3 stays the default: IDE, coverage and the Sonar report paths use it
     scalaVersion := scala3,
+    crossScalaVersions := Seq(scala3, scala213),
     scalacOptions := Seq(
       "-encoding", "UTF-8",
       "-deprecation", // warning and location for usages of deprecated APIs
       "-feature", // warning and location for usages of features that should be imported explicitly
       "-unchecked", // additional warnings where generated code depends on assumptions
       "-Wvalue-discard", // Warn when non-Unit expression results are unused
-      "-Wunused:all"
-    ),
+    ) ++ {
+      CrossVersion.partialVersion(scalaVersion.value) match {
+        case Some((2, _)) => Seq(
+          "-Xsource:3", // accept the Scala 3 syntax the shared sources use (`?` wildcards, `xs*` splices)
+          "-Wunused:imports,privates,locals,implicits,nowarn" // 2.13 has no -Wunused:all
+        )
+        case _ => Seq("-Wunused:all")
+      }
+    },
     //scalastyleConfig := baseDirectory.value / "project/scalastyle-config.xml",
     scalafmtConfig := (ThisBuild / baseDirectory).value / "project/.scalafmt.conf",
     scalafmtOnCompile := true,

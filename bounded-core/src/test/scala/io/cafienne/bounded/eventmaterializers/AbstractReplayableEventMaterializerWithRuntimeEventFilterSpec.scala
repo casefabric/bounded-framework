@@ -143,7 +143,7 @@ class AbstractReplayableEventMaterializerWithEventFilterSpec
 
     storeEventsActor ! PoisonPill
     val terminated = testProbe.expectTerminated(storeEventsActor)
-    assert(terminated.existenceConfirmed): Unit
+    if (!terminated.existenceConfirmed) fail("the events actor did not stop")
   }
 
   override def beforeAll(): Unit = {

@@ -11,6 +11,7 @@ import org.apache.pekko.util.Timeout
 import io.cafienne.bounded.aggregate.{CommandValidator, DomainCommand, ValidateableCommand}
 
 import java.net.URLEncoder
+import scala.annotation.nowarn
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.atomic.AtomicInteger
 import scala.concurrent.duration._
@@ -53,8 +54,12 @@ class DefaultTypedCommandGateway[Cmd <: DomainCommand](
   object CommandGatewayGuardian {
 
     sealed trait AggregateControl
+    // Scala 2.13 cannot check the outer (gateway) reference in the generated equals; there is one guardian per
+    // gateway, so the messages never meet those of another gateway.
+    @nowarn("msg=outer reference")
     final case class SpawnAggregate(aggregateId: String, replyTo: ActorRef[StatusReply[ActorRef[Cmd]]])
         extends AggregateControl
+    @nowarn("msg=outer reference")
     final case class StopAggregate(aggregateId: String)         extends AggregateControl
     private case class AggregateTerminated(aggregateId: String) extends AggregateControl
     case object GracefulShutdown                                extends AggregateControl

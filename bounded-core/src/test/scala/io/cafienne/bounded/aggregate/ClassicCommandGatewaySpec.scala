@@ -84,7 +84,7 @@ class ClassicCommandGatewaySpec
   "Command Gateway" should "hanlde multiple commands to a single aggregate" in {
     val testAggregateRootId1 = "testAr1"
 
-    whenReady(commandGateway.send(Create(testAggregateRootId1))) { answer => assert(answer == ()) }
+    whenReady(commandGateway.send(Create(testAggregateRootId1))) { _ => succeed }
 
     whenReady(commandGateway.sendAndAsk(AddItem(testAggregateRootId1, "item1"))) { answer =>
       assert(answer == Ok(List(ItemAdded("testAr1", "item1"))))

@@ -61,14 +61,18 @@ object BoundedR2dbcProjection {
     slices: Option[SliceRange] = None,
     adjust: ExactlyOnceProjection[Offset, ?] => ExactlyOnceProjection[Offset, ?] = identity
   )(handle: (R2dbcSession, Any) => Future[Done]): ExactlyOnceProjection[Offset, ?] =
-    withSource(system, projection, slices)([Envelope] =>
-      (id: ProjectionId, source: SourceProvider[Offset, Envelope], envelope: ProjectionEnvelope[Envelope]) =>
+    withSource(system, projection, slices)(new Build[ExactlyOnceProjection[Offset, ?]] {
+      def apply[Envelope](
+        id: ProjectionId,
+        source: SourceProvider[Offset, Envelope],
+        envelope: ProjectionEnvelope[Envelope]
+      ): ExactlyOnceProjection[Offset, ?] =
         adjust(
           R2dbcProjection
-            .exactlyOnce(id, settings, source, () => handler(projection)(handle)(using envelope))(system)
-            .withStatusObserver(BoundedProjections.publishEventProcessed(system, projection)(using envelope))
+            .exactlyOnce(id, settings, source, () => handler(projection)(handle)(envelope))(system)
+            .withStatusObserver(BoundedProjections.publishEventProcessed(system, projection)(envelope))
         )
-    )
+    })
 
   /**
     * The statements `handle` runs on the session are in a transaction of their own; the offsets are stored after the
@@ -81,14 +85,18 @@ object BoundedR2dbcProjection {
     slices: Option[SliceRange] = None,
     adjust: AtLeastOnceProjection[Offset, ?] => AtLeastOnceProjection[Offset, ?] = identity
   )(handle: (R2dbcSession, Any) => Future[Done]): AtLeastOnceProjection[Offset, ?] =
-    withSource(system, projection, slices)([Envelope] =>
-      (id: ProjectionId, source: SourceProvider[Offset, Envelope], envelope: ProjectionEnvelope[Envelope]) =>
+    withSource(system, projection, slices)(new Build[AtLeastOnceProjection[Offset, ?]] {
+      def apply[Envelope](
+        id: ProjectionId,
+        source: SourceProvider[Offset, Envelope],
+        envelope: ProjectionEnvelope[Envelope]
+      ): AtLeastOnceProjection[Offset, ?] =
         adjust(
           R2dbcProjection
-            .atLeastOnce(id, settings, source, () => handler(projection)(handle)(using envelope))(system)
-            .withStatusObserver(BoundedProjections.publishEventProcessed(system, projection)(using envelope))
+            .atLeastOnce(id, settings, source, () => handler(projection)(handle)(envelope))(system)
+            .withStatusObserver(BoundedProjections.publishEventProcessed(system, projection)(envelope))
         )
-    )
+    })
 
   /** The offsets are stored after the events, in batches; `handle` must be idempotent. */
   def atLeastOnceAsync(
@@ -98,16 +106,20 @@ object BoundedR2dbcProjection {
     slices: Option[SliceRange] = None,
     adjust: AtLeastOnceProjection[Offset, ?] => AtLeastOnceProjection[Offset, ?] = identity
   )(handle: Any => Future[Done]): AtLeastOnceProjection[Offset, ?] =
-    withSource(system, projection, slices)([Envelope] =>
-      (id: ProjectionId, source: SourceProvider[Offset, Envelope], envelope: ProjectionEnvelope[Envelope]) =>
+    withSource(system, projection, slices)(new Build[AtLeastOnceProjection[Offset, ?]] {
+      def apply[Envelope](
+        id: ProjectionId,
+        source: SourceProvider[Offset, Envelope],
+        envelope: ProjectionEnvelope[Envelope]
+      ): AtLeastOnceProjection[Offset, ?] =
         adjust(
           R2dbcProjection
-            .atLeastOnceAsync(id, settings, source, () => BoundedHandlers.async(projection)(handle)(using envelope))(
+            .atLeastOnceAsync(id, settings, source, () => BoundedHandlers.async(projection)(handle)(envelope))(
               system
             )
-            .withStatusObserver(BoundedProjections.publishEventProcessed(system, projection)(using envelope))
+            .withStatusObserver(BoundedProjections.publishEventProcessed(system, projection)(envelope))
         )
-    )
+    })
 
   /**
     * `handle` gets the events in groups (size and time set with `withGroup`); the statements it runs on the session
@@ -120,14 +132,18 @@ object BoundedR2dbcProjection {
     slices: Option[SliceRange] = None,
     adjust: GroupedProjection[Offset, ?] => GroupedProjection[Offset, ?] = identity
   )(handle: (R2dbcSession, Seq[Any]) => Future[Done]): GroupedProjection[Offset, ?] =
-    withSource(system, projection, slices)([Envelope] =>
-      (id: ProjectionId, source: SourceProvider[Offset, Envelope], envelope: ProjectionEnvelope[Envelope]) =>
+    withSource(system, projection, slices)(new Build[GroupedProjection[Offset, ?]] {
+      def apply[Envelope](
+        id: ProjectionId,
+        source: SourceProvider[Offset, Envelope],
+        envelope: ProjectionEnvelope[Envelope]
+      ): GroupedProjection[Offset, ?] =
         adjust(
           R2dbcProjection
-            .groupedWithin(id, settings, source, () => groupedHandler(projection)(handle)(using envelope))(system)
-            .withStatusObserver(BoundedProjections.publishEventProcessed(system, projection)(using envelope))
+            .groupedWithin(id, settings, source, () => groupedHandler(projection)(handle)(envelope))(system)
+            .withStatusObserver(BoundedProjections.publishEventProcessed(system, projection)(envelope))
         )
-    )
+    })
 
   /** `handle` gets the events in groups; the offset of a group is stored after it, so `handle` must be idempotent. */
   def groupedWithinAsync(
@@ -137,23 +153,39 @@ object BoundedR2dbcProjection {
     slices: Option[SliceRange] = None,
     adjust: GroupedProjection[Offset, ?] => GroupedProjection[Offset, ?] = identity
   )(handle: Seq[Any] => Future[Done]): GroupedProjection[Offset, ?] =
-    withSource(system, projection, slices)([Envelope] =>
-      (id: ProjectionId, source: SourceProvider[Offset, Envelope], envelope: ProjectionEnvelope[Envelope]) =>
+    withSource(system, projection, slices)(new Build[GroupedProjection[Offset, ?]] {
+      def apply[Envelope](
+        id: ProjectionId,
+        source: SourceProvider[Offset, Envelope],
+        envelope: ProjectionEnvelope[Envelope]
+      ): GroupedProjection[Offset, ?] =
         adjust(
           R2dbcProjection
             .groupedWithinAsync(
               id,
               settings,
               source,
-              () => BoundedHandlers.groupedAsync(projection)(handle)(using envelope)
+              () => BoundedHandlers.groupedAsync(projection)(handle)(envelope)
             )(system)
-            .withStatusObserver(BoundedProjections.publishEventProcessed(system, projection)(using envelope))
+            .withStatusObserver(BoundedProjections.publishEventProcessed(system, projection)(envelope))
         )
-    )
+    })
+
+  /**
+    * Builds a projection for the envelope type of the source that `withSource` picks. A trait with a polymorphic
+    * method rather than a polymorphic function type, which Scala 2.13 does not have.
+    */
+  private trait Build[Result] {
+    def apply[Envelope](
+      id: ProjectionId,
+      source: SourceProvider[Offset, Envelope],
+      envelope: ProjectionEnvelope[Envelope]
+    ): Result
+  }
 
   /** Builds the projection on the source for the journal: by slices on R2DBC, by tag on the others. */
   private def withSource[Result](system: ActorSystem[?], projection: EventProjection, slices: Option[SliceRange])(
-    build: [Envelope] => (ProjectionId, SourceProvider[Offset, Envelope], ProjectionEnvelope[Envelope]) => Result
+    build: Build[Result]
   ): Result =
     if (BoundedProjections.isR2dbcJournal(system)) {
       val range = slices.getOrElse(sliceRanges(system, 1).head)

@@ -11,7 +11,7 @@ object LoggingTestProbe {
   def apply()(implicit system: ActorSystem): TestProbe = {
     val probe = TestProbe()
     probe.setAutoPilot(new TestActor.AutoPilot {
-      def run(sender: ActorRef, msg: Any) = {
+      def run(sender: ActorRef, msg: Any): TestActor.AutoPilot = {
         val other = sender.path
         val me    = probe.ref.path
         system.log.debug(s"$me received $msg from $other")
