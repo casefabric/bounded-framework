@@ -5,7 +5,6 @@
 package io.cafienne.bounded.test
 
 import org.apache.pekko.Done
-import scala.compiletime.uninitialized
 
 import java.util.UUID
 import org.apache.pekko.actor._
@@ -42,7 +41,7 @@ object TestableProjection {
 
 class TestableProjection private (system: ActorSystem, timeout: Timeout, aggregateType: AggregateType) {
 
-  private var eventMaterializers: Option[EventMaterializers] = uninitialized
+  private var eventMaterializers: Option[EventMaterializers] = _
   private implicit val executionContext: ExecutionContext    = system.dispatcher
   private implicit val actorSystem: ActorSystem              = system
   private var materializerId: Option[UUID]                   = None

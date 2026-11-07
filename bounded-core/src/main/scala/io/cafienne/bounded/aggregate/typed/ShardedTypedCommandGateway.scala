@@ -98,7 +98,7 @@ class ShardedTypedCommandGateway[Cmd <: DomainCommand: ClassTag](
   override def shutdown(): Future[Unit] = {
     val region  = ClassicClusterSharding(system.toClassic).shardRegion(entityTypeKey.name)
     val stopped = Promise[Unit]()
-    system.systemActorOf(
+    system.systemActorOf[Nothing](
       Behaviors.setup[Nothing] { context =>
         context.watch(region.toTyped)
         Behaviors.receiveSignal[Nothing] { case (_, Terminated(_)) =>

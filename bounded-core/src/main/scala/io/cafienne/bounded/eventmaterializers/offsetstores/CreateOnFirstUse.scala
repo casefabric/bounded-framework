@@ -5,7 +5,6 @@
 package io.cafienne.bounded.eventmaterializers.offsetstores
 
 import scala.concurrent.{ExecutionContext, Future}
-import scala.compiletime.uninitialized
 
 /**
   * Runs `create` (e.g. creating the offset table) before the first operation of an offset store, without
@@ -16,7 +15,7 @@ import scala.compiletime.uninitialized
   * violation). A failed create is therefore run once more straight away: by then the table exists and it succeeds.
   */
 private[offsetstores] final class CreateOnFirstUse(create: () => Future[Unit])(implicit ec: ExecutionContext) {
-  private var created: Future[Unit] = uninitialized
+  private var created: Future[Unit] = _
 
   def apply(): Future[Unit] = synchronized {
     if (created == null || created.value.exists(_.isFailure)) {

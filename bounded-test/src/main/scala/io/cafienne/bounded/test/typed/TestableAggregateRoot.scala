@@ -198,7 +198,7 @@ class TestableAggregateRoot[A <: DomainCommand, B <: DomainEvent, C] private (
 
   private val wrappedActor = testKit.spawn(supervise, s"supervisor-$arTestId")
   private val eventProbe   = testKit.createTestProbe[Any]("EventStreamProbe")
-  testKit.internalSystem.eventStream.tell(Subscribe[Any](eventProbe.ref)(using ClassTag.Any))
+  testKit.internalSystem.eventStream.tell(Subscribe[Any](eventProbe.ref)(ClassTag.Any))
 
   /**
     * After initialization of the aggregate root, the when allows to send a command and check thereafter what events are
