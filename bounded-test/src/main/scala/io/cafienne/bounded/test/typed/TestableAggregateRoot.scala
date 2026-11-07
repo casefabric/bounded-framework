@@ -16,7 +16,8 @@ import io.cafienne.bounded.test.typed.TestableAggregateRoot._
 
 import scala.reflect.ClassTag
 import org.apache.pekko.util.Timeout
-import io.cafienne.bounded.aggregate.{DomainCommand, DomainEvent, HandlingFailure}
+import io.cafienne.bounded.aggregate.{DomainCommand, DomainEvent, HandlingFailure, Ko}
+import org.apache.pekko.actor.typed.ActorRef
 import io.cafienne.bounded.aggregate.typed._
 
 import scala.concurrent.duration.Duration
@@ -65,6 +66,8 @@ object TestableAggregateRoot {
       extends Exception(s"Expected handling of command [$command] to fail")
 
   case object NoCommandsIssued extends Exception("Expected one or more commands, but got none")
+
+  case object NoReply extends Exception("No reply: send the command with whenAsk")
 
   case class PersistenceIdMismatch(expected: String, actual: String)
       extends Exception(
@@ -143,6 +146,7 @@ class TestableAggregateRoot[A <: DomainCommand, B <: DomainEvent, C] private (
   // Set by the supervising actor, read by the test
   @volatile private var lastFailure: Option[HandlingFailure] = Option.empty
   private var lastCommand: Option[DomainCommand]             = Option.empty
+  private var lastReplies: List[Any]                         = Nil
 
   import TestableAggregateRoot.testId
   private final val arTestId    = testId(id)
@@ -209,6 +213,7 @@ class TestableAggregateRoot[A <: DomainCommand, B <: DomainEvent, C] private (
     */
   def when(command: A): TestableAggregateRoot[A, B, C] = {
     if (command.aggregateRootId != id) throw MisdirectedCommand(id, command)
+    lastReplies = Nil
     wrappedActor.tell(command)
     lastCommand = Some(command)
     // The first command also recovers the aggregate, so allow the caller's timeout instead of the probe default (3s)
@@ -217,6 +222,62 @@ class TestableAggregateRoot[A <: DomainCommand, B <: DomainEvent, C] private (
     Thread.sleep(500)
     this
   }
+
+  /**
+    * Sends a command built with a reply ref, and waits for the reply (the caller's timeout), also when the aggregate
+    * replies only after an asynchronous step (`pipeToSelf`, e.g. a call to another system) and the persist after
+    * it. The reply is `reply` then; a `Ko` reply is also the `failure`. `events` shows what the command persisted.
+    *
+    * {{{
+    * TestableAggregateRoot
+    *   .givenEvents(manager, "order-1", OrderPlaced("order-1"))
+    *   .whenAsk(replyTo => ShipOrder("order-1", replyTo))
+    *   .reply shouldBe a[Persisted]
+    * }}}
+    */
+  def whenAsk(command: ActorRef[Any] => A): TestableAggregateRoot[A, B, C] = whenAskAll(command)
+
+  /**
+    * Sends the commands one after the other without waiting, and then waits for a reply to each, in the order the
+    * replies arrive (`replies`). Use it to check what an aggregate does with commands that arrive while it waits,
+    * e.g. that it stashes them until an asynchronous step is done.
+    */
+  def whenAskAll(commands: (ActorRef[Any] => A)*): TestableAggregateRoot[A, B, C] = {
+    if (commands.isEmpty) throw NoCommandsIssued
+    val probe = testKit.createTestProbe[Any]()
+    lastFailure = None
+    commands.foreach { build =>
+      val command = build(probe.ref)
+      if (command.aggregateRootId != id) throw MisdirectedCommand(id, command)
+      wrappedActor.tell(command)
+      lastCommand = Some(command)
+    }
+    lastReplies = awaitReplies(probe, commands.size)
+    this
+  }
+
+  // Waits for the replies, but stops early when the aggregate failed: it will not reply then.
+  private def awaitReplies(
+    probe: org.apache.pekko.actor.testkit.typed.scaladsl.TestProbe[Any],
+    expected: Int
+  ): List[Any] = {
+    val deadline = timeout.duration.fromNow
+    var replies  = List.empty[Any]
+    while (replies.size < expected && lastFailure.isEmpty && deadline.hasTimeLeft()) {
+      val wait = deadline.timeLeft.min(scala.concurrent.duration.Duration(100, "millis"))
+      try replies = replies :+ probe.receiveMessage(wait)
+      catch { case _: AssertionError => () }
+    }
+    if (replies.size < expected && lastFailure.isEmpty)
+      throw new AssertionError(s"Expected $expected replies within ${timeout.duration}, got ${replies.size}: $replies")
+    replies
+  }
+
+  /** The reply to the last command sent with `whenAsk`. */
+  def reply: Any = lastReplies.lastOption.getOrElse(throw NoReply)
+
+  /** The replies to the commands sent with the last `whenAsk` or `whenAskAll`, in the order they arrived. */
+  def replies: List[Any] = lastReplies
 
   private def assumingCommandIssued[T](thunk: DomainCommand => T): T =
     lastCommand.fold(throw NoCommandsIssued)(thunk)
@@ -229,9 +290,13 @@ class TestableAggregateRoot[A <: DomainCommand, B <: DomainEvent, C] private (
     persistenceTestKit.persistedInStorage(persistenceId).map(_.asInstanceOf[B]).toList.filterNot(unwanted)
   }
 
-  /** Last known command handling failure */
+  /** Last known command handling failure: an exception the aggregate threw, or a `Ko` reply to `whenAsk`. */
   def failure: HandlingFailure =
-    assumingCommandIssued(c => lastFailure.getOrElse(throw UnexpectedCommandHandlingSuccess(c)))
+    assumingCommandIssued(c =>
+      lastFailure
+        .orElse(lastReplies.reverse.collectFirst { case Ko(failure) => failure })
+        .getOrElse(throw UnexpectedCommandHandlingSuccess(c))
+    )
 
   override def toString: String = {
     s"Aggregate Root ${ctag.runtimeClass.getSimpleName} $id"

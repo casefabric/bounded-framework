@@ -23,7 +23,9 @@ import org.apache.pekko.projection.eventsourced.scaladsl.EventSourcedProvider
 import org.apache.pekko.projection.scaladsl.{Handler, SourceProvider}
 import io.cafienne.bounded.eventmaterializers.EventProcessed
 import io.cafienne.bounded.pekko.persistence.ReadJournalProvider
+import io.cafienne.bounded.readside.{ProjectionDown, ProjectionFailure, ProjectionProgress, ReadSideRegistry}
 
+import java.util.concurrent.ConcurrentHashMap
 import scala.concurrent.Future
 
 /**
@@ -102,9 +104,13 @@ object BoundedProjections {
     )
 
   /**
-    * Publishes an `EventProcessed` on the event stream after an event is processed (for an exactly-once projection:
-    * once it is committed), when `bounded.eventmaterializers.publish` is on, like the event materializers do. Events
-    * the filter rejects are not published.
+    * The status observer of every Bounded projection. When `bounded.eventmaterializers.publish` is on it publishes
+    * on the event stream, like the event materializers do:
+    *  - after an event is processed (for an exactly-once projection: once it is committed) an `EventProcessed`
+    *    when the filter accepts the event, and a `ProjectionProgress` for every event;
+    *  - a `ProjectionFailure` when the handler fails on an event, final when the recovery strategy gives up on it;
+    *  - a `ProjectionDown` when the projection's stream fails.
+    * It also registers the projection with the `ReadSideRegistry`, so it can be waited for.
     */
   private[projection] def publishEventProcessed[Envelope](system: ActorSystem[?], projection: EventProjection)(
     implicit envelope: ProjectionEnvelope[Envelope]
@@ -112,34 +118,65 @@ object BoundedProjections {
     val config  = system.settings.config
     val publish = config.hasPath("bounded.eventmaterializers.publish") &&
       config.getBoolean("bounded.eventmaterializers.publish")
+    val readSideId = projection.readSideId
+    if (publish) ReadSideRegistry(system.classicSystem).register(readSideId)
+
+    def emit(message: AnyRef): Unit = if (publish) system.eventStream ! EventStream.Publish(message)
+
     new StatusObserver[Envelope] {
+      // The failed attempts per event, to know when the recovery strategy gives up on it
+      private val attempts = new ConcurrentHashMap[(String, Long), Integer]()
+
       override def started(projectionId: ProjectionId): Unit                       = ()
-      override def failed(projectionId: ProjectionId, cause: Throwable): Unit      = ()
       override def stopped(projectionId: ProjectionId): Unit                       = ()
       override def beforeProcess(projectionId: ProjectionId, env: Envelope): Unit  = ()
       override def offsetProgress(projectionId: ProjectionId, env: Envelope): Unit = ()
+
+      override def failed(projectionId: ProjectionId, cause: Throwable): Unit = {
+        attempts.clear()
+        emit(ProjectionDown(readSideId, cause))
+      }
+
       override def error(
         projectionId: ProjectionId,
         env: Envelope,
         cause: Throwable,
         recoveryStrategy: HandlerRecoveryStrategy
-      ): Unit = ()
+      ): Unit = {
+        val key     = (envelope.persistenceId(env), envelope.sequenceNr(env))
+        val attempt = attempts.merge(key, 1, (a: Integer, b: Integer) => Integer.valueOf(a + b)).intValue()
+        val isFinal = attempt > retriesOf(recoveryStrategy)
+        if (isFinal) { attempts.remove(key); () }
+        emit(ProjectionFailure(readSideId, key._1, key._2, cause, isFinal))
+      }
 
       override def afterProcess(projectionId: ProjectionId, env: Envelope): Unit = {
-        val event = envelope.event(env)
-        if (publish && projection.accepts(event)) {
-          system.eventStream ! EventStream.Publish(
-            EventProcessed(
-              projection.materializerId,
-              envelope.offset(env),
-              envelope.persistenceId(env),
-              envelope.sequenceNr(env),
-              event
-            )
-          )
+        val event         = envelope.event(env)
+        val persistenceId = envelope.persistenceId(env)
+        val sequenceNr    = envelope.sequenceNr(env)
+        if (!attempts.isEmpty) { attempts.remove((persistenceId, sequenceNr)); () }
+        if (projection.accepts(event)) {
+          emit(EventProcessed(projection.materializerId, envelope.offset(env), persistenceId, sequenceNr, event))
         }
+        emit(ProjectionProgress(readSideId, persistenceId, sequenceNr))
       }
     }
+  }
+
+  /**
+    * The number of retries after the first attempt of a recovery strategy: 0 for `fail` and `skip`, n for
+    * `retryAndFail(n, _)` and `retryAndSkip(n, _)`. Pekko keeps the strategy classes internal, so they are read as
+    * the case classes they are; an unknown strategy is taken to retry without end, so its failures are never final.
+    */
+  private[projection] def retriesOf(strategy: HandlerRecoveryStrategy): Int = strategy match {
+    case p: Product if p.productPrefix == "Fail" || p.productPrefix == "Skip" => 0
+    case p: Product
+        if (p.productPrefix == "RetryAndFail" || p.productPrefix == "RetryAndSkip") && p.productArity == 2 =>
+      p.productElement(0) match {
+        case retries: Int => retries
+        case _            => Int.MaxValue
+      }
+    case _ => Int.MaxValue
   }
 
   private def configuredJournal(system: ActorSystem[?]): String =

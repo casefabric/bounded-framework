@@ -38,6 +38,12 @@ trait EventProjection {
   /** The id of the projection: its name, and the aggregate type as its key. */
   final def projectionId: ProjectionId = ProjectionId(projectionName, aggregateType.name)
 
+  /**
+    * The id under which the projection publishes its progress, and under which `ReadSideRegistry.awaitProcessed`
+    * waits for it: the id of `projectionId`, `name-aggregatetype`. All slice ranges of an R2DBC projection share it.
+    */
+  final def readSideId: String = projectionId.id
+
   /** Whether the filter accepts the event. */
   private[projection] final def accepts(event: Any): Boolean = event match {
     case domainEvent: DomainEvent => eventFilter.filter(domainEvent)

@@ -82,13 +82,13 @@ class AggregateTypeMigrationSafetySpec extends AnyWordSpec with Matchers with Sc
     "copy nothing when a target is an old stream that is migrated itself" in withJournal { implicit system =>
       legacyUnder("q", Append(Seq(Created("q"))))
       // a 1.0.0 stream under the target's id that the rule moves to another type
-      legacyUnder("simple|q", Append(Seq(TypedSimpleAggregateCreated("q"))))
+      legacyUnder("simple|q", Append(Seq(typedSimpleAggregateCreated("q"))))
 
       val migrated = new AggregateTypeMigration(system, rule).migrate().futureValue
 
       migrated.verified shouldBe false
       migrated.conflicts shouldBe Seq("simple|q is a target of q, but is migrated itself")
-      events("simple|q") shouldBe Seq(TypedSimpleAggregateCreated("q"))
+      events("simple|q") shouldBe Seq(typedSimpleAggregateCreated("q"))
       persistenceIds() should not contain s"${Typed.name}|q"
     }
 
@@ -167,7 +167,7 @@ class AggregateTypeMigrationSafetySpec extends AnyWordSpec with Matchers with Sc
     }
   }
 
-  private def TypedSimpleAggregateCreated(id: String) =
+  private def typedSimpleAggregateCreated(id: String) =
     io.cafienne.bounded.aggregate.TypedSimpleAggregate.Created(id, meta)
 
   private def legacyUnder(persistenceId: String, command: Any)(implicit system: ActorSystem): Unit = {

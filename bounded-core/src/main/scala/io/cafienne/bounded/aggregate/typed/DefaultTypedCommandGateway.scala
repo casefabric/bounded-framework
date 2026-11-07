@@ -4,6 +4,7 @@
 
 package io.cafienne.bounded.aggregate.typed
 
+import org.apache.pekko.actor.NoSerializationVerificationNeeded
 import org.apache.pekko.actor.typed.{ActorRef, ActorSystem, Behavior, PostStop, Scheduler, Terminated}
 import org.apache.pekko.actor.typed.scaladsl.{ActorContext, Behaviors, TimerScheduler}
 import org.apache.pekko.pattern.StatusReply
@@ -11,7 +12,6 @@ import org.apache.pekko.util.Timeout
 import io.cafienne.bounded.aggregate.{CommandValidator, DomainCommand, ValidateableCommand}
 
 import java.net.URLEncoder
-import scala.annotation.nowarn
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.atomic.AtomicInteger
 import scala.concurrent.duration._
@@ -53,16 +53,7 @@ class DefaultTypedCommandGateway[Cmd <: DomainCommand](
 
   object CommandGatewayGuardian {
 
-    sealed trait AggregateControl
-    // Scala 2.13 cannot check the outer (gateway) reference in the generated equals; there is one guardian per
-    // gateway, so the messages never meet those of another gateway.
-    @nowarn("msg=outer reference")
-    final case class SpawnAggregate(aggregateId: String, replyTo: ActorRef[StatusReply[ActorRef[Cmd]]])
-        extends AggregateControl
-    @nowarn("msg=outer reference")
-    final case class StopAggregate(aggregateId: String)         extends AggregateControl
-    private case class AggregateTerminated(aggregateId: String) extends AggregateControl
-    case object GracefulShutdown                                extends AggregateControl
+    import DefaultTypedCommandGateway._
 
     val aggregates = collection.mutable.Map[String, ActorRef[Cmd]]()
 
@@ -105,15 +96,16 @@ class DefaultTypedCommandGateway[Cmd <: DomainCommand](
       }
     }
 
-    def behaviors(timers: TimerScheduler[AggregateControl]): Behavior[CommandGatewayGuardian.AggregateControl] =
+    def behaviors(timers: TimerScheduler[AggregateControl]): Behavior[AggregateControl] =
       Behaviors
         .receive[AggregateControl] { (context, message) =>
           message match {
-            case SpawnAggregate(aggregateId, replyTo) if stopping.contains(aggregateId) =>
+            case SpawnAggregate(aggregateId, replyTo: ActorRef[StatusReply[ActorRef[Cmd]]] @unchecked)
+                if stopping.contains(aggregateId) =>
               context.log.debug("Aggregate {} is stopping, it is created again once it has stopped", aggregateId)
               stopping += aggregateId -> (stopping(aggregateId) :+ replyTo)
               Behaviors.same
-            case SpawnAggregate(aggregateId, replyTo) =>
+            case SpawnAggregate(aggregateId, replyTo: ActorRef[StatusReply[ActorRef[Cmd]]] @unchecked) =>
               context.log.debug("Find or create aggregate {}", aggregateId)
               replyTo ! findOrCreate(context, timers, aggregateId)
               Behaviors.same
@@ -187,20 +179,29 @@ class DefaultTypedCommandGateway[Cmd <: DomainCommand](
   }
 
   private def spawnAggregateRoot(aggregateRootId: String): Future[ActorRef[Cmd]] = {
-    gateway.askWithStatus(CommandGatewayGuardian.SpawnAggregate(aggregateRootId, _))
+    gateway.askWithStatus[ActorRef[Cmd]](DefaultTypedCommandGateway.SpawnAggregate[Cmd](aggregateRootId, _))
   }
 
   /**
     * Stops the gateway and its aggregates. The future completes when they have stopped.
     */
   def shutdown(): Future[Unit] = {
-    gateway ! CommandGatewayGuardian.GracefulShutdown
+    gateway ! DefaultTypedCommandGateway.GracefulShutdown
     CommandGatewayGuardian.stopped.future
   }
 
 }
 
 object DefaultTypedCommandGateway {
+
+  // The guardian's own messages. They live here, not in the generic gateway class, so they have no outer reference;
+  // they never leave the node, so `serialize-messages = on` does not check them.
+  private[typed] sealed trait AggregateControl extends NoSerializationVerificationNeeded
+  private[typed] final case class SpawnAggregate[C](aggregateId: String, replyTo: ActorRef[StatusReply[ActorRef[C]]])
+      extends AggregateControl
+  private[typed] final case class StopAggregate(aggregateId: String)       extends AggregateControl
+  private[typed] final case class AggregateTerminated(aggregateId: String) extends AggregateControl
+  private[typed] case object GracefulShutdown                              extends AggregateControl
   private val gatewayCount = new AtomicInteger()
 
   // Gateways for the same manager class get their own guardian name.

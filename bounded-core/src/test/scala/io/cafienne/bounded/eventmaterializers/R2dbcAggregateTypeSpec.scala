@@ -12,6 +12,7 @@ import org.apache.pekko.persistence.Persistence
 import org.apache.pekko.persistence.query.{NoOffset, TimestampOffset}
 import org.apache.pekko.testkit.{TestKit, TestProbe}
 import org.apache.pekko.util.Timeout
+import com.typesafe.config.ConfigFactory
 import com.typesafe.scalalogging.Logger
 import io.cafienne.bounded.R2dbcPostgres
 import io.cafienne.bounded.aggregate.{
@@ -43,6 +44,13 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration._
 import scala.jdk.CollectionConverters._
 
+object R2dbcAggregateTypeSpec {
+  // The db_timestamp of a copied row: some time before now, or just before another event
+  sealed trait CopiedAt
+  final case class MillisAgo(millis: Long)                    extends CopiedAt
+  final case class Before(persistenceId: String, seqNr: Long) extends CopiedAt
+}
+
 /**
   * Event materializers and combined logic on the R2DBC journal (Postgres in a container), reading aggregate types by entity
   * type. Canceled when Docker is not available.
@@ -54,9 +62,16 @@ class R2dbcAggregateTypeSpec
     with Eventually
     with BeforeAndAfterAll {
   import DockerTests.dockerAvailable
+  import R2dbcAggregateTypeSpec._
 
   implicit override val patienceConfig: PatienceConfig =
     PatienceConfig(timeout = Span(30, Seconds), interval = Span(100, Millis))
+
+  // Backtracking reads events once they are this old. Longer than the shared 1s, so that a slow machine does not let
+  // it pass an event before the test writes a late row behind it.
+  private val behindCurrentTime = 3.seconds
+  // Long enough for backtracking to read its window again after an event
+  private val backtrackingPass = behindCurrentTime + 2.seconds
 
   private var database: Option[R2dbcPostgres]  = None
   private var actorSystem: Option[ActorSystem] = None
@@ -65,7 +80,14 @@ class R2dbcAggregateTypeSpec
   private lazy val system: ActorSystem = {
     val postgres = new R2dbcPostgres()
     database = Some(postgres)
-    val created = ActorSystem("R2dbcAggregateTypeSpec", postgres.config)
+    val created = ActorSystem(
+      "R2dbcAggregateTypeSpec",
+      ConfigFactory
+        .parseString(
+          s"pekko.persistence.r2dbc.query.backtracking.behind-current-time = ${behindCurrentTime.toMillis}ms"
+        )
+        .withFallback(postgres.config)
+    )
     actorSystem = Some(created)
     created
   }
@@ -162,11 +184,12 @@ class R2dbcAggregateTypeSpec
       send(Props(classOf[ClassicSimpleAggregate], id), Create(id))
       eventually(view.handled should contain(Created(id)))
 
-      // a row of an earlier transaction that becomes visible after the view has read past its timestamp
-      copyEvent(s"order|$source", 2L, s"simple|late-copy", 1L, millisAgo = 3000)
+      // a row of an earlier transaction that becomes visible after the view has read past its timestamp: just before
+      // the live event, which backtracking has not reached yet
+      copyEvent(s"order|$source", 2L, s"simple|late-copy", 1L, Before(s"simple|$id", 1L))
 
       eventually(view.handled should contain(ItemAdded(source, "late")))
-      Thread.sleep(3000) // backtracking reads its window again
+      Thread.sleep(backtrackingPass.toMillis) // backtracking reads its window again
       view.handled.count(_ == ItemAdded(source, "late")) shouldBe 1
       view.handled.count(_ == Created(id)) shouldBe 1
 
@@ -185,16 +208,16 @@ class R2dbcAggregateTypeSpec
       val view            = new TypeView("gap-view", Simple, keepOffset = false)
       val (killSwitch, _) = view.registerListenerWithKillSwitch(Some(NoOffset))
 
-      copyEvent(s"order|$source", 2L, "simple|gap", 1L, millisAgo = 0)
+      copyEvent(s"order|$source", 2L, "simple|gap", 1L, MillisAgo(0))
       eventually(view.handled should contain(ItemAdded(source, "gap 1")))
       // event 2 is committed with an older timestamp than event 3, so the query reads 3 first
-      copyEvent(s"order|$source", 3L, "simple|gap", 2L, millisAgo = 3000)
-      copyEvent(s"order|$source", 4L, "simple|gap", 3L, millisAgo = 0)
+      copyEvent(s"order|$source", 3L, "simple|gap", 2L, MillisAgo(3000))
+      copyEvent(s"order|$source", 4L, "simple|gap", 3L, MillisAgo(0))
 
       eventually(view.handled.collect { case ItemAdded(`source`, item) =>
         item
       } shouldBe Seq("gap 1", "gap 2", "gap 3"))
-      Thread.sleep(3000) // backtracking delivers event 2 again
+      Thread.sleep(backtrackingPass.toMillis) // backtracking delivers event 2 again
       view.handled.collect { case ItemAdded(`source`, item) => item } shouldBe Seq("gap 1", "gap 2", "gap 3")
       killSwitch.shutdown()
     }
@@ -233,7 +256,7 @@ class R2dbcAggregateTypeSpec
           ItemAdded(id, "combined logic order")
         )
       )
-      Thread.sleep(3000) // backtracking reads its window again
+      Thread.sleep(backtrackingPass.toMillis) // backtracking reads its window again
       second.handled.count(_ == ItemAdded(id, "combined logic simple")) shouldBe 1
       second.handled.count(_ == ItemAdded(id, "combined logic order")) shouldBe 1
       // The events at the stored offsets are not handled again. Older ones within the backtracking window before them
@@ -274,22 +297,24 @@ class R2dbcAggregateTypeSpec
   }
 
   // Inserts a copy of a stored event under another persistence id, with a db_timestamp the given time in the past.
-  private def copyEvent(fromPid: String, fromSeqNr: Long, toPid: String, toSeqNr: Long, millisAgo: Long): Unit = {
-    val entityType = AggregateType.of(toPid).get.name
-    val inserted   = db.update(
-      """INSERT INTO event_journal (slice, entity_type, persistence_id, seq_nr, db_timestamp, event_ser_id,
+  private def copyEvent(fromPid: String, fromSeqNr: Long, toPid: String, toSeqNr: Long, at: CopiedAt): Unit = {
+    val entityType           = AggregateType.of(toPid).get.name
+    val (timestamp, atBinds) = at match {
+      case MillisAgo(millis)  => ("now() - (? * interval '1 millisecond')", Seq(millis))
+      case Before(pid, seqNr) =>
+        (
+          "(SELECT db_timestamp FROM event_journal WHERE persistence_id = ? AND seq_nr = ?) - interval '1 millisecond'",
+          Seq(pid, seqNr)
+        )
+    }
+    val inserted = db.update(
+      s"""INSERT INTO event_journal (slice, entity_type, persistence_id, seq_nr, db_timestamp, event_ser_id,
         |  event_ser_manifest, event_payload, deleted, writer, adapter_manifest, tags)
-        |SELECT ?, ?, ?, ?, now() - (? * interval '1 millisecond'), event_ser_id, event_ser_manifest, event_payload,
+        |SELECT ?, ?, ?, ?, $timestamp, event_ser_id, event_ser_manifest, event_payload,
         |  false, writer, adapter_manifest, ARRAY[?]
         |FROM event_journal WHERE persistence_id = ? AND seq_nr = ?""".stripMargin,
-      Persistence(system).sliceForPersistenceId(toPid),
-      entityType,
-      toPid,
-      toSeqNr,
-      millisAgo,
-      entityType,
-      fromPid,
-      fromSeqNr
+      (Seq[Any](Persistence(system).sliceForPersistenceId(toPid), entityType, toPid, toSeqNr) ++ atBinds ++
+        Seq[Any](entityType, fromPid, fromSeqNr))*
     )
     inserted shouldBe 1
     ()

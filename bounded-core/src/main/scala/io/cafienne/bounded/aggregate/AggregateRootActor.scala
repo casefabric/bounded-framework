@@ -102,6 +102,13 @@ trait AggregateRootActor[A <: AggregateState[A]]
     */
   val deleteOlderSnapshots: Boolean = true
 
+  /**
+    * Reply `Persisted(events, position)` instead of `Ok(events)` once the events of a command are stored, so the
+    * caller can wait until a read side shows them (`readside.ReadSideRegistry`). A command without events is still
+    * answered with `Ok(Nil)`: there is nothing to wait for.
+    */
+  val replyWithPosition: Boolean = false
+
   // Sender of the command whose events are being persisted. persistAll stashes new commands until all
   // its handlers ran, so there is at most one; it is needed when the journal reports a failure.
   private var persistingFor: Option[ActorRef] = None
@@ -111,8 +118,14 @@ trait AggregateRootActor[A <: AggregateState[A]]
       val originalSender = sender()
       val reply          = handleCommand(cmd, internalState)
 
-      reply match {
-        case Ok(events) if events.nonEmpty =>
+      val toPersist = reply match {
+        case Ok(events)           => events
+        case Persisted(events, _) => events
+        case _: Ko                => Seq.empty
+      }
+
+      toPersist match {
+        case events if events.nonEmpty =>
           // Reply only when the last event is stored, so the caller never gets Ok for events that are not.
           val lastEventSequenceNr = lastSequenceNr + events.size
           persistingFor = Some(originalSender)
@@ -127,7 +140,9 @@ trait AggregateRootActor[A <: AggregateState[A]]
             }
             if (lastSequenceNr == lastEventSequenceNr) {
               persistingFor = None
-              originalSender ! reply
+              originalSender ! (if (replyWithPosition)
+                                  Persisted(events, EventPosition(persistenceId, lastEventSequenceNr))
+                                else Ok(events))
             }
           }
         case _ =>
