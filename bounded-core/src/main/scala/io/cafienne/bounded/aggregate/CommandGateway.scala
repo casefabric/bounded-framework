@@ -4,7 +4,15 @@
 
 package io.cafienne.bounded.aggregate
 
-import org.apache.pekko.actor.{Actor, ActorRef, ActorSystem, PoisonPill, Props, Timers}
+import org.apache.pekko.actor.{
+  Actor,
+  ActorRef,
+  ActorSystem,
+  NoSerializationVerificationNeeded,
+  PoisonPill,
+  Props,
+  Timers
+}
 import org.apache.pekko.event.{Logging, LoggingAdapter}
 import org.apache.pekko.routing.{NoRoutee, Routee, RoutingLogic}
 import org.apache.pekko.util.Timeout
@@ -166,7 +174,9 @@ private final class AggregateRoutingLogic(routeeMap: collection.mutable.Map[Stri
 }
 
 object AggregateRoutingLogic {
-  trait AggregateControl
+
+  /** The gateway's own messages; they never leave the node, so `serialize-messages = on` does not check them. */
+  trait AggregateControl                              extends NoSerializationVerificationNeeded
   final case class StopAggregate(aggregateId: String) extends AggregateControl
   private[aggregate] final case class AggregateTerminated(aggregateId: String, aggregate: ActorRef)
       extends AggregateControl

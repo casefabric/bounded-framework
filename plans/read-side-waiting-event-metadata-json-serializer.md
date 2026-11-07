@@ -4,6 +4,16 @@ Nov 7, 2026 · @Olger Warnier · extracted from the ev-operations migration plan
 
 ## Summary
 
+**Status (Nov 7, 2026): implemented on branch `read-side-metadata-serializer`**, all tests green on Scala 3.3.9 and 2.13.18. Done: W1, W2, W2a, W3, W5, M1–M3, M5, S1–S4, T1, T2, X1, X2. Not done: W4 (cluster variant, a follow-up) and M4 (logging MDC in the gateways; asynchronous gateways make a thread-local MDC of little use). Where the code differs from the items below:
+
+- **Names.** The signals live in `bounded-core` (`io.cafienne.bounded.readside`), so they are keyed by a `readSideId: String`, not Pekko's `ProjectionId` (bounded-core has no projection dependency): `EventProjection.readSideId` (the projection id, shared by all slice ranges) or a materializer's `viewIdentifier`. `ProjectionFailure` has `isFinal` (`final` is a keyword). The pending reasons are `Pending.TimedOut` and `Pending.Down(cause)`.
+- **Registration.** "A projection id the registry does not know" means one that never registered: projections register when they are built (with publishing on), materializers when they start listening; `ReadSideRegistry.register(id)` for anything else. "Not started" became "publishing is off" (`bounded.eventmaterializers.publish`), the one case where nothing can ever complete.
+- **`ProjectionDown`** completes the waiters at that moment with `Pending(Down)`; later waiters wait as usual, because the projection may already have restarted.
+- **Materializers** publish non-final failures per failed attempt and, when their restarts are used up, a final failure for the event they last failed on plus `ProjectionDown`. A replaying materializer publishes nothing.
+- **S1.** Pekko itself refuses a second serializer with the same identifier when the actor system starts, so the base only refuses Pekko's reserved ids 0–40. `EventFormat.apply` / `withMetaData` take spray-json codecs.
+- **X1** also moved the typed gateway's guardian protocol into the `DefaultTypedCommandGateway` companion: in the generic class it had an outer reference, and its `@nowarn` gave a warning on Scala 3 that sbt 2's compile cache had hidden on `main`.
+- **T.** `whenAsk(replyTo => command)` and `whenAskAll(...)` on the typed `TestableAggregateRoot`, with `reply`, `replies`, and a `Ko` as `failure`.
+
 The ev-operations backend moves to DDD / CQRS on Bounded, in Bounded's **Scala 2.13 build**, inside the case engine's JVM and on the engine's JDBC journal. Its plan (D3) puts three generic parts in Bounded instead of in the backend, because any Bounded user with a read side, an audit need or stored events needs them:
 
 - **W. Waiting for the read side** ("read your own write"): a reply that says where the command's events are, and a registry that completes once a chosen projection has processed them.
