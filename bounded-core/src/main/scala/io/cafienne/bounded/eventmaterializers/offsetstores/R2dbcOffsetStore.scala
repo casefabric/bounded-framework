@@ -9,15 +9,15 @@ import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.actor.typed.scaladsl.adapter._
 import org.apache.pekko.persistence.query.{NoOffset, Offset}
 import org.apache.pekko.persistence.r2dbc.ConnectionFactoryProvider
-import org.apache.pekko.stream.scaladsl.{Sink, Source}
 import com.typesafe.config.Config
-import io.r2dbc.spi.{ConnectionFactory, Result, Row, RowMetadata}
+import io.r2dbc.spi.{Connection, ConnectionFactory, Result, Row, RowMetadata}
 import org.reactivestreams.Publisher
-import reactor.core.publisher.Mono
+import reactor.core.publisher.{Flux, Mono}
 
-import java.util.function.BiFunction
+import java.util.function.{BiFunction, Function => JFunction}
 
 import scala.concurrent.{ExecutionContext, Future}
+import scala.jdk.CollectionConverters._
 import scala.jdk.FutureConverters._
 
 /**
@@ -30,8 +30,7 @@ import scala.jdk.FutureConverters._
 class R2dbcOffsetStore(system: ActorSystem, connectionFactoryPath: String) extends OffsetStore {
   import R2dbcOffsetStore._
 
-  private implicit val actorSystem: ActorSystem = system
-  private implicit val ec: ExecutionContext     = system.dispatcher
+  private implicit val ec: ExecutionContext = system.dispatcher
 
   private val connectionFactory: ConnectionFactory =
     ConnectionFactoryProvider(system.toTyped).connectionFactoryFor(connectionFactoryPath)
@@ -70,22 +69,35 @@ class R2dbcOffsetStore(system: ActorSystem, connectionFactoryPath: String) exten
       })
     )
 
-  // Runs one statement on a connection from the pool and closes the connection, also when the statement fails.
-  // The connection is taken with Mono.toFuture: a stream that cancels the pool's publisher after its one element
-  // (like Sink.head) keeps the connection from returning to the pool on close, so the pool runs dry.
+  // Runs one statement on a connection from the pool and closes the connection, also when the statement fails or
+  // is cancelled. It stays in Reactor (Flux.usingWhen, concatMap) instead of passing the publishers through Pekko
+  // Streams: a Source.fromPublisher requests results ahead and subscribes to each Result later, on another thread,
+  // and the Postgres driver can then lose a result's row description ("metadata must not be null"). A stream that
+  // cancels the pool's publisher (like Sink.head) also keeps the connection from returning to the pool.
   private def run[T](sql: String, binds: Seq[String])(read: Result => Publisher[T]): Future[Seq[T]] =
-    Mono.from(connectionFactory.create()).toFuture.asScala.flatMap { connection =>
-      val statement = binds.zipWithIndex.foldLeft(connection.createStatement(sql)) { case (stmt, (value, index)) =>
-        stmt.bind(index, value)
-      }
-      val results = Source
-        .fromPublisher(statement.execute())
-        .flatMapConcat(result => Source.fromPublisher(read(result)))
-        .runWith(Sink.seq)
-      results.transformWith { outcome =>
-        Mono.from(connection.close()).toFuture.asScala.transform(_ => outcome)
-      }
-    }
+    Flux
+      .usingWhen[T, Connection](
+        Mono.from[Connection](connectionFactory.create()),
+        new JFunction[Connection, Publisher[T]] {
+          override def apply(connection: Connection): Publisher[T] = {
+            val statement = binds.zipWithIndex.foldLeft(connection.createStatement(sql)) {
+              case (stmt, (value, index)) => stmt.bind(index, value)
+            }
+            Flux
+              .from(statement.execute())
+              .concatMap(new JFunction[Result, Publisher[T]] {
+                override def apply(result: Result): Publisher[T] = read(result)
+              })
+          }
+        },
+        new JFunction[Connection, Publisher[?]] {
+          override def apply(connection: Connection): Publisher[?] = connection.close()
+        }
+      )
+      .collectList()
+      .toFuture
+      .asScala
+      .map(_.asScala.toSeq)
 }
 
 object R2dbcOffsetStore {
