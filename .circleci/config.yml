@@ -33,7 +33,10 @@ jobs:
             sudo apt-get install -y sbt
             sudo apt-get clean && sudo apt-get autoclean
       - add_ssh_keys
-      - checkout
+      # A full clone: the default blobless clone leaves out the blobs of older commits, and the SonarCloud
+      # scanner's git blame (JGit, which cannot fetch them lazily) then fails with "Missing blob"
+      - checkout:
+          method: full
       - restore_cache:
           keys:
             - v3-dependencies-{{ checksum "build.sbt" }}-{{ checksum "project/Dependencies.scala" }}-{{ checksum "project/plugins.sbt" }}-{{ checksum "project/build.properties" }}
