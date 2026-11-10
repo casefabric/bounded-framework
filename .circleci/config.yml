@@ -50,9 +50,22 @@ jobs:
           name: Run tests on Scala 2.13
           # The sbt server keeps the coverage setting of the previous step, so switch it off first
           command: cat /dev/null | sbt "coverageOff; ++2.13.18; test"
-          #- store_artifacts: # for display in Artifacts: https://circleci.com/docs/2.0/artifacts/
-          #path: target/universal/samplescala.zip
-          #destination: samplescala
+      - run:
+          # The step log keeps only its last 400 kB, so a failed test is often cut off there; the JUnit reports
+          # (one folder per Scala version and module) show it in the job's Tests tab, also when a test step failed
+          name: Collect test reports
+          when: always
+          command: |
+            mkdir -p ~/test-results
+            for dir in target/out/jvm/scala-*/*/test-reports; do
+              if [ -d "$dir" ]; then
+                target=$(echo "$dir" | cut -d/ -f4,5 | tr / -)
+                mkdir -p ~/test-results/"$target"
+                cp "$dir"/*.xml ~/test-results/"$target"/ 2>/dev/null || true
+              fi
+            done
+      - store_test_results:
+          path: ~/test-results
       - save_cache:
           key: v3-dependencies-{{ checksum "build.sbt" }}-{{ checksum "project/Dependencies.scala" }}-{{ checksum "project/plugins.sbt" }}-{{ checksum "project/build.properties" }}
           paths:
